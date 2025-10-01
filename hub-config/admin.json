@@ -1,20 +1,20 @@
 {
     "schema_version": "https://raw.githubusercontent.com/hubverse-org/schemas/main/v5.1.0/admin-schema.json",
-    "name": "Template Forecast Hub",
-    "maintainer": "Consortium of Infectious Disease Modeling Hubs",
+    "name": "Reich Lab Forecasting Testbed for 2025-2026 season",
+    "maintainer": "Reich Lab @ UMass-Amherst",
     "contact": {
-        "name": "Joe Bloggs",
-        "email": "j.bloggs@cidmh.com"
+        "name": "Nick Reich",
+        "email": "nick@umass.edu"
     },
     "repository": {
         "host": "github",
-        "owner": "hubverse-org",
-        "name": "hubTemplate"
+        "owner": "reichlab",
+        "name": "forecast-sandbox-2025-2026"
     },
-    "file_format": ["csv", "parquet"],
+    "file_format": ["csv"],
     "timezone": "US/Eastern",
     "cloud": {
-        "enabled": true,
+        "enabled": false,
         "host": {
             "name": "aws",
             "storage_service": "s3",
