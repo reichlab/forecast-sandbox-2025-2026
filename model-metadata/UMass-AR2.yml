@@ -15,10 +15,7 @@ model_contributors: [
     "email": "nick@umass.edu"
   }
 ]
-website_url: "https://github.com/reichlab/idmodels"
 license: "CC-BY-4.0"
-citation: "citation"
-team_funding: "funding"
 designated_model: true
 methods: "An AR(2) model fit separately to each location."
 data_inputs: "Weekly incident flu hospitalizations from NHSN."
