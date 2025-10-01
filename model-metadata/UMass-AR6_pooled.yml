@@ -1,7 +1,7 @@
 team_name: "UMass-Amherst"
 team_abbr: "UMass"
-model_name: "AR(2)"
-model_abbr: "AR2"
+model_name: "AR(6) pooled"
+model_abbr: "AR6_pooled"
 model_version: "1.0"
 model_contributors: [
   {
