@@ -24,7 +24,7 @@ def main(today_date: str | None = None):
     
     model_config = SimpleNamespace(
         model_class = "sarix",
-        model_name = "AR6_pooled",
+        model_name = "AR6_pooled_xmas",
         
         # data sources and adjustments for reporting issues
         sources = ["nhsn"],

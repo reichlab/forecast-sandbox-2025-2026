@@ -1,8 +1,8 @@
-# AR2 model for influenza
+# AR6 model with pooling and a holiday covariate for influenza
 
 # To run locally without Docker
 
-To test this out locally, run the following with this directory, e.g. `AR6_pooled` as your working directory.
+To test this out locally, run the following with this directory, e.g. `AR6_pooled_xmas` as your working directory.
 
 ```bash
 python -m venv .venv

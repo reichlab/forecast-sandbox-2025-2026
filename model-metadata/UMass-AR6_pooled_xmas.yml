@@ -21,6 +21,7 @@ methods: "An AR(6) model fit jointly to all locations with shared AR parameters 
 data_inputs: "Weekly incident flu hospitalizations from NHSN."
 methods_long: "
   This is an AR(6) model fit jointly to all locations using Bayesian methods.
+  Specifically, the model fits pooled theta parameters for the AR model.
   Prior to model estimation, we perform the following three data transformations:
    1. Convert hospitalization counts to a rate per 100,000 population.
    2. Take the fourth root.
