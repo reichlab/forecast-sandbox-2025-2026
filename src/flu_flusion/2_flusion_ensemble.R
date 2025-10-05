@@ -36,7 +36,7 @@ model_out_tbl <- dplyr::bind_rows(
 # save
 reference_date <- model_out_tbl$reference_date[1]
 
-output_dir <- "output/model-output/UMass-flusion"
+output_dir <- "../../model-output/UMass-flusion"
 if (!dir.exists(output_dir)) {
   dir.create(output_dir, recursive = TRUE)
 }
