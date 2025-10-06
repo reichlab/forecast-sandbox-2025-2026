@@ -11,7 +11,7 @@ model_contributors: [
   },
   {
     "name": "Thomas Robacker",
-    "affiliation":", "UMass-Amherst",
+    "affiliation":, "UMass-Amherst",
     "email", "trobacker@umass.edu"
   }
 ]
