@@ -9,26 +9,23 @@ model_contributors: [
     "affiliation": "UMass Amherst",
     "email": "elray@umass.edu"
   },
-  {
+    {
     "name": "Thomas Robacker",
-    "affiliation":, "UMass-Amherst",
-    "email", "trobacker@umass.edu"
+    "affiliation": "UMass Amherst",
+    "email": "trobacker@umass.edu"
   }
 ]
-website_url: "https://github.com/reichlab/idmodels"
 license: "CC-BY-4.0"
-citation: "citation"
-team_funding: "This work has been supported by the National Institutes of General Medical Sciences (R35GM119582) and the U.S. CDC(1U01IP001122). The content is solely the responsibility of the authors and does not necessarily represent the official views of NIGMS, the National Institutes of Health, or CDC."
 designated_model: true
 methods: "Ensemble of statistical and machine learning time series models."
-data_inputs: "Weekly incident flu hospitalizations from NHSN, hospitalizations from FluSurv-NET, and outpatient ILI from ILINet."
+data_inputs: "Weekly incident flu hospitalizations from NHSN."
 methods_long: "
   2024/25 season:
   A quantile average of two models:
    1. Gradient boosting quantile regression, fit to NHSN, FluSurv-NET, and ILINet data
    2. An AR(6) model fit to NHSN only, with AR coefficients shared across locations and per-location variance parameters.
   As of 2024-11-23, these are equally weighted.
-  Categorical predictions are derived from the quantile predictions by fitting a monotonic spline to interpolate the quantiles."
-  
+  Categorical predictions are derived from the quantile predictions by fitting a monotonic spline to interpolate the quantiles.
+  "
 ensemble_of_models: true
 ensemble_of_hub_models: false
