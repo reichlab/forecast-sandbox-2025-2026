@@ -28,10 +28,10 @@ categorical_outputs <- idforecastutils::transform_quantile_to_pmf(
   dplyr::mutate(target = "wk flu hosp rate change") |>
   ungroup()
 
-model_out_tbl <- dplyr::bind_rows(
-  model_out_tbl |> dplyr::mutate(output_type_id = as.character(output_type_id)),
-  categorical_outputs
-)
+# model_out_tbl <- dplyr::bind_rows(
+#   model_out_tbl |> dplyr::mutate(output_type_id = as.character(output_type_id)),
+#   categorical_outputs
+# )
 
 # save
 reference_date <- model_out_tbl$reference_date[1]
