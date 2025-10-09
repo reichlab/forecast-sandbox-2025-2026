@@ -5,9 +5,13 @@ This script runs the model and visualizes the seasonal patterns captured by
 the Fourier regression terms for each state.
 """
 
+import sys
+from pathlib import Path
+# Add sarix package to path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent.parent / 'sarix' / 'src'))
+
 import datetime
 from dateutil import relativedelta
-from pathlib import Path
 from types import SimpleNamespace
 import numpy as np
 import pandas as pd
@@ -23,7 +27,7 @@ def main():
     """Run model and plot Fourier seasonality curves."""
 
     # Use a fixed date for reproducibility
-    today_date = datetime.date(2024, 10, 1)
+    today_date = datetime.date(2025, 5, 9)
     reference_date = today_date + relativedelta.relativedelta(weekday=5)
 
     print("Setting up model configuration...")
@@ -73,9 +77,9 @@ def main():
     print(f"  Number of locations: {len(run_config.locations)}")
     print(f"  Fourier harmonics (K): {model_config.fourier_K}")
 
-    # Initialize model (this will fit the model and store results)
-    model = SARIXFourierModel(model_config)
-    model.run(run_config)
+    # Skip the model.run() call - we refit the model below to extract coefficients
+    # model = SARIXFourierModel(model_config)
+    # model.run(run_config)
 
     print("\nExtracting Fourier coefficients from fitted model...")
     # Access the underlying SARIX object that was created during model.run()
@@ -150,6 +154,11 @@ def main():
     n_locations = len(locations)
     K = model_config.fourier_K
 
+    # Load location names from auxiliary data
+    locations_df = pd.read_csv('/Users/nick/Documents/research-versioned/FluSight-forecast-hub/auxiliary-data/locations.csv')
+    location_name_map = dict(zip(locations_df['location'], locations_df['location_name']))
+    location_names = [location_name_map.get(loc, loc) for loc in locations]
+
     # Create day-of-year grid for plotting (full year)
     day_grid = np.arange(0, 365, 1)
     t_normalized = day_grid / 365.25
@@ -190,18 +199,88 @@ def main():
     # Create plots
     print(f"\nCreating plots for {n_locations} locations...")
 
-    # Plot in a grid
-    n_cols = 6
-    n_rows = (n_locations + n_cols - 1) // n_cols
+    # Create a geographically realistic compact layout
+    # Format: location_code -> (row, col)
+    geo_layout = {
+        # Row 0: US centered at top
+        'US': (0, 4),
+        # Row 1: Alaska + Northern New England
+        '02': (1, 0),  # AK
+        '23': (1, 8),  # ME
+        # Row 2: Pacific NW + Northern tier
+        '53': (2, 0),  # WA
+        '16': (2, 1),  # ID
+        '30': (2, 2),  # MT
+        '38': (2, 3),  # ND
+        '27': (2, 4),  # MN
+        '55': (2, 5),  # WI
+        '26': (2, 6),  # MI
+        '50': (2, 7),  # VT
+        '33': (2, 8),  # NH
+        # Row 3: West + Upper Midwest + Northeast
+        '41': (3, 0),  # OR
+        '56': (3, 1),  # WY
+        '46': (3, 2),  # SD
+        '19': (3, 3),  # IA
+        '17': (3, 4),  # IL
+        '18': (3, 5),  # IN
+        '39': (3, 6),  # OH
+        '36': (3, 7),  # NY
+        '25': (3, 8),  # MA
+        # Row 4: California + Mountain West + Midwest + Mid-Atlantic
+        '06': (4, 0),  # CA
+        '32': (4, 1),  # NV
+        '49': (4, 2),  # UT
+        '31': (4, 3),  # NE
+        '29': (4, 4),  # MO
+        '21': (4, 5),  # KY
+        '54': (4, 6),  # WV
+        '42': (4, 7),  # PA
+        '44': (4, 8),  # RI
+        # Row 5: Southwest + South Central + Mid-Atlantic
+        '04': (5, 1),  # AZ
+        '08': (5, 2),  # CO
+        '20': (5, 3),  # KS
+        '05': (5, 4),  # AR
+        '47': (5, 5),  # TN
+        '51': (5, 6),  # VA
+        '34': (5, 7),  # NJ
+        '09': (5, 8),  # CT
+        # Row 6: Deep Southwest + Deep South + Southeast
+        '35': (6, 1),  # NM
+        '40': (6, 2),  # OK
+        '22': (6, 3),  # LA
+        '28': (6, 4),  # MS
+        '01': (6, 5),  # AL
+        '13': (6, 6),  # GA
+        '37': (6, 7),  # NC
+        '24': (6, 8),  # MD
+        # Row 7: Texas + Southeast Coast + DC/DE
+        '48': (7, 2),  # TX
+        '45': (7, 5),  # SC
+        '12': (7, 6),  # FL
+        '11': (7, 7),  # DC
+        '10': (7, 8),  # DE
+        # Row 8: Hawaii + Puerto Rico
+        '15': (8, 0),  # HI
+        '72': (8, 6),  # PR
+    }
 
-    fig = plt.figure(figsize=(20, 3 * n_rows))
+    # Create figure with compact layout
+    n_rows = 9
+    n_cols = 9
+    fig = plt.figure(figsize=(22, 18))
     gs = gridspec.GridSpec(n_rows, n_cols, figure=fig, hspace=0.4, wspace=0.3)
 
-    for idx, (loc, loc_median, loc_lower, loc_upper) in enumerate(
-        zip(locations, seasonality_median, seasonality_lower, seasonality_upper)
+    for loc, loc_name, loc_median, loc_lower, loc_upper in zip(
+        locations, location_names, seasonality_median, seasonality_lower, seasonality_upper
     ):
-        row = idx // n_cols
-        col = idx % n_cols
+        # Get grid position for this location
+        if loc not in geo_layout:
+            print(f"Warning: No geo layout for location {loc}")
+            continue
+
+        row, col = geo_layout[loc]
         ax = fig.add_subplot(gs[row, col])
 
         # Plot credible interval
@@ -215,7 +294,7 @@ def main():
         ax.axhline(y=0, color='gray', linestyle='--', linewidth=0.5, alpha=0.5)
 
         # Format axes
-        ax.set_title(f'Location: {loc}', fontsize=10, fontweight='bold')
+        ax.set_title(f'{loc_name}', fontsize=10, fontweight='bold')
         ax.set_xlabel('Month', fontsize=8)
         ax.set_ylabel('Seasonal effect', fontsize=8)
         ax.set_xticks(month_starts)
@@ -223,7 +302,8 @@ def main():
         ax.tick_params(axis='y', labelsize=7)
         ax.grid(True, alpha=0.3)
 
-        if idx == 0:
+        # Add legend to US plot
+        if loc == 'US':
             ax.legend(fontsize=7, loc='upper right')
 
     plt.suptitle(
