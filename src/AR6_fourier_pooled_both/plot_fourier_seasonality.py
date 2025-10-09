@@ -172,24 +172,23 @@ def main():
 
     # Calculate seasonality curves for each location
     # fourier_beta: (num_samples, n_locations, 1, 2*K)
-    # fourier_features_grid: (365, 2*K)
-    # We want: (n_locations, 365) with median and credible intervals
+    # Strategy:
+    # - Median: use median coefficients for smooth curve
+    # - Credible intervals: use all samples for correct uncertainty
 
     # Squeeze out the variable dimension first
     fourier_beta_reshaped = fourier_beta.squeeze(axis=2)  # (num_samples, n_locations, 2*K)
 
-    # Compute seasonality: for each sample and location, features @ beta
-    # Shape: (num_samples, n_locations, 365)
-    seasonality_samples = np.einsum(
-        'tk,slk->slt',
-        fourier_features_grid,
-        fourier_beta_reshaped
-    )
+    # Compute smooth median curve from median coefficients
+    beta_median = np.median(fourier_beta_reshaped, axis=0)  # (n_locations, 2*K)
+    seasonality_median = np.einsum('tk,lk->lt', fourier_features_grid, beta_median)  # (n_locations, 365)
 
-    # Calculate median and credible intervals
-    seasonality_median = np.median(seasonality_samples, axis=0)  # (n_locations, 365)
-    seasonality_lower = np.percentile(seasonality_samples, 2.5, axis=0)
-    seasonality_upper = np.percentile(seasonality_samples, 97.5, axis=0)
+    # For credible intervals: compute all curves, then take pointwise percentiles
+    # This gives correct uncertainty representation
+    # Shape: (num_samples, n_locations, 365)
+    seasonality_samples = np.einsum('tk,slk->slt', fourier_features_grid, fourier_beta_reshaped)
+    seasonality_lower = np.percentile(seasonality_samples, 2.5, axis=0)  # (n_locations, 365)
+    seasonality_upper = np.percentile(seasonality_samples, 97.5, axis=0)  # (n_locations, 365)
 
     # Convert day-of-year to month labels for x-axis
     dates = pd.date_range('2024-01-01', periods=365, freq='D')
