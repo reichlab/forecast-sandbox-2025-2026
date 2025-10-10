@@ -1,0 +1,43 @@
+team_name: "UMass-Amherst"
+team_abbr: "UMass"
+model_name: "AR(6,1) pooled fourier"
+model_abbr: "AR6_fourier_d1_pooled"
+model_version: "1.0"
+model_contributors: [
+  {
+    "name": "Evan Ray",
+    "affiliation": "UMass Amherst",
+    "email": "elray@umass.edu"
+  },
+  {
+    "name": "Nick Reich",
+    "affiliation": "UMass Amherst",
+    "email": "nick@umass.edu"
+  },
+  {
+    "name": "Claude",
+    "affiliation": "Anthropic",
+    "email": "noreply@anthropic.com"
+  }
+]
+license: "CC-BY-4.0"
+designated_model: true
+methods: "An AR(6,1) model fit jointly to all locations with Fourier seasonality terms and shared AR parameters."
+data_inputs: "Weekly incident flu hospitalizations from NHSN."
+methods_long: "
+  This is an ARIMA(p=6, d=1) model fit jointly to all locations using Bayesian methods.
+  This model pools ARIMA parameters (theta) across all locations.
+  Prior to model estimation, we perform the following three data transformations:
+   1. Convert hospitalization counts to a rate per 100,000 population.
+   2. Take the fourth root.
+   3. Scale and center, dividing by the 95th percentile of all weekly values for
+      the given location and subsequently subtracting the mean.
+  Predictions on the transformed scale are converted back to predictions on the
+  original scale by inverting these transformations.
+  We incorporate annual seasonal patterns using Fourier harmonics with K=2,
+  which adds sine and cosine terms for the first two harmonics of the annual
+  cycle (period of 365.25 days). Fourier coefficients are estimated separately
+  for each location, while AR parameters are shared across locations. 
+  "
+ensemble_of_models: false
+ensemble_of_hub_models: false
