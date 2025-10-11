@@ -1,0 +1,30 @@
+team_name: "UMass-Amherst"
+team_abbr: "UMass"
+model_name: "Ensemble of time series models"
+model_abbr: "flusion"
+model_version: "1.0"
+model_contributors: [
+  {
+    "name": "Evan Ray",
+    "affiliation": "UMass Amherst",
+    "email": "elray@umass.edu"
+  },
+    {
+    "name": "Thomas Robacker",
+    "affiliation": "UMass Amherst",
+    "email": "trobacker@umass.edu"
+  }
+]
+license: "CC-BY-4.0"
+designated_model: true
+methods: "Ensemble of statistical and machine learning time series models."
+data_inputs: "Weekly incident flu hospitalizations from NHSN."
+methods_long: "
+  2024/25 season:
+  A quantile average of two models:
+   1. Gradient boosting quantile regression, fit to NHSN, FluSurv-NET, and ILINet data
+   2. An AR(6) model fit to NHSN only, with AR coefficients shared across locations and per-location variance parameters.
+  As of 2024-11-23, these are equally weighted.
+  "
+ensemble_of_models: true
+ensemble_of_hub_models: false
