@@ -88,14 +88,14 @@ trends_ensemble_outputs <- trends_ensemble_raw |>
 trendsEnsemble::save_model_out_tbl(trends_ensemble_outputs, path = "../../model-output", extension = "csv")
 
 # open PDF
-model_id <- "UMass-trends_ensemble"
-model_folder <- file.path("../../plots", model_id)
-if (!file.exists(model_folder)) dir.create(model_folder, recursive = TRUE)
-grDevices::pdf(file = paste0(model_folder, "/", reference_date, "-", model_id, ".pdf"), paper = "a4r")
-cat_names <- c("large_decrease", "decrease", "stable", "increase", "large_increase")
-idforecastutils::plot_quantile_pmf_outputs_pdf(
-  trends_ensemble_outputs,
-  target_data, locations,
-  reference_date, cats_ordered = cat_names[5:1],
-  quantile_title = "Inc Flu Hosp", pmf_title = "Flu Hosp Rate Change"
-)
+# model_id <- "UMass-trends_ensemble"
+# model_folder <- file.path("../../plots", model_id)
+# if (!file.exists(model_folder)) dir.create(model_folder, recursive = TRUE)
+# grDevices::pdf(file = paste0(model_folder, "/", reference_date, "-", model_id, ".pdf"), paper = "a4r")
+# cat_names <- c("large_decrease", "decrease", "stable", "increase", "large_increase")
+# idforecastutils::plot_quantile_pmf_outputs_pdf(
+#   trends_ensemble_outputs,
+#   target_data, locations,
+#   reference_date, cats_ordered = cat_names[5:1],
+#   quantile_title = "Inc Flu Hosp", pmf_title = "Flu Hosp Rate Change"
+# )
