@@ -20,10 +20,7 @@ model_contributors: [
     "email": "lshandross@umass.edu"
   }
 ]
-website_url: "https://github.com/reichlab/trendsEnsemble"
 license: "CC-BY-4.0"
-citation: "citation"
-team_funding: "funding"
 designated_model: false
 methods: "Equally weighted ensemble of simple time-series baseline models."
 data_inputs: "Weekly incident flu hospitalizations"
