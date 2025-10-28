@@ -1,2 +1,6 @@
 **/.venv/
 *.DS_Store
+.Rproj.user
+**/intermediate-output/
+.Rhistory
+*.Rproj
