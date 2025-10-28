@@ -2,6 +2,7 @@ import click
 import datetime
 from dateutil import relativedelta
 import subprocess
+from typing import Optional
 
 @click.command()
 @click.option(
@@ -15,7 +16,7 @@ import subprocess
     is_flag=True,
     help="Perform a short run."
 )
-def main(today_date: str | None = None, short_run: bool = False):
+def main(today_date: Optional[str] = None, short_run: bool = False):
     """Generate flu predictions from flusion model and plot them."""
     try:
         today_date = datetime.date.fromisoformat(today_date)
@@ -28,9 +29,9 @@ def main(today_date: str | None = None, short_run: bool = False):
     else:
         short_run_flag = []
     
-    subprocess.run(["python", "0_ar6_pooled.py",
+    subprocess.run(["python3", "0_ar6_pooled.py",
                     "--reference_date", str(reference_date)] + short_run_flag)
-    subprocess.run(["python", "1_gbqr.py",
+    subprocess.run(["python3", "1_gbqr.py",
                     "--reference_date", str(reference_date)] + short_run_flag)
     subprocess.run(["Rscript", "2_flusion_ensemble.R", str(reference_date)])
     # subprocess.run(["Rscript", "3_plot.R", str(reference_date)])
