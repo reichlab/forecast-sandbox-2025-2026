@@ -1,0 +1,39 @@
+team_name: "UMass-Amherst"
+team_abbr: "UMass"
+model_name: "Ensemble of time series models with Fourier seasonality"
+model_abbr: "flusion_fourier"
+model_version: "1.0"
+model_contributors: [
+  {
+    "name": "Evan Ray",
+    "affiliation": "UMass Amherst",
+    "email": "elray@umass.edu"
+  },
+    {
+    "name": "Thomas Robacker",
+    "affiliation": "UMass Amherst",
+    "email": "trobacker@umass.edu"
+  }
+]
+license: "CC-BY-4.0"
+designated_model: true
+methods: "Ensemble of statistical and machine learning time series models with Fourier seasonality."
+data_inputs: "Weekly incident flu hospitalizations from NHSN, FluSurv-NET, and ILINet."
+methods_long: "
+  2024/25 season:
+  A quantile average of two models:
+   1. Gradient boosting quantile regression, fit to NHSN, FluSurv-NET, and ILINet data
+   2. An AR(6) model with Fourier seasonality (K=2 harmonics) fit to NHSN only, with AR coefficients shared across locations and per-location variance parameters.
+  The two models are equally weighted.
+
+  The AR(6) component includes Fourier terms to explicitly model annual seasonal patterns.
+  Prior to model estimation, we perform the following three data transformations:
+   1. Convert hospitalization counts to a rate per 100,000 population.
+   2. Take the fourth root.
+   3. Scale and center, dividing by the 95th percentile of all weekly values for
+      the given location and subsequently subtracting the mean.
+  Predictions on the transformed scale are converted back to predictions on the
+  original scale by inverting these transformations.
+  "
+ensemble_of_models: true
+ensemble_of_hub_models: false
