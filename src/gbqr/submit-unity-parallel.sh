@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH -J gbqr_spatial_forecast       # Job name
+#SBATCH -J gbqr_forecast       # Job name
 #SBATCH -N 1                            # Number of nodes
 #SBATCH -c 8                            # Number of cores per task
 #SBATCH --mem=32G                       # Memory per node
