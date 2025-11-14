@@ -1,0 +1,912 @@
+Remaining forecasts to generate: 23
+
+============================================================
+Running flusion3 for date: 2023-12-09
+============================================================
+/Users/trobacker/GitHub/idmodels/src/idmodels/sarix.py:35: FutureWarning: DataFrame.interpolate with object dtype is deprecated and will raise in a future version. Call obj.infer_objects(copy=False) before interpolating instead.
+  df = df.query("wk_end_date >= '2022-10-01'").interpolate()
+  0%|          | 0/4000 [00:00<?, ?it/s]warmup:   0%|          | 1/4000 [00:00<34:49,  1.91it/s, 1 steps of size 2.34e+00. acc. prob=0.00]warmup:   0%|          | 2/4000 [00:00<32:57,  2.02it/s, 1 steps of size 2.30e-01. acc. prob=0.00]warmup:   1%|          | 42/4000 [00:01<01:06, 59.35it/s, 127 steps of size 4.84e-03. acc. prob=0.73]warmup:   2%|▏         | 60/4000 [00:01<00:56, 70.18it/s, 255 steps of size 2.58e-03. acc. prob=0.74]warmup:   2%|▏         | 75/4000 [00:01<00:46, 83.94it/s, 127 steps of size 4.07e-03. acc. prob=0.75]warmup:   2%|▏         | 90/4000 [00:01<00:43, 90.84it/s, 511 steps of size 1.49e-03. acc. prob=0.75]warmup:   3%|▎         | 104/4000 [00:01<00:42, 91.17it/s, 31 steps of size 1.70e-01. acc. prob=0.76]warmup:   3%|▎         | 132/4000 [00:01<00:29, 130.58it/s, 127 steps of size 4.83e-02. acc. prob=0.77]warmup:   4%|▍         | 165/4000 [00:01<00:21, 176.66it/s, 31 steps of size 1.91e-01. acc. prob=0.77] warmup:   5%|▌         | 200/4000 [00:01<00:17, 219.16it/s, 31 steps of size 1.67e-01. acc. prob=0.78]warmup:   6%|▌         | 236/4000 [00:02<00:14, 255.22it/s, 63 steps of size 1.31e-01. acc. prob=0.78]warmup:   7%|▋         | 273/4000 [00:02<00:13, 285.88it/s, 63 steps of size 7.80e-02. acc. prob=0.78]warmup:   8%|▊         | 311/4000 [00:02<00:11, 311.74it/s, 63 steps of size 1.08e-01. acc. prob=0.78]warmup:   9%|▉         | 355/4000 [00:02<00:10, 347.72it/s, 31 steps of size 1.52e-01. acc. prob=0.78]warmup:  10%|█         | 400/4000 [00:02<00:09, 376.38it/s, 63 steps of size 9.25e-02. acc. prob=0.78]warmup:  11%|█▏        | 455/4000 [00:02<00:08, 423.57it/s, 127 steps of size 6.01e-02. acc. prob=0.78]warmup:  12%|█▏        | 499/4000 [00:02<00:09, 383.71it/s, 127 steps of size 5.37e-02. acc. prob=0.78]warmup:  13%|█▎        | 539/4000 [00:02<00:09, 381.88it/s, 63 steps of size 1.19e-01. acc. prob=0.79] warmup:  15%|█▍        | 587/4000 [00:02<00:08, 408.90it/s, 63 steps of size 8.80e-02. acc. prob=0.79]warmup:  16%|█▌        | 632/4000 [00:03<00:08, 419.76it/s, 63 steps of size 9.10e-02. acc. prob=0.79]warmup:  17%|█▋        | 678/4000 [00:03<00:07, 429.08it/s, 63 steps of size 8.27e-02. acc. prob=0.79]warmup:  18%|█▊        | 727/4000 [00:03<00:07, 445.41it/s, 31 steps of size 1.32e-01. acc. prob=0.79]warmup:  19%|█▉        | 777/4000 [00:03<00:07, 458.41it/s, 63 steps of size 9.56e-02. acc. prob=0.79]warmup:  21%|██        | 828/4000 [00:03<00:06, 473.33it/s, 63 steps of size 9.17e-02. acc. prob=0.79]warmup:  22%|██▏       | 876/4000 [00:03<00:07, 443.30it/s, 31 steps of size 1.95e-01. acc. prob=0.79]warmup:  23%|██▎       | 921/4000 [00:03<00:07, 421.59it/s, 63 steps of size 1.16e-01. acc. prob=0.79]warmup:  24%|██▍       | 971/4000 [00:03<00:06, 442.08it/s, 31 steps of size 1.03e-01. acc. prob=0.79]warmup:  25%|██▌       | 1016/4000 [00:03<00:06, 441.31it/s, 63 steps of size 7.35e-02. acc. prob=0.79]warmup:  27%|██▋       | 1068/4000 [00:03<00:06, 460.75it/s, 63 steps of size 9.11e-02. acc. prob=0.79]warmup:  28%|██▊       | 1117/4000 [00:04<00:06, 468.86it/s, 31 steps of size 1.42e-01. acc. prob=0.79]warmup:  29%|██▉       | 1165/4000 [00:04<00:06, 470.15it/s, 31 steps of size 1.31e-01. acc. prob=0.79]warmup:  30%|███       | 1220/4000 [00:04<00:05, 490.36it/s, 63 steps of size 1.01e-01. acc. prob=0.79]warmup:  32%|███▏      | 1274/4000 [00:04<00:05, 503.79it/s, 31 steps of size 1.29e-01. acc. prob=0.79]warmup:  33%|███▎      | 1325/4000 [00:04<00:05, 501.83it/s, 31 steps of size 1.17e-01. acc. prob=0.79]warmup:  35%|███▍      | 1382/4000 [00:04<00:05, 519.71it/s, 31 steps of size 1.32e-01. acc. prob=0.79]warmup:  36%|███▌      | 1438/4000 [00:04<00:04, 529.84it/s, 63 steps of size 1.06e-01. acc. prob=0.79]warmup:  37%|███▋      | 1493/4000 [00:04<00:04, 534.90it/s, 31 steps of size 1.41e-01. acc. prob=0.79]warmup:  39%|███▊      | 1549/4000 [00:04<00:04, 541.55it/s, 31 steps of size 9.94e-02. acc. prob=0.79]warmup:  40%|████      | 1608/4000 [00:04<00:04, 555.00it/s, 63 steps of size 1.04e-01. acc. prob=0.79]warmup:  42%|████▏     | 1664/4000 [00:05<00:04, 549.72it/s, 31 steps of size 1.18e-01. acc. prob=0.79]warmup:  43%|████▎     | 1725/4000 [00:05<00:04, 562.86it/s, 63 steps of size 1.06e-01. acc. prob=0.79]warmup:  45%|████▍     | 1787/4000 [00:05<00:03, 578.10it/s, 31 steps of size 1.00e-01. acc. prob=0.79]warmup:  46%|████▌     | 1848/4000 [00:05<00:03, 585.51it/s, 31 steps of size 1.07e-01. acc. prob=0.79]warmup:  48%|████▊     | 1907/4000 [00:05<00:03, 573.77it/s, 31 steps of size 1.46e-01. acc. prob=0.79]warmup:  49%|████▉     | 1965/4000 [00:05<00:03, 545.27it/s, 63 steps of size 9.27e-02. acc. prob=0.79]sample:  50%|█████     | 2020/4000 [00:05<00:04, 438.34it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample:  52%|█████▏    | 2068/4000 [00:05<00:04, 408.15it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample:  53%|█████▎    | 2112/4000 [00:06<00:04, 390.30it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample:  54%|█████▍    | 2153/4000 [00:06<00:04, 381.64it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample:  55%|█████▍    | 2193/4000 [00:06<00:04, 379.26it/s, 63 steps of size 7.60e-02. acc. prob=0.95]sample:  56%|█████▌    | 2232/4000 [00:06<00:04, 369.24it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample:  57%|█████▋    | 2270/4000 [00:06<00:04, 361.35it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample:  58%|█████▊    | 2307/4000 [00:06<00:04, 356.12it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample:  59%|█████▊    | 2343/4000 [00:06<00:04, 352.87it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample:  59%|█████▉    | 2379/4000 [00:06<00:04, 349.72it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample:  60%|██████    | 2415/4000 [00:06<00:04, 347.61it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample:  61%|██████▏   | 2450/4000 [00:07<00:04, 346.39it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample:  62%|██████▏   | 2485/4000 [00:07<00:04, 345.16it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample:  63%|██████▎   | 2521/4000 [00:07<00:04, 348.09it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample:  64%|██████▍   | 2556/4000 [00:07<00:04, 346.02it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample:  65%|██████▍   | 2591/4000 [00:07<00:04, 345.68it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample:  66%|██████▌   | 2628/4000 [00:07<00:03, 352.32it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample:  67%|██████▋   | 2664/4000 [00:07<00:03, 349.26it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample:  67%|██████▋   | 2699/4000 [00:07<00:03, 347.20it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample:  68%|██████▊   | 2734/4000 [00:07<00:03, 346.01it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample:  69%|██████▉   | 2770/4000 [00:07<00:03, 349.28it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample:  70%|███████   | 2807/4000 [00:08<00:03, 354.72it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample:  71%|███████   | 2845/4000 [00:08<00:03, 360.07it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample:  72%|███████▏  | 2883/4000 [00:08<00:03, 365.86it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample:  73%|███████▎  | 2922/4000 [00:08<00:02, 370.95it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample:  74%|███████▍  | 2960/4000 [00:08<00:02, 368.48it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample:  75%|███████▍  | 2997/4000 [00:08<00:02, 359.63it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample:  76%|███████▌  | 3034/4000 [00:08<00:02, 354.89it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample:  77%|███████▋  | 3071/4000 [00:08<00:02, 357.53it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample:  78%|███████▊  | 3107/4000 [00:08<00:02, 355.32it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample:  79%|███████▊  | 3143/4000 [00:09<00:02, 353.36it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample:  79%|███████▉  | 3179/4000 [00:09<00:02, 350.68it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample:  80%|████████  | 3215/4000 [00:09<00:02, 349.72it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample:  81%|████████▏ | 3250/4000 [00:09<00:02, 348.60it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample:  82%|████████▏ | 3285/4000 [00:09<00:02, 346.20it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample:  83%|████████▎ | 3320/4000 [00:09<00:01, 346.53it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample:  84%|████████▍ | 3355/4000 [00:09<00:01, 345.56it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample:  85%|████████▍ | 3390/4000 [00:09<00:01, 345.07it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample:  86%|████████▌ | 3425/4000 [00:09<00:01, 344.11it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample:  86%|████████▋ | 3460/4000 [00:09<00:01, 343.97it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample:  87%|████████▋ | 3496/4000 [00:10<00:01, 346.28it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample:  88%|████████▊ | 3533/4000 [00:10<00:01, 352.89it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample:  89%|████████▉ | 3569/4000 [00:10<00:01, 346.85it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample:  90%|█████████ | 3604/4000 [00:10<00:01, 346.94it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample:  91%|█████████ | 3639/4000 [00:10<00:01, 345.52it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample:  92%|█████████▏| 3674/4000 [00:10<00:00, 342.63it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample:  93%|█████████▎| 3709/4000 [00:10<00:00, 341.90it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample:  94%|█████████▎| 3744/4000 [00:10<00:00, 342.22it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample:  94%|█████████▍| 3779/4000 [00:10<00:00, 341.86it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample:  95%|█████████▌| 3814/4000 [00:10<00:00, 341.79it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample:  96%|█████████▌| 3849/4000 [00:11<00:00, 341.42it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample:  97%|█████████▋| 3884/4000 [00:11<00:00, 342.88it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample:  98%|█████████▊| 3919/4000 [00:11<00:00, 342.38it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample:  99%|█████████▉| 3955/4000 [00:11<00:00, 346.74it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample: 100%|█████████▉| 3992/4000 [00:11<00:00, 348.14it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample: 100%|██████████| 4000/4000 [00:11<00:00, 347.98it/s, 63 steps of size 7.60e-02. acc. prob=0.94]
+
+                 mean       std    median      5.0%     95.0%     n_eff     r_hat
+ sigma[0,0]      0.04      0.00      0.04      0.04      0.05   3238.90      1.00
+ sigma[1,0]      0.08      0.01      0.08      0.07      0.09   3942.89      1.00
+ sigma[2,0]      0.04      0.00      0.04      0.04      0.05   3777.20      1.00
+ sigma[3,0]      0.04      0.00      0.04      0.04      0.05   3819.90      1.00
+ sigma[4,0]      0.03      0.00      0.03      0.03      0.04   4384.73      1.00
+ sigma[5,0]      0.04      0.00      0.04      0.03      0.05   4379.70      1.00
+ sigma[6,0]      0.04      0.00      0.04      0.04      0.05   4378.14      1.00
+ sigma[7,0]      0.09      0.01      0.09      0.07      0.10   5705.39      1.00
+ sigma[8,0]      0.07      0.01      0.07      0.06      0.08   4578.20      1.00
+ sigma[9,0]      0.03      0.00      0.03      0.02      0.03   4826.83      1.00
+sigma[10,0]      0.03      0.00      0.03      0.03      0.04   4597.60      1.00
+sigma[11,0]      0.08      0.01      0.08      0.07      0.09   3886.96      1.00
+sigma[12,0]      0.06      0.01      0.06      0.05      0.07   4057.91      1.00
+sigma[13,0]      0.04      0.00      0.03      0.03      0.04   4878.83      1.00
+sigma[14,0]      0.04      0.00      0.04      0.03      0.04   4141.03      1.00
+sigma[15,0]      0.05      0.00      0.05      0.04      0.05   3457.07      1.00
+sigma[16,0]      0.04      0.00      0.04      0.04      0.05   3847.11      1.00
+sigma[17,0]      0.04      0.00      0.04      0.04      0.05   4624.46      1.00
+sigma[18,0]      0.04      0.00      0.04      0.04      0.05   3812.39      1.00
+sigma[19,0]      0.06      0.01      0.06      0.05      0.07   4405.83      1.00
+sigma[20,0]      0.03      0.00      0.03      0.03      0.04   5198.80      1.00
+sigma[21,0]      0.04      0.00      0.03      0.03      0.04   4658.76      1.00
+sigma[22,0]      0.04      0.00      0.04      0.03      0.04   3722.43      1.00
+sigma[23,0]      0.03      0.00      0.03      0.03      0.04   4018.96      1.00
+sigma[24,0]      0.04      0.00      0.04      0.04      0.05   4944.19      1.00
+sigma[25,0]      0.04      0.00      0.04      0.03      0.04   3032.93      1.00
+sigma[26,0]      0.06      0.01      0.06      0.05      0.07   4323.51      1.00
+sigma[27,0]      0.05      0.00      0.05      0.04      0.05   3858.60      1.00
+sigma[28,0]      0.04      0.00      0.04      0.04      0.05   5500.88      1.00
+sigma[29,0]      0.06      0.01      0.06      0.05      0.07   3956.45      1.00
+sigma[30,0]      0.04      0.00      0.04      0.03      0.05   4352.84      1.00
+sigma[31,0]      0.05      0.00      0.05      0.04      0.05   4349.46      1.00
+sigma[32,0]      0.03      0.00      0.03      0.02      0.03   4674.46      1.00
+sigma[33,0]      0.04      0.00      0.04      0.03      0.04   3880.15      1.00
+sigma[34,0]      0.07      0.01      0.07      0.06      0.08   4047.46      1.00
+sigma[35,0]      0.03      0.00      0.03      0.02      0.03   4349.64      1.00
+sigma[36,0]      0.04      0.00      0.04      0.04      0.05   3998.48      1.00
+sigma[37,0]      0.04      0.00      0.04      0.03      0.05   4057.12      1.00
+sigma[38,0]      0.03      0.00      0.03      0.03      0.04   4164.94      1.00
+sigma[39,0]      0.07      0.01      0.07      0.06      0.08   3835.98      1.00
+sigma[40,0]      0.04      0.00      0.04      0.03      0.04   4897.10      1.00
+sigma[41,0]      0.07      0.01      0.07      0.06      0.08   4223.76      1.00
+sigma[42,0]      0.04      0.00      0.04      0.03      0.05   5221.04      1.00
+sigma[43,0]      0.03      0.00      0.03      0.02      0.03   3287.98      1.00
+sigma[44,0]      0.05      0.00      0.05      0.04      0.06   3414.42      1.00
+sigma[45,0]      0.07      0.01      0.07      0.06      0.08   3330.68      1.00
+sigma[46,0]      0.04      0.00      0.04      0.03      0.04   3943.76      1.00
+sigma[47,0]      0.04      0.00      0.04      0.04      0.05   3635.42      1.00
+sigma[48,0]      0.06      0.01      0.06      0.05      0.06   4347.95      1.00
+sigma[49,0]      0.04      0.00      0.04      0.03      0.04   3531.99      1.00
+sigma[50,0]      0.08      0.01      0.08      0.06      0.09   4524.66      1.00
+sigma[51,0]      0.05      0.00      0.05      0.04      0.06   3271.95      1.00
+sigma[52,0]      0.02      0.00      0.02      0.02      0.03   3149.27      1.00
+   theta[0]      1.14      0.02      1.14      1.11      1.17   2779.06      1.00
+   theta[1]     -0.05      0.03     -0.05     -0.09      0.00   2558.74      1.00
+   theta[2]     -0.08      0.03     -0.08     -0.13     -0.04   3436.72      1.00
+   theta[3]      0.03      0.03      0.03     -0.02      0.07   3189.41      1.00
+   theta[4]     -0.11      0.03     -0.10     -0.15     -0.06   2548.62      1.00
+   theta[5]     -0.03      0.02     -0.03     -0.06     -0.00   2905.98      1.00
+theta_sd[0]      0.56      0.20      0.52      0.30      0.81   2147.35      1.00
+
+Number of divergences: 0
+
+MCMC elapsed time: 15.449991226196289
+/Users/trobacker/GitHub/idmodels/src/idmodels/sarix.py:35: FutureWarning: DataFrame.interpolate with object dtype is deprecated and will raise in a future version. Call obj.infer_objects(copy=False) before interpolating instead.
+  df = df.query("wk_end_date >= '2022-10-01'").interpolate()
+  0%|          | 0/4000 [00:00<?, ?it/s]warmup:   0%|          | 1/4000 [00:00<34:50,  1.91it/s, 1 steps of size 2.34e+00. acc. prob=0.00]warmup:   0%|          | 2/4000 [00:00<32:31,  2.05it/s, 1 steps of size 2.30e-01. acc. prob=0.00]warmup:   1%|          | 41/4000 [00:01<01:07, 58.97it/s, 127 steps of size 2.89e-03. acc. prob=0.72]warmup:   1%|▏         | 59/4000 [00:01<00:55, 71.02it/s, 255 steps of size 2.09e-03. acc. prob=0.74]warmup:   2%|▏         | 74/4000 [00:01<00:46, 83.98it/s, 127 steps of size 2.89e-03. acc. prob=0.75]warmup:   2%|▏         | 89/4000 [00:01<00:41, 93.19it/s, 71 steps of size 9.90e-04. acc. prob=0.75] warmup:   3%|▎         | 103/4000 [00:01<00:43, 89.88it/s, 63 steps of size 1.16e-01. acc. prob=0.76]warmup:   3%|▎         | 132/4000 [00:01<00:29, 130.57it/s, 127 steps of size 4.83e-02. acc. prob=0.77]warmup:   4%|▍         | 164/4000 [00:01<00:22, 173.55it/s, 63 steps of size 1.02e-01. acc. prob=0.77] warmup:   5%|▍         | 199/4000 [00:01<00:17, 216.29it/s, 63 steps of size 1.34e-01. acc. prob=0.78]warmup:   6%|▌         | 236/4000 [00:02<00:14, 254.81it/s, 63 steps of size 1.31e-01. acc. prob=0.78]warmup:   7%|▋         | 274/4000 [00:02<00:12, 287.15it/s, 63 steps of size 1.42e-01. acc. prob=0.78]warmup:   8%|▊         | 314/4000 [00:02<00:11, 317.58it/s, 63 steps of size 1.40e-01. acc. prob=0.78]warmup:   9%|▉         | 354/4000 [00:02<00:10, 340.80it/s, 26 steps of size 1.18e-01. acc. prob=0.78]warmup:  10%|▉         | 396/4000 [00:02<00:09, 362.62it/s, 31 steps of size 1.19e-01. acc. prob=0.78]warmup:  11%|█         | 447/4000 [00:02<00:08, 403.38it/s, 63 steps of size 8.35e-02. acc. prob=0.78]warmup:  12%|█▏        | 489/4000 [00:02<00:09, 379.62it/s, 63 steps of size 1.29e-01. acc. prob=0.78]warmup:  13%|█▎        | 528/4000 [00:02<00:09, 376.65it/s, 8 steps of size 3.59e-02. acc. prob=0.78] warmup:  14%|█▍        | 572/4000 [00:02<00:08, 393.72it/s, 63 steps of size 9.11e-02. acc. prob=0.79]warmup:  16%|█▌        | 620/4000 [00:03<00:08, 417.68it/s, 63 steps of size 8.48e-02. acc. prob=0.79]warmup:  17%|█▋        | 664/4000 [00:03<00:07, 423.08it/s, 63 steps of size 9.41e-02. acc. prob=0.79]warmup:  18%|█▊        | 713/4000 [00:03<00:07, 441.25it/s, 31 steps of size 1.07e-01. acc. prob=0.79]warmup:  19%|█▉        | 764/4000 [00:03<00:07, 458.09it/s, 63 steps of size 1.05e-01. acc. prob=0.79]warmup:  20%|██        | 816/4000 [00:03<00:06, 474.37it/s, 31 steps of size 1.39e-01. acc. prob=0.79]warmup:  22%|██▏       | 864/4000 [00:03<00:06, 452.45it/s, 63 steps of size 1.53e-01. acc. prob=0.79]warmup:  23%|██▎       | 910/4000 [00:03<00:07, 434.73it/s, 31 steps of size 4.18e-02. acc. prob=0.79]warmup:  24%|██▍       | 954/4000 [00:03<00:07, 426.43it/s, 127 steps of size 6.15e-02. acc. prob=0.79]warmup:  25%|██▌       | 1000/4000 [00:03<00:06, 434.65it/s, 63 steps of size 8.50e-02. acc. prob=0.79]warmup:  26%|██▌       | 1049/4000 [00:03<00:06, 450.42it/s, 31 steps of size 1.34e-01. acc. prob=0.79]warmup:  27%|██▋       | 1099/4000 [00:04<00:06, 462.92it/s, 31 steps of size 1.45e-01. acc. prob=0.79]warmup:  29%|██▊       | 1147/4000 [00:04<00:06, 466.75it/s, 63 steps of size 1.01e-01. acc. prob=0.79]warmup:  30%|███       | 1201/4000 [00:04<00:05, 487.90it/s, 31 steps of size 1.23e-01. acc. prob=0.79]warmup:  31%|███▏      | 1251/4000 [00:04<00:05, 487.98it/s, 63 steps of size 1.08e-01. acc. prob=0.79]warmup:  33%|███▎      | 1306/4000 [00:04<00:05, 503.73it/s, 63 steps of size 1.08e-01. acc. prob=0.79]warmup:  34%|███▍      | 1359/4000 [00:04<00:05, 511.48it/s, 63 steps of size 1.11e-01. acc. prob=0.79]warmup:  35%|███▌      | 1416/4000 [00:04<00:04, 526.94it/s, 31 steps of size 1.17e-01. acc. prob=0.79]warmup:  37%|███▋      | 1472/4000 [00:04<00:04, 534.77it/s, 63 steps of size 1.07e-01. acc. prob=0.79]warmup:  38%|███▊      | 1527/4000 [00:04<00:04, 539.12it/s, 31 steps of size 1.42e-01. acc. prob=0.79]warmup:  40%|███▉      | 1581/4000 [00:04<00:04, 536.65it/s, 31 steps of size 1.01e-01. acc. prob=0.79]warmup:  41%|████      | 1639/4000 [00:05<00:04, 548.78it/s, 31 steps of size 1.29e-01. acc. prob=0.79]warmup:  42%|████▎     | 1700/4000 [00:05<00:04, 565.62it/s, 31 steps of size 9.42e-02. acc. prob=0.79]warmup:  44%|████▍     | 1763/4000 [00:05<00:03, 583.57it/s, 31 steps of size 1.30e-01. acc. prob=0.79]warmup:  46%|████▌     | 1822/4000 [00:05<00:03, 581.87it/s, 31 steps of size 1.29e-01. acc. prob=0.79]warmup:  47%|████▋     | 1885/4000 [00:05<00:03, 592.89it/s, 63 steps of size 1.09e-01. acc. prob=0.79]warmup:  49%|████▊     | 1945/4000 [00:05<00:03, 575.17it/s, 31 steps of size 1.27e-01. acc. prob=0.79]sample:  50%|█████     | 2003/4000 [00:05<00:04, 457.80it/s, 63 steps of size 7.60e-02. acc. prob=0.88]sample:  51%|█████▏    | 2053/4000 [00:05<00:04, 420.09it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample:  52%|█████▏    | 2098/4000 [00:06<00:04, 399.66it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample:  54%|█████▎    | 2140/4000 [00:06<00:04, 382.12it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample:  55%|█████▍    | 2180/4000 [00:06<00:04, 370.80it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample:  55%|█████▌    | 2218/4000 [00:06<00:04, 372.28it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample:  56%|█████▋    | 2256/4000 [00:06<00:04, 363.39it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample:  57%|█████▋    | 2293/4000 [00:06<00:04, 358.45it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample:  58%|█████▊    | 2330/4000 [00:06<00:04, 354.37it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample:  59%|█████▉    | 2366/4000 [00:06<00:04, 351.28it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample:  60%|██████    | 2402/4000 [00:06<00:04, 348.55it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample:  61%|██████    | 2437/4000 [00:07<00:04, 343.58it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample:  62%|██████▏   | 2472/4000 [00:07<00:04, 342.16it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample:  63%|██████▎   | 2509/4000 [00:07<00:04, 348.99it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample:  64%|██████▎   | 2544/4000 [00:07<00:04, 343.52it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample:  64%|██████▍   | 2579/4000 [00:07<00:04, 340.22it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample:  65%|██████▌   | 2616/4000 [00:07<00:03, 347.16it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample:  66%|██████▋   | 2651/4000 [00:07<00:03, 343.32it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample:  67%|██████▋   | 2686/4000 [00:07<00:03, 343.46it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample:  68%|██████▊   | 2721/4000 [00:07<00:03, 343.37it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample:  69%|██████▉   | 2756/4000 [00:07<00:03, 343.39it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample:  70%|██████▉   | 2791/4000 [00:08<00:03, 342.84it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample:  71%|███████   | 2826/4000 [00:08<00:03, 342.71it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample:  72%|███████▏  | 2861/4000 [00:08<00:03, 344.56it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample:  72%|███████▏  | 2899/4000 [00:08<00:03, 352.79it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample:  73%|███████▎  | 2937/4000 [00:08<00:02, 358.27it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample:  74%|███████▍  | 2973/4000 [00:08<00:02, 355.18it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample:  75%|███████▌  | 3009/4000 [00:08<00:02, 349.75it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample:  76%|███████▌  | 3047/4000 [00:08<00:02, 357.65it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample:  77%|███████▋  | 3083/4000 [00:08<00:02, 351.61it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample:  78%|███████▊  | 3119/4000 [00:08<00:02, 350.06it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample:  79%|███████▉  | 3155/4000 [00:09<00:02, 348.54it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample:  80%|███████▉  | 3190/4000 [00:09<00:02, 348.42it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample:  81%|████████  | 3225/4000 [00:09<00:02, 347.28it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample:  82%|████████▏ | 3260/4000 [00:09<00:02, 347.10it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample:  82%|████████▏ | 3295/4000 [00:09<00:02, 345.82it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample:  83%|████████▎ | 3330/4000 [00:09<00:01, 344.22it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample:  84%|████████▍ | 3365/4000 [00:09<00:01, 343.59it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample:  85%|████████▌ | 3400/4000 [00:09<00:01, 344.13it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample:  86%|████████▌ | 3435/4000 [00:09<00:01, 344.18it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample:  87%|████████▋ | 3471/4000 [00:10<00:01, 347.56it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample:  88%|████████▊ | 3506/4000 [00:10<00:01, 344.89it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample:  89%|████████▊ | 3541/4000 [00:10<00:01, 343.03it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample:  89%|████████▉ | 3576/4000 [00:10<00:01, 343.21it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample:  90%|█████████ | 3611/4000 [00:10<00:01, 344.30it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample:  91%|█████████ | 3646/4000 [00:10<00:01, 344.61it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample:  92%|█████████▏| 3681/4000 [00:10<00:00, 343.80it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample:  93%|█████████▎| 3716/4000 [00:10<00:00, 344.04it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample:  94%|█████████▍| 3751/4000 [00:10<00:00, 345.44it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample:  95%|█████████▍| 3786/4000 [00:10<00:00, 344.92it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample:  96%|█████████▌| 3821/4000 [00:11<00:00, 345.81it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample:  96%|█████████▋| 3856/4000 [00:11<00:00, 346.04it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample:  97%|█████████▋| 3896/4000 [00:11<00:00, 360.53it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample:  98%|█████████▊| 3933/4000 [00:11<00:00, 348.70it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample:  99%|█████████▉| 3968/4000 [00:11<00:00, 348.59it/s, 63 steps of size 7.60e-02. acc. prob=0.94]sample: 100%|██████████| 4000/4000 [00:11<00:00, 346.70it/s, 63 steps of size 7.60e-02. acc. prob=0.94]
+
+                 mean       std    median      5.0%     95.0%     n_eff     r_hat
+ sigma[0,0]      0.04      0.00      0.04      0.04      0.05   3238.90      1.00
+ sigma[1,0]      0.08      0.01      0.08      0.07      0.09   3942.89      1.00
+ sigma[2,0]      0.04      0.00      0.04      0.04      0.05   3777.20      1.00
+ sigma[3,0]      0.04      0.00      0.04      0.04      0.05   3819.90      1.00
+ sigma[4,0]      0.03      0.00      0.03      0.03      0.04   4384.73      1.00
+ sigma[5,0]      0.04      0.00      0.04      0.03      0.05   4379.70      1.00
+ sigma[6,0]      0.04      0.00      0.04      0.04      0.05   4378.14      1.00
+ sigma[7,0]      0.09      0.01      0.09      0.07      0.10   5705.39      1.00
+ sigma[8,0]      0.07      0.01      0.07      0.06      0.08   4578.20      1.00
+ sigma[9,0]      0.03      0.00      0.03      0.02      0.03   4826.83      1.00
+sigma[10,0]      0.03      0.00      0.03      0.03      0.04   4597.60      1.00
+sigma[11,0]      0.08      0.01      0.08      0.07      0.09   3886.96      1.00
+sigma[12,0]      0.06      0.01      0.06      0.05      0.07   4057.91      1.00
+sigma[13,0]      0.04      0.00      0.03      0.03      0.04   4878.83      1.00
+sigma[14,0]      0.04      0.00      0.04      0.03      0.04   4141.03      1.00
+sigma[15,0]      0.05      0.00      0.05      0.04      0.05   3457.07      1.00
+sigma[16,0]      0.04      0.00      0.04      0.04      0.05   3847.11      1.00
+sigma[17,0]      0.04      0.00      0.04      0.04      0.05   4624.46      1.00
+sigma[18,0]      0.04      0.00      0.04      0.04      0.05   3812.39      1.00
+sigma[19,0]      0.06      0.01      0.06      0.05      0.07   4405.83      1.00
+sigma[20,0]      0.03      0.00      0.03      0.03      0.04   5198.80      1.00
+sigma[21,0]      0.04      0.00      0.03      0.03      0.04   4658.76      1.00
+sigma[22,0]      0.04      0.00      0.04      0.03      0.04   3722.43      1.00
+sigma[23,0]      0.03      0.00      0.03      0.03      0.04   4018.96      1.00
+sigma[24,0]      0.04      0.00      0.04      0.04      0.05   4944.19      1.00
+sigma[25,0]      0.04      0.00      0.04      0.03      0.04   3032.93      1.00
+sigma[26,0]      0.06      0.01      0.06      0.05      0.07   4323.51      1.00
+sigma[27,0]      0.05      0.00      0.05      0.04      0.05   3858.60      1.00
+sigma[28,0]      0.04      0.00      0.04      0.04      0.05   5500.88      1.00
+sigma[29,0]      0.06      0.01      0.06      0.05      0.07   3956.45      1.00
+sigma[30,0]      0.04      0.00      0.04      0.03      0.05   4352.84      1.00
+sigma[31,0]      0.05      0.00      0.05      0.04      0.05   4349.46      1.00
+sigma[32,0]      0.03      0.00      0.03      0.02      0.03   4674.46      1.00
+sigma[33,0]      0.04      0.00      0.04      0.03      0.04   3880.15      1.00
+sigma[34,0]      0.07      0.01      0.07      0.06      0.08   4047.46      1.00
+sigma[35,0]      0.03      0.00      0.03      0.02      0.03   4349.64      1.00
+sigma[36,0]      0.04      0.00      0.04      0.04      0.05   3998.48      1.00
+sigma[37,0]      0.04      0.00      0.04      0.03      0.05   4057.12      1.00
+sigma[38,0]      0.03      0.00      0.03      0.03      0.04   4164.94      1.00
+sigma[39,0]      0.07      0.01      0.07      0.06      0.08   3835.98      1.00
+sigma[40,0]      0.04      0.00      0.04      0.03      0.04   4897.10      1.00
+sigma[41,0]      0.07      0.01      0.07      0.06      0.08   4223.76      1.00
+sigma[42,0]      0.04      0.00      0.04      0.03      0.05   5221.04      1.00
+sigma[43,0]      0.03      0.00      0.03      0.02      0.03   3287.98      1.00
+sigma[44,0]      0.05      0.00      0.05      0.04      0.06   3414.42      1.00
+sigma[45,0]      0.07      0.01      0.07      0.06      0.08   3330.68      1.00
+sigma[46,0]      0.04      0.00      0.04      0.03      0.04   3943.76      1.00
+sigma[47,0]      0.04      0.00      0.04      0.04      0.05   3635.42      1.00
+sigma[48,0]      0.06      0.01      0.06      0.05      0.06   4347.95      1.00
+sigma[49,0]      0.04      0.00      0.04      0.03      0.04   3531.99      1.00
+sigma[50,0]      0.08      0.01      0.08      0.06      0.09   4524.66      1.00
+sigma[51,0]      0.05      0.00      0.05      0.04      0.06   3271.95      1.00
+sigma[52,0]      0.02      0.00      0.02      0.02      0.03   3149.27      1.00
+   theta[0]      1.14      0.02      1.14      1.11      1.17   2779.06      1.00
+   theta[1]     -0.05      0.03     -0.05     -0.09      0.00   2558.74      1.00
+   theta[2]     -0.08      0.03     -0.08     -0.13     -0.04   3436.72      1.00
+   theta[3]      0.03      0.03      0.03     -0.02      0.07   3189.41      1.00
+   theta[4]     -0.11      0.03     -0.10     -0.15     -0.06   2548.62      1.00
+   theta[5]     -0.03      0.02     -0.03     -0.06     -0.00   2905.98      1.00
+theta_sd[0]      0.56      0.20      0.52      0.30      0.81   2147.35      1.00
+
+Number of divergences: 0
+
+MCMC elapsed time: 15.284873247146606
+/Users/trobacker/GitHub/forecast-sandbox-2025-2026/src/flusion3/.venv/lib/python3.12/site-packages/iddata/loader.py:505: FutureWarning: DataFrameGroupBy.apply operated on the grouping columns. This behavior is deprecated, and in a future version of pandas the grouping columns will be excluded from the operation. Either pass `include_groups=False` to exclude the groupings or explicitly select the grouping columns after groupby to silence this warning.
+  .apply(lambda x: pd.DataFrame({"inc": [np.mean(x["inc"])]})) \
+/Users/trobacker/GitHub/forecast-sandbox-2025-2026/src/flusion3/.venv/lib/python3.12/site-packages/iddata/loader.py:189: FutureWarning: DataFrame.fillna with 'method' is deprecated and will raise in a future version. Use obj.ffill() or obj.bfill() instead.
+  df[fill_cols] = df[fill_cols].fillna(axis=0, method="ffill")
+/Users/trobacker/GitHub/forecast-sandbox-2025-2026/src/flusion3/.venv/lib/python3.12/site-packages/iddata/loader.py:189: FutureWarning: DataFrame.fillna with 'method' is deprecated and will raise in a future version. Use obj.ffill() or obj.bfill() instead.
+  df[fill_cols] = df[fill_cols].fillna(axis=0, method="ffill")
+/Users/trobacker/GitHub/forecast-sandbox-2025-2026/src/flusion3/.venv/lib/python3.12/site-packages/iddata/loader.py:189: FutureWarning: DataFrame.fillna with 'method' is deprecated and will raise in a future version. Use obj.ffill() or obj.bfill() instead.
+  df[fill_cols] = df[fill_cols].fillna(axis=0, method="ffill")
+/Users/trobacker/GitHub/forecast-sandbox-2025-2026/src/flusion3/.venv/lib/python3.12/site-packages/iddata/loader.py:189: FutureWarning: DataFrame.fillna with 'method' is deprecated and will raise in a future version. Use obj.ffill() or obj.bfill() instead.
+  df[fill_cols] = df[fill_cols].fillna(axis=0, method="ffill")
+/Users/trobacker/GitHub/forecast-sandbox-2025-2026/src/flusion3/.venv/lib/python3.12/site-packages/iddata/loader.py:189: FutureWarning: DataFrame.fillna with 'method' is deprecated and will raise in a future version. Use obj.ffill() or obj.bfill() instead.
+  df[fill_cols] = df[fill_cols].fillna(axis=0, method="ffill")
+/Users/trobacker/GitHub/forecast-sandbox-2025-2026/src/flusion3/.venv/lib/python3.12/site-packages/iddata/loader.py:189: FutureWarning: DataFrame.fillna with 'method' is deprecated and will raise in a future version. Use obj.ffill() or obj.bfill() instead.
+  df[fill_cols] = df[fill_cols].fillna(axis=0, method="ffill")
+/Users/trobacker/GitHub/forecast-sandbox-2025-2026/src/flusion3/.venv/lib/python3.12/site-packages/iddata/loader.py:189: FutureWarning: DataFrame.fillna with 'method' is deprecated and will raise in a future version. Use obj.ffill() or obj.bfill() instead.
+  df[fill_cols] = df[fill_cols].fillna(axis=0, method="ffill")
+/Users/trobacker/GitHub/forecast-sandbox-2025-2026/src/flusion3/.venv/lib/python3.12/site-packages/iddata/loader.py:189: FutureWarning: DataFrame.fillna with 'method' is deprecated and will raise in a future version. Use obj.ffill() or obj.bfill() instead.
+  df[fill_cols] = df[fill_cols].fillna(axis=0, method="ffill")
+/Users/trobacker/GitHub/forecast-sandbox-2025-2026/src/flusion3/.venv/lib/python3.12/site-packages/iddata/loader.py:189: FutureWarning: DataFrame.fillna with 'method' is deprecated and will raise in a future version. Use obj.ffill() or obj.bfill() instead.
+  df[fill_cols] = df[fill_cols].fillna(axis=0, method="ffill")
+/Users/trobacker/GitHub/forecast-sandbox-2025-2026/src/flusion3/.venv/lib/python3.12/site-packages/iddata/loader.py:189: FutureWarning: DataFrame.fillna with 'method' is deprecated and will raise in a future version. Use obj.ffill() or obj.bfill() instead.
+  df[fill_cols] = df[fill_cols].fillna(axis=0, method="ffill")
+/Users/trobacker/GitHub/forecast-sandbox-2025-2026/src/flusion3/.venv/lib/python3.12/site-packages/iddata/loader.py:189: FutureWarning: DataFrame.fillna with 'method' is deprecated and will raise in a future version. Use obj.ffill() or obj.bfill() instead.
+  df[fill_cols] = df[fill_cols].fillna(axis=0, method="ffill")
+/Users/trobacker/GitHub/forecast-sandbox-2025-2026/src/flusion3/.venv/lib/python3.12/site-packages/iddata/loader.py:189: FutureWarning: DataFrame.fillna with 'method' is deprecated and will raise in a future version. Use obj.ffill() or obj.bfill() instead.
+  df[fill_cols] = df[fill_cols].fillna(axis=0, method="ffill")
+/Users/trobacker/GitHub/forecast-sandbox-2025-2026/src/flusion3/.venv/lib/python3.12/site-packages/iddata/loader.py:189: FutureWarning: DataFrame.fillna with 'method' is deprecated and will raise in a future version. Use obj.ffill() or obj.bfill() instead.
+  df[fill_cols] = df[fill_cols].fillna(axis=0, method="ffill")
+/Users/trobacker/GitHub/forecast-sandbox-2025-2026/src/flusion3/.venv/lib/python3.12/site-packages/iddata/loader.py:189: FutureWarning: DataFrame.fillna with 'method' is deprecated and will raise in a future version. Use obj.ffill() or obj.bfill() instead.
+  df[fill_cols] = df[fill_cols].fillna(axis=0, method="ffill")
+/Users/trobacker/GitHub/forecast-sandbox-2025-2026/src/flusion3/.venv/lib/python3.12/site-packages/iddata/loader.py:189: FutureWarning: DataFrame.fillna with 'method' is deprecated and will raise in a future version. Use obj.ffill() or obj.bfill() instead.
+  df[fill_cols] = df[fill_cols].fillna(axis=0, method="ffill")
+/Users/trobacker/GitHub/forecast-sandbox-2025-2026/src/flusion3/.venv/lib/python3.12/site-packages/iddata/loader.py:539: FutureWarning: DataFrameGroupBy.apply operated on the grouping columns. This behavior is deprecated, and in a future version of pandas the grouping columns will be excluded from the operation. Either pass `include_groups=False` to exclude the groupings or explicitly select the grouping columns after groupby to silence this warning.
+  .apply(lambda x: pd.DataFrame({"inc": [np.mean(x["inc"])]})) \
+/Users/trobacker/GitHub/forecast-sandbox-2025-2026/src/flusion3/.venv/lib/python3.12/site-packages/timeseriesutils/featurize.py:502: FutureWarning: DataFrameGroupBy.apply operated on the grouping columns. This behavior is deprecated, and in a future version of pandas the grouping columns will be excluded from the operation. Either pass `include_groups=False` to exclude the groupings or explicitly select the grouping columns after groupby to silence this warning.
+  .apply(taylor_coefs_one_column_grp,
+/Users/trobacker/GitHub/forecast-sandbox-2025-2026/src/flusion3/.venv/lib/python3.12/site-packages/timeseriesutils/featurize.py:502: FutureWarning: DataFrameGroupBy.apply operated on the grouping columns. This behavior is deprecated, and in a future version of pandas the grouping columns will be excluded from the operation. Either pass `include_groups=False` to exclude the groupings or explicitly select the grouping columns after groupby to silence this warning.
+  .apply(taylor_coefs_one_column_grp,
+/Users/trobacker/GitHub/forecast-sandbox-2025-2026/src/flusion3/.venv/lib/python3.12/site-packages/timeseriesutils/featurize.py:502: FutureWarning: DataFrameGroupBy.apply operated on the grouping columns. This behavior is deprecated, and in a future version of pandas the grouping columns will be excluded from the operation. Either pass `include_groups=False` to exclude the groupings or explicitly select the grouping columns after groupby to silence this warning.
+  .apply(taylor_coefs_one_column_grp,
+/Users/trobacker/GitHub/forecast-sandbox-2025-2026/src/flusion3/.venv/lib/python3.12/site-packages/timeseriesutils/featurize.py:502: FutureWarning: DataFrameGroupBy.apply operated on the grouping columns. This behavior is deprecated, and in a future version of pandas the grouping columns will be excluded from the operation. Either pass `include_groups=False` to exclude the groupings or explicitly select the grouping columns after groupby to silence this warning.
+  .apply(taylor_coefs_one_column_grp,
+Bag number:   0%|          | 0/20 [00:00<?, ?it/s]Bag number:   5%|▌         | 1/20 [00:35<11:23, 35.97s/it]Bag number:  10%|█         | 2/20 [01:13<11:04, 36.90s/it]Bag number:  15%|█▌        | 3/20 [01:51<10:36, 37.46s/it]Bag number:  20%|██        | 4/20 [02:29<10:04, 37.75s/it]Bag number:  25%|██▌       | 5/20 [03:07<09:23, 37.57s/it]Bag number:  30%|███       | 6/20 [03:46<08:52, 38.07s/it]Bag number:  35%|███▌      | 7/20 [04:23<08:10, 37.74s/it]Bag number:  40%|████      | 8/20 [05:01<07:36, 38.07s/it]Bag number:  45%|████▌     | 9/20 [05:41<07:02, 38.38s/it]Bag number:  50%|█████     | 10/20 [06:21<06:31, 39.14s/it]Bag number:  55%|█████▌    | 11/20 [07:02<05:55, 39.54s/it]Bag number:  60%|██████    | 12/20 [23:17<43:12, 324.06s/it]Bag number:  65%|██████▌   | 13/20 [39:16<1:00:15, 516.46s/it]Bag number:  70%|███████   | 14/20 [39:53<37:10, 371.77s/it]  Bag number:  75%|███████▌  | 15/20 [56:44<47:02, 564.48s/it]Bag number:  80%|████████  | 16/20 [1:12:35<45:23, 680.80s/it]Bag number:  85%|████████▌ | 17/20 [1:30:15<39:44, 794.74s/it]Bag number:  90%|█████████ | 18/20 [1:46:57<28:34, 857.18s/it]Bag number:  95%|█████████▌| 19/20 [1:47:37<10:11, 611.64s/it]Bag number: 100%|██████████| 20/20 [2:05:44<00:00, 754.21s/it]Bag number: 100%|██████████| 20/20 [2:05:44<00:00, 377.21s/it]
+
+Attaching package: ‘dplyr’
+
+The following objects are masked from ‘package:stats’:
+
+    filter, lag
+
+The following objects are masked from ‘package:base’:
+
+    intersect, setdiff, setequal, union
+
+Rows: 10070 Columns: 5
+── Column specification ────────────────────────────────────────────────────────
+Delimiter: ","
+chr  (2): location, location_name
+dbl  (2): value, weekly_rate
+date (1): date
+
+ℹ Use `spec()` to retrieve the full column specification for this data.
+ℹ Specify the column types or set `show_col_types = FALSE` to quiet this message.
+Rows: 53 Columns: 12
+── Column specification ────────────────────────────────────────────────────────
+Delimiter: ","
+chr (3): abbreviation, location, location_name
+dbl (9): population, count_rate0p3, count_rate0p5, count_rate0p7, count_rate...
+
+ℹ Use `spec()` to retrieve the full column specification for this data.
+ℹ Specify the column types or set `show_col_types = FALSE` to quiet this message.
+Running flusion3 ensemble for reference date: 2023-12-09
+============================================================
+
+1/4: Running AR6 (no Fourier)...
+
+2/4: Running AR6 with Fourier seasonality...
+
+3/4: Running GBQR...
+
+4/4: Creating ensemble...
+
+============================================================
+Flusion3 ensemble complete!
+Output saved to: ../../model-output/UMass-flusion3/2023-12-09-UMass-flusion3.csv
+✓ Successfully completed forecast for 2023-12-09
+
+============================================================
+Running flusion3 for date: 2023-12-13
+============================================================
+/Users/trobacker/GitHub/idmodels/src/idmodels/sarix.py:35: FutureWarning: DataFrame.interpolate with object dtype is deprecated and will raise in a future version. Call obj.infer_objects(copy=False) before interpolating instead.
+  df = df.query("wk_end_date >= '2022-10-01'").interpolate()
+  0%|          | 0/4000 [00:00<?, ?it/s]warmup:   0%|          | 1/4000 [00:00<35:30,  1.88it/s, 1 steps of size 2.34e+00. acc. prob=0.00]warmup:   0%|          | 2/4000 [00:01<33:41,  1.98it/s, 1 steps of size 2.30e-01. acc. prob=0.00]warmup:   1%|          | 32/4000 [00:01<01:29, 44.27it/s, 255 steps of size 2.03e-03. acc. prob=0.70]warmup:   1%|          | 46/4000 [00:01<01:09, 56.85it/s, 127 steps of size 1.52e-03. acc. prob=0.72]warmup:   1%|▏         | 59/4000 [00:01<01:00, 65.21it/s, 255 steps of size 2.48e-03. acc. prob=0.74]warmup:   2%|▏         | 73/4000 [00:01<00:49, 79.44it/s, 127 steps of size 2.38e-03. acc. prob=0.74]warmup:   2%|▏         | 87/4000 [00:01<00:42, 91.09it/s, 255 steps of size 2.42e-03. acc. prob=0.75]warmup:   2%|▎         | 100/4000 [00:01<00:39, 99.35it/s, 127 steps of size 4.11e-03. acc. prob=0.76]warmup:   3%|▎         | 116/4000 [00:01<00:34, 113.16it/s, 255 steps of size 3.55e-02. acc. prob=0.76]warmup:   4%|▎         | 141/4000 [00:01<00:26, 147.28it/s, 127 steps of size 6.42e-02. acc. prob=0.77]warmup:   4%|▍         | 166/4000 [00:02<00:21, 174.51it/s, 15 steps of size 1.91e-02. acc. prob=0.77] warmup:   5%|▍         | 195/4000 [00:02<00:18, 203.99it/s, 127 steps of size 5.82e-02. acc. prob=0.77]warmup:   6%|▌         | 230/4000 [00:02<00:15, 244.96it/s, 127 steps of size 6.05e-02. acc. prob=0.78]warmup:   6%|▋         | 256/4000 [02:03<1:27:03,  1.40s/it, 5 steps of size 2.27e-02. acc. prob=0.78] warmup:   7%|▋         | 279/4000 [02:03<1:02:52,  1.01s/it, 63 steps of size 9.96e-02. acc. prob=0.78]warmup:   8%|▊         | 310/4000 [02:03<40:53,  1.50it/s, 127 steps of size 8.04e-02. acc. prob=0.78] warmup:   9%|▊         | 348/4000 [02:03<25:16,  2.41it/s, 63 steps of size 1.00e-01. acc. prob=0.78] warmup:  10%|▉         | 391/4000 [02:03<15:34,  3.86it/s, 31 steps of size 1.45e-01. acc. prob=0.78]warmup:  11%|█         | 441/4000 [02:03<09:28,  6.26it/s, 31 steps of size 1.05e-01. acc. prob=0.78]warmup:  12%|█▏        | 480/4000 [02:03<06:36,  8.88it/s, 31 steps of size 3.36e-02. acc. prob=0.78]warmup:  13%|█▎        | 517/4000 [02:04<04:41, 12.37it/s, 63 steps of size 1.43e-01. acc. prob=0.79]warmup:  14%|█▍        | 555/4000 [02:04<03:18, 17.38it/s, 63 steps of size 7.89e-02. acc. prob=0.79]warmup:  15%|█▌        | 600/4000 [02:04<02:12, 25.64it/s, 31 steps of size 8.31e-02. acc. prob=0.79]warmup:  16%|█▌        | 647/4000 [02:04<01:29, 37.43it/s, 63 steps of size 1.08e-01. acc. prob=0.79]warmup:  17%|█▋        | 696/4000 [02:04<01:01, 53.92it/s, 63 steps of size 1.02e-01. acc. prob=0.79]warmup:  19%|█▊        | 746/4000 [02:04<00:42, 76.02it/s, 63 steps of size 1.13e-01. acc. prob=0.79]warmup:  20%|█▉        | 795/4000 [02:04<00:31, 103.29it/s, 31 steps of size 1.44e-01. acc. prob=0.79]warmup:  21%|██        | 847/4000 [02:04<00:22, 139.13it/s, 63 steps of size 1.02e-01. acc. prob=0.79]warmup:  22%|██▏       | 895/4000 [02:04<00:18, 168.63it/s, 5 steps of size 3.91e-02. acc. prob=0.79] warmup:  23%|██▎       | 939/4000 [02:05<00:15, 197.27it/s, 63 steps of size 8.71e-02. acc. prob=0.79]warmup:  25%|██▍       | 989/4000 [02:05<00:12, 242.79it/s, 63 steps of size 1.04e-01. acc. prob=0.79]warmup:  26%|██▌       | 1033/4000 [02:05<00:10, 273.26it/s, 63 steps of size 1.14e-01. acc. prob=0.79]warmup:  27%|██▋       | 1084/4000 [02:05<00:09, 320.56it/s, 63 steps of size 1.14e-01. acc. prob=0.79]warmup:  28%|██▊       | 1135/4000 [02:05<00:07, 362.69it/s, 63 steps of size 9.32e-02. acc. prob=0.79]warmup:  30%|██▉       | 1182/4000 [02:05<00:07, 388.30it/s, 31 steps of size 9.95e-02. acc. prob=0.79]warmup:  31%|███       | 1232/4000 [02:05<00:06, 414.32it/s, 63 steps of size 8.65e-02. acc. prob=0.79]warmup:  32%|███▏      | 1288/4000 [02:05<00:06, 451.96it/s, 31 steps of size 1.33e-01. acc. prob=0.79]warmup:  33%|███▎      | 1338/4000 [02:05<00:05, 464.97it/s, 31 steps of size 8.79e-02. acc. prob=0.79]warmup:  35%|███▍      | 1392/4000 [02:06<00:05, 484.80it/s, 31 steps of size 1.13e-01. acc. prob=0.79]warmup:  36%|███▌      | 1443/4000 [02:06<00:05, 484.28it/s, 31 steps of size 1.49e-01. acc. prob=0.79]warmup:  37%|███▋      | 1499/4000 [02:06<00:04, 501.91it/s, 63 steps of size 9.88e-02. acc. prob=0.79]warmup:  39%|███▉      | 1554/4000 [02:06<00:04, 514.60it/s, 31 steps of size 1.11e-01. acc. prob=0.79]warmup:  40%|████      | 1616/4000 [02:06<00:04, 544.36it/s, 31 steps of size 9.92e-02. acc. prob=0.79]warmup:  42%|████▏     | 1672/4000 [02:06<00:04, 535.46it/s, 63 steps of size 1.11e-01. acc. prob=0.79]warmup:  43%|████▎     | 1733/4000 [02:06<00:04, 556.48it/s, 31 steps of size 1.12e-01. acc. prob=0.79]warmup:  45%|████▍     | 1791/4000 [02:06<00:03, 562.64it/s, 31 steps of size 1.19e-01. acc. prob=0.79]warmup:  46%|████▋     | 1853/4000 [02:06<00:03, 579.02it/s, 31 steps of size 1.36e-01. acc. prob=0.79]warmup:  48%|████▊     | 1912/4000 [02:06<00:03, 563.71it/s, 31 steps of size 1.16e-01. acc. prob=0.79]warmup:  49%|████▉     | 1969/4000 [02:07<00:04, 503.59it/s, 127 steps of size 7.11e-02. acc. prob=0.79]sample:  51%|█████     | 2021/4000 [02:07<00:04, 475.41it/s, 63 steps of size 9.62e-02. acc. prob=0.90] sample:  52%|█████▏    | 2070/4000 [02:07<00:04, 470.22it/s, 31 steps of size 9.62e-02. acc. prob=0.91]sample:  53%|█████▎    | 2119/4000 [02:07<00:03, 472.72it/s, 63 steps of size 9.62e-02. acc. prob=0.90]sample:  54%|█████▍    | 2167/4000 [02:07<00:03, 463.54it/s, 63 steps of size 9.62e-02. acc. prob=0.90]sample:  55%|█████▌    | 2218/4000 [02:07<00:03, 474.97it/s, 31 steps of size 9.62e-02. acc. prob=0.91]sample:  57%|█████▋    | 2266/4000 [02:07<00:03, 456.80it/s, 31 steps of size 9.62e-02. acc. prob=0.90]sample:  58%|█████▊    | 2312/4000 [02:07<00:03, 452.47it/s, 31 steps of size 9.62e-02. acc. prob=0.90]sample:  59%|█████▉    | 2358/4000 [02:07<00:03, 445.79it/s, 31 steps of size 9.62e-02. acc. prob=0.90]sample:  60%|██████    | 2406/4000 [02:08<00:03, 453.14it/s, 63 steps of size 9.62e-02. acc. prob=0.90]sample:  61%|██████▏   | 2453/4000 [02:08<00:03, 454.47it/s, 63 steps of size 9.62e-02. acc. prob=0.90]sample:  62%|██████▏   | 2499/4000 [02:08<00:03, 445.00it/s, 63 steps of size 9.62e-02. acc. prob=0.90]sample:  64%|██████▎   | 2544/4000 [02:08<00:03, 434.19it/s, 63 steps of size 9.62e-02. acc. prob=0.90]sample:  65%|██████▍   | 2592/4000 [02:08<00:03, 444.50it/s, 63 steps of size 9.62e-02. acc. prob=0.90]sample:  66%|██████▌   | 2640/4000 [02:08<00:02, 453.46it/s, 63 steps of size 9.62e-02. acc. prob=0.90]sample:  67%|██████▋   | 2686/4000 [02:08<00:02, 446.57it/s, 31 steps of size 9.62e-02. acc. prob=0.90]sample:  68%|██████▊   | 2732/4000 [02:08<00:02, 449.61it/s, 31 steps of size 9.62e-02. acc. prob=0.90]sample:  69%|██████▉   | 2778/4000 [02:08<00:02, 444.56it/s, 63 steps of size 9.62e-02. acc. prob=0.90]sample:  71%|███████   | 2826/4000 [02:08<00:02, 454.63it/s, 31 steps of size 9.62e-02. acc. prob=0.90]sample:  72%|███████▏  | 2872/4000 [02:09<00:02, 455.16it/s, 63 steps of size 9.62e-02. acc. prob=0.90]sample:  73%|███████▎  | 2920/4000 [02:09<00:02, 458.49it/s, 63 steps of size 9.62e-02. acc. prob=0.90]sample:  74%|███████▍  | 2967/4000 [02:09<00:02, 459.43it/s, 63 steps of size 9.62e-02. acc. prob=0.90]sample:  75%|███████▌  | 3013/4000 [02:09<00:02, 457.41it/s, 31 steps of size 9.62e-02. acc. prob=0.90]sample:  76%|███████▋  | 3059/4000 [02:09<00:02, 453.88it/s, 31 steps of size 9.62e-02. acc. prob=0.90]sample:  78%|███████▊  | 3105/4000 [02:09<00:02, 444.60it/s, 63 steps of size 9.62e-02. acc. prob=0.90]sample:  79%|███████▉  | 3152/4000 [02:09<00:01, 448.59it/s, 63 steps of size 9.62e-02. acc. prob=0.90]sample:  80%|███████▉  | 3197/4000 [02:09<00:01, 448.97it/s, 63 steps of size 9.62e-02. acc. prob=0.90]sample:  81%|████████  | 3243/4000 [02:09<00:01, 451.81it/s, 63 steps of size 9.62e-02. acc. prob=0.90]sample:  82%|████████▏ | 3289/4000 [02:10<00:01, 446.75it/s, 31 steps of size 9.62e-02. acc. prob=0.90]sample:  83%|████████▎ | 3339/4000 [02:10<00:01, 461.19it/s, 31 steps of size 9.62e-02. acc. prob=0.90]sample:  85%|████████▍ | 3386/4000 [02:10<00:01, 453.57it/s, 63 steps of size 9.62e-02. acc. prob=0.90]sample:  86%|████████▌ | 3432/4000 [02:10<00:01, 453.39it/s, 63 steps of size 9.62e-02. acc. prob=0.90]sample:  87%|████████▋ | 3478/4000 [02:10<00:01, 451.93it/s, 31 steps of size 9.62e-02. acc. prob=0.90]sample:  88%|████████▊ | 3524/4000 [02:10<00:01, 448.72it/s, 63 steps of size 9.62e-02. acc. prob=0.90]sample:  89%|████████▉ | 3569/4000 [02:10<00:00, 445.87it/s, 63 steps of size 9.62e-02. acc. prob=0.89]sample:  90%|█████████ | 3616/4000 [02:10<00:00, 451.03it/s, 63 steps of size 9.62e-02. acc. prob=0.89]sample:  92%|█████████▏| 3665/4000 [02:10<00:00, 460.95it/s, 31 steps of size 9.62e-02. acc. prob=0.90]sample:  93%|█████████▎| 3712/4000 [02:10<00:00, 449.95it/s, 31 steps of size 9.62e-02. acc. prob=0.90]sample:  94%|█████████▍| 3758/4000 [02:11<00:00, 446.97it/s, 31 steps of size 9.62e-02. acc. prob=0.90]sample:  95%|█████████▌| 3803/4000 [02:11<00:00, 447.60it/s, 31 steps of size 9.62e-02. acc. prob=0.90]sample:  96%|█████████▌| 3849/4000 [02:11<00:00, 448.18it/s, 63 steps of size 9.62e-02. acc. prob=0.90]sample:  98%|█████████▊| 3900/4000 [02:11<00:00, 465.37it/s, 63 steps of size 9.62e-02. acc. prob=0.90]sample:  99%|█████████▊| 3947/4000 [02:11<00:00, 454.30it/s, 31 steps of size 9.62e-02. acc. prob=0.90]sample: 100%|█████████▉| 3995/4000 [02:11<00:00, 460.31it/s, 31 steps of size 9.62e-02. acc. prob=0.90]sample: 100%|██████████| 4000/4000 [02:11<00:00, 30.40it/s, 63 steps of size 9.62e-02. acc. prob=0.90] 
+
+                 mean       std    median      5.0%     95.0%     n_eff     r_hat
+ sigma[0,0]      0.04      0.00      0.04      0.04      0.05   2680.68      1.00
+ sigma[1,0]      0.08      0.01      0.08      0.07      0.09   2235.87      1.00
+ sigma[2,0]      0.04      0.00      0.04      0.04      0.05   2321.22      1.00
+ sigma[3,0]      0.04      0.00      0.04      0.04      0.05   2255.66      1.00
+ sigma[4,0]      0.03      0.00      0.03      0.03      0.04   2439.15      1.00
+ sigma[5,0]      0.04      0.00      0.04      0.03      0.05   2889.19      1.00
+ sigma[6,0]      0.04      0.00      0.04      0.04      0.05   2321.25      1.00
+ sigma[7,0]      0.09      0.01      0.09      0.07      0.10   2363.69      1.00
+ sigma[8,0]      0.07      0.01      0.07      0.06      0.08   2812.53      1.00
+ sigma[9,0]      0.03      0.00      0.03      0.02      0.03   2596.43      1.00
+sigma[10,0]      0.03      0.00      0.03      0.03      0.04   2373.62      1.00
+sigma[11,0]      0.08      0.01      0.08      0.07      0.09   2245.52      1.00
+sigma[12,0]      0.06      0.01      0.06      0.05      0.07   2245.55      1.00
+sigma[13,0]      0.04      0.00      0.03      0.03      0.04   2341.05      1.00
+sigma[14,0]      0.04      0.00      0.04      0.03      0.04   1809.49      1.00
+sigma[15,0]      0.05      0.00      0.05      0.04      0.05   2368.10      1.00
+sigma[16,0]      0.04      0.00      0.04      0.04      0.05   2418.26      1.00
+sigma[17,0]      0.04      0.00      0.04      0.04      0.05   2531.76      1.00
+sigma[18,0]      0.04      0.00      0.04      0.04      0.05   2355.64      1.00
+sigma[19,0]      0.05      0.01      0.05      0.05      0.06   2312.71      1.00
+sigma[20,0]      0.03      0.00      0.03      0.03      0.04   2446.99      1.00
+sigma[21,0]      0.04      0.00      0.04      0.03      0.04   2201.61      1.00
+sigma[22,0]      0.04      0.00      0.04      0.03      0.04   2460.51      1.00
+sigma[23,0]      0.03      0.00      0.03      0.03      0.04   2145.26      1.00
+sigma[24,0]      0.04      0.00      0.04      0.04      0.05   2042.37      1.00
+sigma[25,0]      0.04      0.00      0.04      0.03      0.05   2515.92      1.00
+sigma[26,0]      0.06      0.01      0.06      0.05      0.07   2020.42      1.00
+sigma[27,0]      0.05      0.00      0.05      0.04      0.05   2512.63      1.00
+sigma[28,0]      0.05      0.00      0.04      0.04      0.05   2726.15      1.00
+sigma[29,0]      0.06      0.01      0.06      0.05      0.07   2637.15      1.00
+sigma[30,0]      0.04      0.00      0.04      0.03      0.05   2298.45      1.00
+sigma[31,0]      0.05      0.00      0.05      0.04      0.05   2252.08      1.00
+sigma[32,0]      0.03      0.00      0.03      0.02      0.03   2654.57      1.00
+sigma[33,0]      0.04      0.00      0.04      0.03      0.04   2065.44      1.00
+sigma[34,0]      0.07      0.01      0.07      0.06      0.08   2196.98      1.00
+sigma[35,0]      0.03      0.00      0.03      0.03      0.04   2475.73      1.00
+sigma[36,0]      0.04      0.00      0.04      0.04      0.05   2501.54      1.00
+sigma[37,0]      0.04      0.00      0.04      0.04      0.05   2702.43      1.00
+sigma[38,0]      0.03      0.00      0.03      0.03      0.04   2395.39      1.00
+sigma[39,0]      0.07      0.01      0.07      0.06      0.08   2148.80      1.00
+sigma[40,0]      0.04      0.00      0.04      0.03      0.04   2274.85      1.00
+sigma[41,0]      0.07      0.01      0.07      0.06      0.08   2273.14      1.00
+sigma[42,0]      0.04      0.00      0.04      0.03      0.05   2620.72      1.00
+sigma[43,0]      0.03      0.00      0.03      0.02      0.03   2150.17      1.00
+sigma[44,0]      0.05      0.00      0.05      0.04      0.06   2309.69      1.00
+sigma[45,0]      0.07      0.01      0.07      0.06      0.08   2350.63      1.00
+sigma[46,0]      0.04      0.00      0.04      0.03      0.04   2034.90      1.00
+sigma[47,0]      0.04      0.00      0.04      0.04      0.05   2171.28      1.00
+sigma[48,0]      0.06      0.01      0.06      0.05      0.06   2731.38      1.00
+sigma[49,0]      0.04      0.00      0.04      0.03      0.04   2283.97      1.00
+sigma[50,0]      0.08      0.01      0.08      0.07      0.09   2279.88      1.00
+sigma[51,0]      0.05      0.00      0.05      0.04      0.06   2387.27      1.00
+sigma[52,0]      0.02      0.00      0.02      0.02      0.03   1996.25      1.00
+   theta[0]      1.14      0.02      1.14      1.11      1.17   1775.20      1.00
+   theta[1]     -0.05      0.03     -0.05     -0.10     -0.00   1400.02      1.00
+   theta[2]     -0.08      0.03     -0.08     -0.12     -0.03   1909.86      1.00
+   theta[3]      0.02      0.03      0.02     -0.02      0.07   1907.37      1.00
+   theta[4]     -0.10      0.03     -0.10     -0.15     -0.06   1538.69      1.00
+   theta[5]     -0.03      0.02     -0.03     -0.06     -0.00   1504.10      1.00
+theta_sd[0]      0.57      0.20      0.53      0.29      0.83   1564.95      1.00
+
+Number of divergences: 0
+
+MCMC elapsed time: 135.37686777114868
+/Users/trobacker/GitHub/idmodels/src/idmodels/sarix.py:35: FutureWarning: DataFrame.interpolate with object dtype is deprecated and will raise in a future version. Call obj.infer_objects(copy=False) before interpolating instead.
+  df = df.query("wk_end_date >= '2022-10-01'").interpolate()
+  0%|          | 0/4000 [00:00<?, ?it/s]warmup:   0%|          | 1/4000 [00:00<36:38,  1.82it/s, 1 steps of size 2.34e+00. acc. prob=0.00]warmup:   0%|          | 2/4000 [00:00<32:13,  2.07it/s, 1 steps of size 2.30e-01. acc. prob=0.00]warmup:   1%|          | 32/4000 [00:01<01:26, 45.93it/s, 255 steps of size 2.03e-03. acc. prob=0.70]warmup:   1%|          | 46/4000 [00:01<01:07, 58.40it/s, 127 steps of size 1.52e-03. acc. prob=0.72]warmup:   1%|▏         | 59/4000 [00:01<00:59, 66.57it/s, 255 steps of size 2.48e-03. acc. prob=0.74]warmup:   2%|▏         | 72/4000 [00:01<00:50, 78.28it/s, 255 steps of size 2.80e-03. acc. prob=0.75]warmup:   2%|▏         | 86/4000 [00:01<00:42, 91.12it/s, 255 steps of size 1.63e-03. acc. prob=0.75]warmup:   2%|▏         | 99/4000 [00:01<00:39, 98.04it/s, 127 steps of size 3.48e-03. acc. prob=0.76]warmup:   3%|▎         | 116/4000 [00:01<00:34, 112.94it/s, 255 steps of size 3.55e-02. acc. prob=0.76]warmup:   4%|▎         | 141/4000 [00:01<00:26, 147.49it/s, 127 steps of size 6.42e-02. acc. prob=0.77]warmup:   4%|▍         | 165/4000 [00:02<00:22, 172.12it/s, 63 steps of size 1.71e-01. acc. prob=0.77] warmup:   5%|▍         | 193/4000 [00:02<00:18, 201.23it/s, 31 steps of size 1.63e-01. acc. prob=0.78]warmup:   6%|▌         | 229/4000 [00:02<00:15, 245.37it/s, 31 steps of size 4.17e-02. acc. prob=0.78]warmup:   7%|▋         | 265/4000 [00:02<00:13, 276.57it/s, 255 steps of size 4.95e-02. acc. prob=0.78]warmup:   7%|▋         | 294/4000 [00:02<00:13, 278.49it/s, 127 steps of size 6.05e-02. acc. prob=0.78]warmup:   8%|▊         | 331/4000 [00:02<00:12, 304.08it/s, 63 steps of size 1.26e-01. acc. prob=0.78] warmup:   9%|▉         | 373/4000 [00:02<00:10, 335.46it/s, 63 steps of size 1.20e-01. acc. prob=0.78]warmup:  10%|█         | 419/4000 [00:02<00:09, 369.99it/s, 63 steps of size 1.29e-01. acc. prob=0.78]warmup:  12%|█▏        | 462/4000 [00:02<00:09, 383.00it/s, 127 steps of size 4.96e-02. acc. prob=0.78]warmup:  13%|█▎        | 501/4000 [00:02<00:09, 357.86it/s, 63 steps of size 1.06e-01. acc. prob=0.78] warmup:  14%|█▎        | 541/4000 [00:03<00:09, 369.20it/s, 9 steps of size 4.99e-02. acc. prob=0.78] warmup:  15%|█▍        | 584/4000 [00:03<00:08, 383.45it/s, 63 steps of size 1.06e-01. acc. prob=0.79]warmup:  16%|█▌        | 631/4000 [00:03<00:08, 405.27it/s, 63 steps of size 9.23e-02. acc. prob=0.79]warmup:  17%|█▋        | 680/4000 [00:03<00:07, 428.37it/s, 63 steps of size 9.39e-02. acc. prob=0.79]warmup:  18%|█▊        | 731/4000 [00:03<00:07, 450.33it/s, 31 steps of size 1.76e-01. acc. prob=0.79]warmup:  19%|█▉        | 777/4000 [00:03<00:07, 453.16it/s, 63 steps of size 9.80e-02. acc. prob=0.79]warmup:  21%|██        | 829/4000 [00:03<00:06, 469.86it/s, 63 steps of size 1.08e-01. acc. prob=0.79]warmup:  22%|██▏       | 877/4000 [00:03<00:07, 427.60it/s, 63 steps of size 1.02e-01. acc. prob=0.79]warmup:  23%|██▎       | 921/4000 [00:03<00:07, 406.15it/s, 6 steps of size 4.77e-02. acc. prob=0.79] warmup:  24%|██▍       | 963/4000 [00:04<00:07, 400.72it/s, 31 steps of size 9.35e-02. acc. prob=0.79]warmup:  25%|██▌       | 1007/4000 [00:04<00:07, 410.16it/s, 31 steps of size 1.44e-01. acc. prob=0.79]warmup:  27%|██▋       | 1064/4000 [00:04<00:06, 442.39it/s, 31 steps of size 1.91e-01. acc. prob=0.79]warmup:  28%|██▊       | 1115/4000 [00:04<00:06, 458.67it/s, 63 steps of size 9.56e-02. acc. prob=0.79]warmup:  29%|██▉       | 1162/4000 [00:04<00:06, 459.62it/s, 63 steps of size 1.05e-01. acc. prob=0.79]warmup:  30%|███       | 1214/4000 [00:04<00:05, 476.89it/s, 31 steps of size 1.15e-01. acc. prob=0.79]warmup:  32%|███▏      | 1265/4000 [00:04<00:05, 485.06it/s, 31 steps of size 1.35e-01. acc. prob=0.79]warmup:  33%|███▎      | 1318/4000 [00:04<00:05, 496.43it/s, 31 steps of size 1.23e-01. acc. prob=0.79]warmup:  34%|███▍      | 1369/4000 [00:04<00:05, 500.28it/s, 31 steps of size 1.35e-01. acc. prob=0.79]warmup:  36%|███▌      | 1421/4000 [00:04<00:05, 506.01it/s, 31 steps of size 1.39e-01. acc. prob=0.79]warmup:  37%|███▋      | 1473/4000 [00:05<00:04, 509.67it/s, 31 steps of size 1.19e-01. acc. prob=0.79]warmup:  38%|███▊      | 1528/4000 [00:05<00:04, 520.31it/s, 31 steps of size 1.01e-01. acc. prob=0.79]warmup:  40%|███▉      | 1581/4000 [00:05<00:04, 521.89it/s, 31 steps of size 1.00e-01. acc. prob=0.79]warmup:  41%|████      | 1638/4000 [00:05<00:04, 535.36it/s, 31 steps of size 1.26e-01. acc. prob=0.79]warmup:  42%|████▏     | 1693/4000 [00:05<00:04, 539.25it/s, 31 steps of size 1.18e-01. acc. prob=0.79]warmup:  44%|████▍     | 1760/4000 [00:05<00:03, 572.43it/s, 31 steps of size 1.24e-01. acc. prob=0.79]warmup:  45%|████▌     | 1819/4000 [00:05<00:03, 575.37it/s, 31 steps of size 9.49e-02. acc. prob=0.79]warmup:  47%|████▋     | 1881/4000 [00:05<00:03, 585.86it/s, 31 steps of size 1.09e-01. acc. prob=0.79]warmup:  48%|████▊     | 1940/4000 [00:05<00:03, 558.94it/s, 63 steps of size 1.05e-01. acc. prob=0.79]warmup:  50%|████▉     | 1997/4000 [00:06<00:04, 482.78it/s, 31 steps of size 1.06e-01. acc. prob=0.79]sample:  51%|█████     | 2048/4000 [00:06<00:04, 465.51it/s, 63 steps of size 9.62e-02. acc. prob=0.89]sample:  52%|█████▏    | 2098/4000 [00:06<00:04, 474.40it/s, 31 steps of size 9.62e-02. acc. prob=0.89]sample:  54%|█████▎    | 2147/4000 [00:06<00:03, 467.82it/s, 31 steps of size 9.62e-02. acc. prob=0.90]sample:  55%|█████▍    | 2195/4000 [00:06<00:03, 463.07it/s, 63 steps of size 9.62e-02. acc. prob=0.91]sample:  56%|█████▌    | 2242/4000 [00:06<00:03, 453.03it/s, 31 steps of size 9.62e-02. acc. prob=0.90]sample:  57%|█████▋    | 2288/4000 [00:06<00:03, 451.04it/s, 31 steps of size 9.62e-02. acc. prob=0.90]sample:  58%|█████▊    | 2334/4000 [00:06<00:03, 449.36it/s, 31 steps of size 9.62e-02. acc. prob=0.90]sample:  60%|█████▉    | 2384/4000 [00:06<00:03, 462.27it/s, 63 steps of size 9.62e-02. acc. prob=0.90]sample:  61%|██████    | 2432/4000 [00:06<00:03, 464.07it/s, 63 steps of size 9.62e-02. acc. prob=0.90]sample:  62%|██████▏   | 2479/4000 [00:07<00:03, 452.29it/s, 63 steps of size 9.62e-02. acc. prob=0.90]sample:  63%|██████▎   | 2525/4000 [00:07<00:03, 445.04it/s, 63 steps of size 9.62e-02. acc. prob=0.90]sample:  64%|██████▍   | 2570/4000 [00:07<00:03, 439.67it/s, 31 steps of size 9.62e-02. acc. prob=0.90]sample:  65%|██████▌   | 2618/4000 [00:07<00:03, 450.96it/s, 63 steps of size 9.62e-02. acc. prob=0.90]sample:  67%|██████▋   | 2664/4000 [00:07<00:02, 446.79it/s, 63 steps of size 9.62e-02. acc. prob=0.90]sample:  68%|██████▊   | 2709/4000 [00:07<00:02, 447.49it/s, 31 steps of size 9.62e-02. acc. prob=0.90]sample:  69%|██████▉   | 2754/4000 [00:07<00:02, 435.11it/s, 31 steps of size 9.62e-02. acc. prob=0.90]sample:  70%|██████▉   | 2799/4000 [00:07<00:02, 437.82it/s, 63 steps of size 9.62e-02. acc. prob=0.90]sample:  71%|███████   | 2848/4000 [00:07<00:02, 451.24it/s, 63 steps of size 9.62e-02. acc. prob=0.90]sample:  72%|███████▏  | 2894/4000 [00:08<00:02, 452.82it/s, 63 steps of size 9.62e-02. acc. prob=0.90]sample:  74%|███████▎  | 2947/4000 [00:08<00:02, 464.57it/s, 63 steps of size 9.62e-02. acc. prob=0.90]sample:  75%|███████▍  | 2994/4000 [00:08<00:02, 463.26it/s, 63 steps of size 9.62e-02. acc. prob=0.90]sample:  76%|███████▌  | 3041/4000 [00:08<00:02, 454.48it/s, 63 steps of size 9.62e-02. acc. prob=0.90]sample:  77%|███████▋  | 3087/4000 [00:08<00:02, 450.68it/s, 63 steps of size 9.62e-02. acc. prob=0.90]sample:  78%|███████▊  | 3133/4000 [00:08<00:01, 452.03it/s, 63 steps of size 9.62e-02. acc. prob=0.90]sample:  80%|███████▉  | 3180/4000 [00:08<00:01, 456.70it/s, 31 steps of size 9.62e-02. acc. prob=0.90]sample:  81%|████████  | 3226/4000 [00:08<00:01, 453.25it/s, 31 steps of size 9.62e-02. acc. prob=0.90]sample:  82%|████████▏ | 3272/4000 [00:08<00:01, 446.78it/s, 63 steps of size 9.62e-02. acc. prob=0.90]sample:  83%|████████▎ | 3317/4000 [00:08<00:01, 440.36it/s, 63 steps of size 9.62e-02. acc. prob=0.90]sample:  84%|████████▍ | 3365/4000 [00:09<00:01, 450.99it/s, 31 steps of size 9.62e-02. acc. prob=0.90]sample:  85%|████████▌ | 3411/4000 [00:09<00:01, 445.44it/s, 63 steps of size 9.62e-02. acc. prob=0.90]sample:  86%|████████▋ | 3457/4000 [00:09<00:01, 448.39it/s, 31 steps of size 9.62e-02. acc. prob=0.90]sample:  88%|████████▊ | 3504/4000 [00:09<00:01, 454.23it/s, 63 steps of size 9.62e-02. acc. prob=0.90]sample:  89%|████████▉ | 3550/4000 [00:09<00:00, 453.03it/s, 31 steps of size 9.62e-02. acc. prob=0.90]sample:  90%|████████▉ | 3596/4000 [00:09<00:00, 454.81it/s, 31 steps of size 9.62e-02. acc. prob=0.90]sample:  91%|█████████ | 3643/4000 [00:09<00:00, 456.25it/s, 63 steps of size 9.62e-02. acc. prob=0.90]sample:  92%|█████████▏| 3689/4000 [00:09<00:00, 454.33it/s, 63 steps of size 9.62e-02. acc. prob=0.90]sample:  93%|█████████▎| 3735/4000 [00:09<00:00, 449.29it/s, 31 steps of size 9.62e-02. acc. prob=0.90]sample:  95%|█████████▍| 3782/4000 [00:09<00:00, 454.19it/s, 31 steps of size 9.62e-02. acc. prob=0.90]sample:  96%|█████████▌| 3828/4000 [00:10<00:00, 448.74it/s, 31 steps of size 9.62e-02. acc. prob=0.90]sample:  97%|█████████▋| 3874/4000 [00:10<00:00, 449.36it/s, 63 steps of size 9.62e-02. acc. prob=0.90]sample:  98%|█████████▊| 3920/4000 [00:10<00:00, 450.50it/s, 31 steps of size 9.62e-02. acc. prob=0.90]sample:  99%|█████████▉| 3966/4000 [00:10<00:00, 443.97it/s, 31 steps of size 9.62e-02. acc. prob=0.90]sample: 100%|██████████| 4000/4000 [00:10<00:00, 382.04it/s, 63 steps of size 9.62e-02. acc. prob=0.90]
+
+                 mean       std    median      5.0%     95.0%     n_eff     r_hat
+ sigma[0,0]      0.04      0.00      0.04      0.04      0.05   2680.68      1.00
+ sigma[1,0]      0.08      0.01      0.08      0.07      0.09   2235.87      1.00
+ sigma[2,0]      0.04      0.00      0.04      0.04      0.05   2321.22      1.00
+ sigma[3,0]      0.04      0.00      0.04      0.04      0.05   2255.66      1.00
+ sigma[4,0]      0.03      0.00      0.03      0.03      0.04   2439.15      1.00
+ sigma[5,0]      0.04      0.00      0.04      0.03      0.05   2889.19      1.00
+ sigma[6,0]      0.04      0.00      0.04      0.04      0.05   2321.25      1.00
+ sigma[7,0]      0.09      0.01      0.09      0.07      0.10   2363.69      1.00
+ sigma[8,0]      0.07      0.01      0.07      0.06      0.08   2812.53      1.00
+ sigma[9,0]      0.03      0.00      0.03      0.02      0.03   2596.43      1.00
+sigma[10,0]      0.03      0.00      0.03      0.03      0.04   2373.62      1.00
+sigma[11,0]      0.08      0.01      0.08      0.07      0.09   2245.52      1.00
+sigma[12,0]      0.06      0.01      0.06      0.05      0.07   2245.55      1.00
+sigma[13,0]      0.04      0.00      0.03      0.03      0.04   2341.05      1.00
+sigma[14,0]      0.04      0.00      0.04      0.03      0.04   1809.49      1.00
+sigma[15,0]      0.05      0.00      0.05      0.04      0.05   2368.10      1.00
+sigma[16,0]      0.04      0.00      0.04      0.04      0.05   2418.26      1.00
+sigma[17,0]      0.04      0.00      0.04      0.04      0.05   2531.76      1.00
+sigma[18,0]      0.04      0.00      0.04      0.04      0.05   2355.64      1.00
+sigma[19,0]      0.05      0.01      0.05      0.05      0.06   2312.71      1.00
+sigma[20,0]      0.03      0.00      0.03      0.03      0.04   2446.99      1.00
+sigma[21,0]      0.04      0.00      0.04      0.03      0.04   2201.61      1.00
+sigma[22,0]      0.04      0.00      0.04      0.03      0.04   2460.51      1.00
+sigma[23,0]      0.03      0.00      0.03      0.03      0.04   2145.26      1.00
+sigma[24,0]      0.04      0.00      0.04      0.04      0.05   2042.37      1.00
+sigma[25,0]      0.04      0.00      0.04      0.03      0.05   2515.92      1.00
+sigma[26,0]      0.06      0.01      0.06      0.05      0.07   2020.42      1.00
+sigma[27,0]      0.05      0.00      0.05      0.04      0.05   2512.63      1.00
+sigma[28,0]      0.05      0.00      0.04      0.04      0.05   2726.15      1.00
+sigma[29,0]      0.06      0.01      0.06      0.05      0.07   2637.15      1.00
+sigma[30,0]      0.04      0.00      0.04      0.03      0.05   2298.45      1.00
+sigma[31,0]      0.05      0.00      0.05      0.04      0.05   2252.08      1.00
+sigma[32,0]      0.03      0.00      0.03      0.02      0.03   2654.57      1.00
+sigma[33,0]      0.04      0.00      0.04      0.03      0.04   2065.44      1.00
+sigma[34,0]      0.07      0.01      0.07      0.06      0.08   2196.98      1.00
+sigma[35,0]      0.03      0.00      0.03      0.03      0.04   2475.73      1.00
+sigma[36,0]      0.04      0.00      0.04      0.04      0.05   2501.54      1.00
+sigma[37,0]      0.04      0.00      0.04      0.04      0.05   2702.43      1.00
+sigma[38,0]      0.03      0.00      0.03      0.03      0.04   2395.39      1.00
+sigma[39,0]      0.07      0.01      0.07      0.06      0.08   2148.80      1.00
+sigma[40,0]      0.04      0.00      0.04      0.03      0.04   2274.85      1.00
+sigma[41,0]      0.07      0.01      0.07      0.06      0.08   2273.14      1.00
+sigma[42,0]      0.04      0.00      0.04      0.03      0.05   2620.72      1.00
+sigma[43,0]      0.03      0.00      0.03      0.02      0.03   2150.17      1.00
+sigma[44,0]      0.05      0.00      0.05      0.04      0.06   2309.69      1.00
+sigma[45,0]      0.07      0.01      0.07      0.06      0.08   2350.63      1.00
+sigma[46,0]      0.04      0.00      0.04      0.03      0.04   2034.90      1.00
+sigma[47,0]      0.04      0.00      0.04      0.04      0.05   2171.28      1.00
+sigma[48,0]      0.06      0.01      0.06      0.05      0.06   2731.38      1.00
+sigma[49,0]      0.04      0.00      0.04      0.03      0.04   2283.97      1.00
+sigma[50,0]      0.08      0.01      0.08      0.07      0.09   2279.88      1.00
+sigma[51,0]      0.05      0.00      0.05      0.04      0.06   2387.27      1.00
+sigma[52,0]      0.02      0.00      0.02      0.02      0.03   1996.25      1.00
+   theta[0]      1.14      0.02      1.14      1.11      1.17   1775.20      1.00
+   theta[1]     -0.05      0.03     -0.05     -0.10     -0.00   1400.02      1.00
+   theta[2]     -0.08      0.03     -0.08     -0.12     -0.03   1909.86      1.00
+   theta[3]      0.02      0.03      0.02     -0.02      0.07   1907.37      1.00
+   theta[4]     -0.10      0.03     -0.10     -0.15     -0.06   1538.69      1.00
+   theta[5]     -0.03      0.02     -0.03     -0.06     -0.00   1504.10      1.00
+theta_sd[0]      0.57      0.20      0.53      0.29      0.83   1564.95      1.00
+
+Number of divergences: 0
+
+MCMC elapsed time: 14.040178775787354
+/Users/trobacker/GitHub/forecast-sandbox-2025-2026/src/flusion3/.venv/lib/python3.12/site-packages/iddata/loader.py:505: FutureWarning: DataFrameGroupBy.apply operated on the grouping columns. This behavior is deprecated, and in a future version of pandas the grouping columns will be excluded from the operation. Either pass `include_groups=False` to exclude the groupings or explicitly select the grouping columns after groupby to silence this warning.
+  .apply(lambda x: pd.DataFrame({"inc": [np.mean(x["inc"])]})) \
+/Users/trobacker/GitHub/forecast-sandbox-2025-2026/src/flusion3/.venv/lib/python3.12/site-packages/iddata/loader.py:189: FutureWarning: DataFrame.fillna with 'method' is deprecated and will raise in a future version. Use obj.ffill() or obj.bfill() instead.
+  df[fill_cols] = df[fill_cols].fillna(axis=0, method="ffill")
+/Users/trobacker/GitHub/forecast-sandbox-2025-2026/src/flusion3/.venv/lib/python3.12/site-packages/iddata/loader.py:189: FutureWarning: DataFrame.fillna with 'method' is deprecated and will raise in a future version. Use obj.ffill() or obj.bfill() instead.
+  df[fill_cols] = df[fill_cols].fillna(axis=0, method="ffill")
+/Users/trobacker/GitHub/forecast-sandbox-2025-2026/src/flusion3/.venv/lib/python3.12/site-packages/iddata/loader.py:189: FutureWarning: DataFrame.fillna with 'method' is deprecated and will raise in a future version. Use obj.ffill() or obj.bfill() instead.
+  df[fill_cols] = df[fill_cols].fillna(axis=0, method="ffill")
+/Users/trobacker/GitHub/forecast-sandbox-2025-2026/src/flusion3/.venv/lib/python3.12/site-packages/iddata/loader.py:189: FutureWarning: DataFrame.fillna with 'method' is deprecated and will raise in a future version. Use obj.ffill() or obj.bfill() instead.
+  df[fill_cols] = df[fill_cols].fillna(axis=0, method="ffill")
+/Users/trobacker/GitHub/forecast-sandbox-2025-2026/src/flusion3/.venv/lib/python3.12/site-packages/iddata/loader.py:189: FutureWarning: DataFrame.fillna with 'method' is deprecated and will raise in a future version. Use obj.ffill() or obj.bfill() instead.
+  df[fill_cols] = df[fill_cols].fillna(axis=0, method="ffill")
+/Users/trobacker/GitHub/forecast-sandbox-2025-2026/src/flusion3/.venv/lib/python3.12/site-packages/iddata/loader.py:189: FutureWarning: DataFrame.fillna with 'method' is deprecated and will raise in a future version. Use obj.ffill() or obj.bfill() instead.
+  df[fill_cols] = df[fill_cols].fillna(axis=0, method="ffill")
+/Users/trobacker/GitHub/forecast-sandbox-2025-2026/src/flusion3/.venv/lib/python3.12/site-packages/iddata/loader.py:189: FutureWarning: DataFrame.fillna with 'method' is deprecated and will raise in a future version. Use obj.ffill() or obj.bfill() instead.
+  df[fill_cols] = df[fill_cols].fillna(axis=0, method="ffill")
+/Users/trobacker/GitHub/forecast-sandbox-2025-2026/src/flusion3/.venv/lib/python3.12/site-packages/iddata/loader.py:189: FutureWarning: DataFrame.fillna with 'method' is deprecated and will raise in a future version. Use obj.ffill() or obj.bfill() instead.
+  df[fill_cols] = df[fill_cols].fillna(axis=0, method="ffill")
+/Users/trobacker/GitHub/forecast-sandbox-2025-2026/src/flusion3/.venv/lib/python3.12/site-packages/iddata/loader.py:189: FutureWarning: DataFrame.fillna with 'method' is deprecated and will raise in a future version. Use obj.ffill() or obj.bfill() instead.
+  df[fill_cols] = df[fill_cols].fillna(axis=0, method="ffill")
+/Users/trobacker/GitHub/forecast-sandbox-2025-2026/src/flusion3/.venv/lib/python3.12/site-packages/iddata/loader.py:189: FutureWarning: DataFrame.fillna with 'method' is deprecated and will raise in a future version. Use obj.ffill() or obj.bfill() instead.
+  df[fill_cols] = df[fill_cols].fillna(axis=0, method="ffill")
+/Users/trobacker/GitHub/forecast-sandbox-2025-2026/src/flusion3/.venv/lib/python3.12/site-packages/iddata/loader.py:189: FutureWarning: DataFrame.fillna with 'method' is deprecated and will raise in a future version. Use obj.ffill() or obj.bfill() instead.
+  df[fill_cols] = df[fill_cols].fillna(axis=0, method="ffill")
+/Users/trobacker/GitHub/forecast-sandbox-2025-2026/src/flusion3/.venv/lib/python3.12/site-packages/iddata/loader.py:189: FutureWarning: DataFrame.fillna with 'method' is deprecated and will raise in a future version. Use obj.ffill() or obj.bfill() instead.
+  df[fill_cols] = df[fill_cols].fillna(axis=0, method="ffill")
+/Users/trobacker/GitHub/forecast-sandbox-2025-2026/src/flusion3/.venv/lib/python3.12/site-packages/iddata/loader.py:189: FutureWarning: DataFrame.fillna with 'method' is deprecated and will raise in a future version. Use obj.ffill() or obj.bfill() instead.
+  df[fill_cols] = df[fill_cols].fillna(axis=0, method="ffill")
+/Users/trobacker/GitHub/forecast-sandbox-2025-2026/src/flusion3/.venv/lib/python3.12/site-packages/iddata/loader.py:189: FutureWarning: DataFrame.fillna with 'method' is deprecated and will raise in a future version. Use obj.ffill() or obj.bfill() instead.
+  df[fill_cols] = df[fill_cols].fillna(axis=0, method="ffill")
+/Users/trobacker/GitHub/forecast-sandbox-2025-2026/src/flusion3/.venv/lib/python3.12/site-packages/iddata/loader.py:189: FutureWarning: DataFrame.fillna with 'method' is deprecated and will raise in a future version. Use obj.ffill() or obj.bfill() instead.
+  df[fill_cols] = df[fill_cols].fillna(axis=0, method="ffill")
+/Users/trobacker/GitHub/forecast-sandbox-2025-2026/src/flusion3/.venv/lib/python3.12/site-packages/iddata/loader.py:539: FutureWarning: DataFrameGroupBy.apply operated on the grouping columns. This behavior is deprecated, and in a future version of pandas the grouping columns will be excluded from the operation. Either pass `include_groups=False` to exclude the groupings or explicitly select the grouping columns after groupby to silence this warning.
+  .apply(lambda x: pd.DataFrame({"inc": [np.mean(x["inc"])]})) \
+/Users/trobacker/GitHub/forecast-sandbox-2025-2026/src/flusion3/.venv/lib/python3.12/site-packages/timeseriesutils/featurize.py:502: FutureWarning: DataFrameGroupBy.apply operated on the grouping columns. This behavior is deprecated, and in a future version of pandas the grouping columns will be excluded from the operation. Either pass `include_groups=False` to exclude the groupings or explicitly select the grouping columns after groupby to silence this warning.
+  .apply(taylor_coefs_one_column_grp,
+/Users/trobacker/GitHub/forecast-sandbox-2025-2026/src/flusion3/.venv/lib/python3.12/site-packages/timeseriesutils/featurize.py:502: FutureWarning: DataFrameGroupBy.apply operated on the grouping columns. This behavior is deprecated, and in a future version of pandas the grouping columns will be excluded from the operation. Either pass `include_groups=False` to exclude the groupings or explicitly select the grouping columns after groupby to silence this warning.
+  .apply(taylor_coefs_one_column_grp,
+/Users/trobacker/GitHub/forecast-sandbox-2025-2026/src/flusion3/.venv/lib/python3.12/site-packages/timeseriesutils/featurize.py:502: FutureWarning: DataFrameGroupBy.apply operated on the grouping columns. This behavior is deprecated, and in a future version of pandas the grouping columns will be excluded from the operation. Either pass `include_groups=False` to exclude the groupings or explicitly select the grouping columns after groupby to silence this warning.
+  .apply(taylor_coefs_one_column_grp,
+/Users/trobacker/GitHub/forecast-sandbox-2025-2026/src/flusion3/.venv/lib/python3.12/site-packages/timeseriesutils/featurize.py:502: FutureWarning: DataFrameGroupBy.apply operated on the grouping columns. This behavior is deprecated, and in a future version of pandas the grouping columns will be excluded from the operation. Either pass `include_groups=False` to exclude the groupings or explicitly select the grouping columns after groupby to silence this warning.
+  .apply(taylor_coefs_one_column_grp,
+Bag number:   0%|          | 0/20 [00:00<?, ?it/s]Bag number:   5%|▌         | 1/20 [15:39<4:57:37, 939.88s/it]Bag number:  10%|█         | 2/20 [32:34<4:55:05, 983.66s/it]Bag number:  15%|█▌        | 3/20 [46:53<4:22:36, 926.85s/it]Bag number:  20%|██        | 4/20 [47:33<2:33:47, 576.75s/it]Bag number:  25%|██▌       | 5/20 [1:04:49<3:05:34, 742.27s/it]Bag number:  30%|███       | 6/20 [1:20:28<3:08:49, 809.22s/it]Bag number:  35%|███▌      | 7/20 [1:37:36<3:10:51, 880.90s/it]Bag number:  40%|████      | 8/20 [1:38:17<2:02:42, 613.51s/it]Bag number:  45%|████▌     | 9/20 [1:56:14<2:19:01, 758.35s/it]Bag number:  50%|█████     | 10/20 [2:14:29<2:23:43, 862.33s/it]Bag number:  55%|█████▌    | 11/20 [2:31:04<2:15:25, 902.80s/it]Bag number:  60%|██████    | 12/20 [2:46:52<2:02:11, 916.44s/it]Bag number:  65%|██████▌   | 13/20 [3:02:45<1:48:14, 927.79s/it]Bag number:  70%|███████   | 14/20 [3:03:25<1:05:57, 659.64s/it]Bag number:  75%|███████▌  | 15/20 [3:21:31<1:05:40, 788.12s/it]Bag number:  80%|████████  | 16/20 [3:37:10<55:34, 833.50s/it]  Bag number:  85%|████████▌ | 17/20 [3:37:35<29:31, 590.35s/it]Bag number:  90%|█████████ | 18/20 [3:38:02<14:01, 420.99s/it]Bag number:  95%|█████████▌| 19/20 [3:42:18<06:11, 371.49s/it]Bag number: 100%|██████████| 20/20 [3:42:44<00:00, 267.82s/it]Bag number: 100%|██████████| 20/20 [3:42:44<00:00, 668.24s/it]
+
+Attaching package: ‘dplyr’
+
+The following objects are masked from ‘package:stats’:
+
+    filter, lag
+
+The following objects are masked from ‘package:base’:
+
+    intersect, setdiff, setequal, union
+
+Rows: 10070 Columns: 5
+── Column specification ────────────────────────────────────────────────────────
+Delimiter: ","
+chr  (2): location, location_name
+dbl  (2): value, weekly_rate
+date (1): date
+
+ℹ Use `spec()` to retrieve the full column specification for this data.
+ℹ Specify the column types or set `show_col_types = FALSE` to quiet this message.
+Rows: 53 Columns: 12
+── Column specification ────────────────────────────────────────────────────────
+Delimiter: ","
+chr (3): abbreviation, location, location_name
+dbl (9): population, count_rate0p3, count_rate0p5, count_rate0p7, count_rate...
+
+ℹ Use `spec()` to retrieve the full column specification for this data.
+ℹ Specify the column types or set `show_col_types = FALSE` to quiet this message.
+Running flusion3 ensemble for reference date: 2023-12-16
+============================================================
+
+1/4: Running AR6 (no Fourier)...
+
+2/4: Running AR6 with Fourier seasonality...
+
+3/4: Running GBQR...
+
+4/4: Creating ensemble...
+
+============================================================
+Flusion3 ensemble complete!
+Output saved to: ../../model-output/UMass-flusion3/2023-12-16-UMass-flusion3.csv
+✓ Successfully completed forecast for 2023-12-13
+
+============================================================
+Running flusion3 for date: 2023-12-20
+============================================================
+/Users/trobacker/GitHub/idmodels/src/idmodels/sarix.py:35: FutureWarning: DataFrame.interpolate with object dtype is deprecated and will raise in a future version. Call obj.infer_objects(copy=False) before interpolating instead.
+  df = df.query("wk_end_date >= '2022-10-01'").interpolate()
+  0%|          | 0/4000 [00:00<?, ?it/s]warmup:   0%|          | 1/4000 [00:00<33:08,  2.01it/s, 1 steps of size 2.34e+00. acc. prob=0.00]warmup:   0%|          | 2/4000 [00:00<29:28,  2.26it/s, 1 steps of size 2.30e-01. acc. prob=0.00]warmup:   1%|          | 44/4000 [00:01<00:58, 68.06it/s, 511 steps of size 1.25e-03. acc. prob=0.72]warmup:   2%|▏         | 62/4000 [00:01<00:47, 82.99it/s, 127 steps of size 5.68e-03. acc. prob=0.74]warmup:   2%|▏         | 79/4000 [00:01<00:40, 96.18it/s, 127 steps of size 3.58e-03. acc. prob=0.75]warmup:   2%|▏         | 95/4000 [00:01<00:37, 104.08it/s, 255 steps of size 3.07e-03. acc. prob=0.75]warmup:   3%|▎         | 114/4000 [00:01<00:31, 122.28it/s, 255 steps of size 4.13e-02. acc. prob=0.76]warmup:   4%|▎         | 145/4000 [00:01<00:23, 165.45it/s, 255 steps of size 3.35e-02. acc. prob=0.77]warmup:   5%|▍         | 185/4000 [00:01<00:16, 224.79it/s, 63 steps of size 1.30e-01. acc. prob=0.77] warmup:   6%|▌         | 239/4000 [00:01<00:12, 307.79it/s, 63 steps of size 9.39e-02. acc. prob=0.78]warmup:   7%|▋         | 282/4000 [00:01<00:10, 338.41it/s, 127 steps of size 7.65e-02. acc. prob=0.78]warmup:   8%|▊         | 326/4000 [00:02<00:10, 366.39it/s, 28 steps of size 8.11e-02. acc. prob=0.78] warmup:   9%|▉         | 378/4000 [00:02<00:08, 408.93it/s, 63 steps of size 7.95e-02. acc. prob=0.78]warmup:  11%|█         | 436/4000 [00:02<00:07, 456.98it/s, 31 steps of size 1.14e-01. acc. prob=0.78]warmup:  12%|█▏        | 484/4000 [00:02<00:08, 420.96it/s, 31 steps of size 1.91e-01. acc. prob=0.78]warmup:  13%|█▎        | 536/4000 [00:02<00:07, 447.35it/s, 63 steps of size 1.29e-01. acc. prob=0.79]warmup:  15%|█▍        | 587/4000 [00:02<00:07, 463.71it/s, 63 steps of size 8.63e-02. acc. prob=0.79]warmup:  16%|█▌        | 645/4000 [00:02<00:06, 496.83it/s, 63 steps of size 1.25e-01. acc. prob=0.79]warmup:  18%|█▊        | 707/4000 [00:02<00:06, 529.25it/s, 63 steps of size 8.81e-02. acc. prob=0.79]warmup:  19%|█▉        | 772/4000 [00:02<00:05, 560.71it/s, 63 steps of size 8.82e-02. acc. prob=0.79]warmup:  21%|██        | 835/4000 [00:02<00:05, 578.83it/s, 63 steps of size 1.07e-01. acc. prob=0.79]warmup:  22%|██▏       | 894/4000 [00:03<00:06, 514.57it/s, 31 steps of size 1.79e-01. acc. prob=0.79]warmup:  24%|██▎       | 948/4000 [00:03<00:06, 504.87it/s, 127 steps of size 5.21e-02. acc. prob=0.79]warmup:  25%|██▌       | 1003/4000 [00:03<00:05, 515.94it/s, 63 steps of size 9.43e-02. acc. prob=0.79]warmup:  27%|██▋       | 1062/4000 [00:03<00:05, 534.02it/s, 63 steps of size 1.06e-01. acc. prob=0.79]warmup:  28%|██▊       | 1124/4000 [00:03<00:05, 556.28it/s, 63 steps of size 1.08e-01. acc. prob=0.79]warmup:  30%|██▉       | 1183/4000 [00:03<00:05, 563.02it/s, 63 steps of size 1.01e-01. acc. prob=0.79]warmup:  31%|███▏      | 1252/4000 [00:03<00:04, 598.45it/s, 31 steps of size 1.40e-01. acc. prob=0.79]warmup:  33%|███▎      | 1320/4000 [00:03<00:04, 622.27it/s, 31 steps of size 1.39e-01. acc. prob=0.79]warmup:  35%|███▍      | 1393/4000 [00:03<00:03, 653.07it/s, 31 steps of size 8.65e-02. acc. prob=0.79]warmup:  36%|███▋      | 1459/4000 [00:04<00:03, 650.89it/s, 31 steps of size 1.17e-01. acc. prob=0.79]warmup:  38%|███▊      | 1530/4000 [00:04<00:03, 667.01it/s, 31 steps of size 1.15e-01. acc. prob=0.79]warmup:  40%|███▉      | 1597/4000 [00:04<00:03, 657.45it/s, 31 steps of size 1.38e-01. acc. prob=0.79]warmup:  42%|████▏     | 1669/4000 [00:04<00:03, 674.44it/s, 31 steps of size 1.23e-01. acc. prob=0.79]warmup:  44%|████▎     | 1746/4000 [00:04<00:03, 702.13it/s, 31 steps of size 1.34e-01. acc. prob=0.79]warmup:  46%|████▌     | 1820/4000 [00:04<00:03, 710.96it/s, 31 steps of size 1.08e-01. acc. prob=0.79]warmup:  47%|████▋     | 1892/4000 [00:04<00:02, 713.05it/s, 63 steps of size 8.46e-02. acc. prob=0.79]warmup:  49%|████▉     | 1964/4000 [00:04<00:02, 679.58it/s, 63 steps of size 5.25e-02. acc. prob=0.79]sample:  51%|█████     | 2033/4000 [00:04<00:03, 596.20it/s, 63 steps of size 9.06e-02. acc. prob=0.89]sample:  52%|█████▏    | 2095/4000 [00:05<00:03, 547.49it/s, 63 steps of size 9.06e-02. acc. prob=0.90]sample:  54%|█████▍    | 2152/4000 [00:05<00:03, 526.19it/s, 31 steps of size 9.06e-02. acc. prob=0.91]sample:  55%|█████▌    | 2206/4000 [00:05<00:03, 507.72it/s, 63 steps of size 9.06e-02. acc. prob=0.92]sample:  56%|█████▋    | 2258/4000 [00:05<00:03, 491.74it/s, 31 steps of size 9.06e-02. acc. prob=0.91]sample:  58%|█████▊    | 2308/4000 [00:05<00:03, 477.56it/s, 63 steps of size 9.06e-02. acc. prob=0.91]sample:  59%|█████▉    | 2357/4000 [00:05<00:03, 463.99it/s, 63 steps of size 9.06e-02. acc. prob=0.91]sample:  60%|██████    | 2404/4000 [00:05<00:03, 458.79it/s, 31 steps of size 9.06e-02. acc. prob=0.91]sample:  61%|██████▏   | 2450/4000 [00:05<00:03, 457.75it/s, 31 steps of size 9.06e-02. acc. prob=0.91]sample:  62%|██████▏   | 2497/4000 [00:05<00:03, 459.03it/s, 63 steps of size 9.06e-02. acc. prob=0.91]sample:  64%|██████▎   | 2543/4000 [00:06<00:03, 454.74it/s, 63 steps of size 9.06e-02. acc. prob=0.91]sample:  65%|██████▍   | 2593/4000 [00:06<00:03, 464.66it/s, 63 steps of size 9.06e-02. acc. prob=0.91]sample:  66%|██████▌   | 2640/4000 [00:06<00:02, 457.21it/s, 63 steps of size 9.06e-02. acc. prob=0.91]sample:  67%|██████▋   | 2686/4000 [00:06<00:02, 455.42it/s, 63 steps of size 9.06e-02. acc. prob=0.91]sample:  68%|██████▊   | 2732/4000 [00:06<00:02, 454.19it/s, 63 steps of size 9.06e-02. acc. prob=0.91]sample:  69%|██████▉   | 2778/4000 [00:06<00:02, 451.57it/s, 63 steps of size 9.06e-02. acc. prob=0.91]sample:  71%|███████   | 2825/4000 [00:06<00:02, 456.88it/s, 31 steps of size 9.06e-02. acc. prob=0.91]sample:  72%|███████▏  | 2872/4000 [00:06<00:02, 459.25it/s, 63 steps of size 9.06e-02. acc. prob=0.91]sample:  73%|███████▎  | 2921/4000 [00:06<00:02, 465.63it/s, 63 steps of size 9.06e-02. acc. prob=0.91]sample:  74%|███████▍  | 2968/4000 [00:06<00:02, 463.02it/s, 63 steps of size 9.06e-02. acc. prob=0.91]sample:  75%|███████▌  | 3016/4000 [00:07<00:02, 466.58it/s, 63 steps of size 9.06e-02. acc. prob=0.91]sample:  77%|███████▋  | 3063/4000 [00:07<00:02, 466.83it/s, 63 steps of size 9.06e-02. acc. prob=0.91]sample:  78%|███████▊  | 3110/4000 [00:07<00:01, 463.06it/s, 63 steps of size 9.06e-02. acc. prob=0.91]sample:  79%|███████▉  | 3157/4000 [00:07<00:01, 462.50it/s, 31 steps of size 9.06e-02. acc. prob=0.91]sample:  80%|████████  | 3204/4000 [00:07<00:01, 459.57it/s, 63 steps of size 9.06e-02. acc. prob=0.91]sample:  81%|████████▏ | 3250/4000 [00:07<00:01, 456.96it/s, 63 steps of size 9.06e-02. acc. prob=0.91]sample:  82%|████████▏ | 3298/4000 [00:07<00:01, 463.66it/s, 31 steps of size 9.06e-02. acc. prob=0.91]sample:  84%|████████▎ | 3347/4000 [00:07<00:01, 469.13it/s, 63 steps of size 9.06e-02. acc. prob=0.91]sample:  85%|████████▍ | 3396/4000 [00:07<00:01, 474.53it/s, 63 steps of size 9.06e-02. acc. prob=0.91]sample:  86%|████████▋ | 3450/4000 [00:07<00:01, 492.35it/s, 63 steps of size 9.06e-02. acc. prob=0.91]sample:  88%|████████▊ | 3500/4000 [00:08<00:01, 484.42it/s, 63 steps of size 9.06e-02. acc. prob=0.91]sample:  89%|████████▊ | 3549/4000 [00:08<00:00, 482.92it/s, 63 steps of size 9.06e-02. acc. prob=0.91]sample:  90%|████████▉ | 3599/4000 [00:08<00:00, 486.19it/s, 63 steps of size 9.06e-02. acc. prob=0.91]sample:  91%|█████████ | 3648/4000 [00:08<00:00, 480.52it/s, 31 steps of size 9.06e-02. acc. prob=0.91]sample:  92%|█████████▏| 3697/4000 [00:08<00:00, 468.39it/s, 63 steps of size 9.06e-02. acc. prob=0.91]sample:  94%|█████████▎| 3744/4000 [00:08<00:00, 463.73it/s, 63 steps of size 9.06e-02. acc. prob=0.91]sample:  95%|█████████▍| 3791/4000 [00:08<00:00, 463.20it/s, 63 steps of size 9.06e-02. acc. prob=0.91]sample:  96%|█████████▌| 3838/4000 [00:08<00:00, 455.77it/s, 63 steps of size 9.06e-02. acc. prob=0.91]sample:  97%|█████████▋| 3886/4000 [00:08<00:00, 460.54it/s, 63 steps of size 9.06e-02. acc. prob=0.91]sample:  98%|█████████▊| 3933/4000 [00:09<00:00, 456.32it/s, 63 steps of size 9.06e-02. acc. prob=0.91]sample:  99%|█████████▉| 3979/4000 [00:09<00:00, 452.20it/s, 31 steps of size 9.06e-02. acc. prob=0.91]sample: 100%|██████████| 4000/4000 [00:09<00:00, 436.86it/s, 63 steps of size 9.06e-02. acc. prob=0.91]
+
+                 mean       std    median      5.0%     95.0%     n_eff     r_hat
+ sigma[0,0]      0.04      0.00      0.04      0.04      0.05   3448.34      1.00
+ sigma[1,0]      0.08      0.01      0.08      0.07      0.09   3164.20      1.00
+ sigma[2,0]      0.04      0.00      0.04      0.04      0.05   3439.60      1.00
+ sigma[3,0]      0.04      0.00      0.04      0.03      0.05   3172.16      1.00
+ sigma[4,0]      0.03      0.00      0.03      0.03      0.04   3267.21      1.00
+ sigma[5,0]      0.04      0.00      0.04      0.04      0.05   2920.03      1.00
+ sigma[6,0]      0.05      0.00      0.04      0.04      0.05   3110.50      1.00
+ sigma[7,0]      0.09      0.01      0.09      0.07      0.10   3084.36      1.00
+ sigma[8,0]      0.07      0.01      0.07      0.06      0.08   2960.64      1.00
+ sigma[9,0]      0.03      0.00      0.03      0.02      0.03   2762.67      1.00
+sigma[10,0]      0.04      0.00      0.04      0.03      0.05   2894.74      1.00
+sigma[11,0]      0.08      0.01      0.08      0.07      0.09   2754.77      1.00
+sigma[12,0]      0.06      0.01      0.06      0.05      0.07   2873.73      1.00
+sigma[13,0]      0.03      0.00      0.03      0.03      0.04   3239.93      1.00
+sigma[14,0]      0.04      0.00      0.04      0.03      0.04   2940.99      1.00
+sigma[15,0]      0.05      0.00      0.04      0.04      0.05   2385.15      1.00
+sigma[16,0]      0.04      0.00      0.04      0.04      0.05   2847.45      1.00
+sigma[17,0]      0.04      0.00      0.04      0.04      0.05   3228.00      1.00
+sigma[18,0]      0.04      0.00      0.04      0.04      0.05   2873.30      1.00
+sigma[19,0]      0.05      0.01      0.05      0.05      0.06   3480.51      1.00
+sigma[20,0]      0.03      0.00      0.03      0.03      0.04   2959.82      1.00
+sigma[21,0]      0.04      0.00      0.04      0.03      0.04   2434.89      1.00
+sigma[22,0]      0.04      0.00      0.04      0.03      0.04   3520.73      1.00
+sigma[23,0]      0.03      0.00      0.03      0.03      0.04   3282.50      1.00
+sigma[24,0]      0.04      0.00      0.04      0.04      0.05   3330.09      1.00
+sigma[25,0]      0.04      0.00      0.04      0.03      0.05   3402.19      1.00
+sigma[26,0]      0.06      0.01      0.06      0.05      0.07   3183.74      1.00
+sigma[27,0]      0.05      0.00      0.05      0.04      0.05   3004.90      1.00
+sigma[28,0]      0.05      0.00      0.04      0.04      0.05   3451.60      1.00
+sigma[29,0]      0.06      0.01      0.06      0.05      0.07   3071.01      1.00
+sigma[30,0]      0.04      0.00      0.04      0.03      0.05   2455.56      1.00
+sigma[31,0]      0.05      0.00      0.05      0.04      0.06   3423.04      1.00
+sigma[32,0]      0.03      0.00      0.03      0.02      0.03   3510.25      1.00
+sigma[33,0]      0.04      0.00      0.04      0.03      0.04   3383.12      1.00
+sigma[34,0]      0.07      0.01      0.07      0.06      0.09   3277.88      1.00
+sigma[35,0]      0.03      0.00      0.03      0.03      0.03   3537.78      1.00
+sigma[36,0]      0.04      0.00      0.04      0.04      0.05   2239.91      1.00
+sigma[37,0]      0.04      0.00      0.04      0.03      0.05   2822.69      1.00
+sigma[38,0]      0.03      0.00      0.03      0.03      0.04   3193.56      1.00
+sigma[39,0]      0.07      0.01      0.07      0.06      0.08   3301.68      1.00
+sigma[40,0]      0.04      0.00      0.04      0.03      0.04   3524.51      1.00
+sigma[41,0]      0.07      0.01      0.07      0.06      0.08   3186.05      1.00
+sigma[42,0]      0.04      0.00      0.04      0.03      0.05   3698.78      1.00
+sigma[43,0]      0.03      0.00      0.03      0.02      0.03   3580.83      1.00
+sigma[44,0]      0.05      0.00      0.05      0.04      0.06   2992.93      1.00
+sigma[45,0]      0.07      0.01      0.07      0.06      0.08   3063.68      1.00
+sigma[46,0]      0.04      0.00      0.04      0.03      0.04   3309.42      1.00
+sigma[47,0]      0.04      0.00      0.04      0.03      0.05   3416.52      1.00
+sigma[48,0]      0.06      0.01      0.06      0.05      0.06   3075.41      1.00
+sigma[49,0]      0.04      0.00      0.04      0.03      0.04   2987.77      1.00
+sigma[50,0]      0.08      0.01      0.08      0.07      0.09   2921.89      1.00
+sigma[51,0]      0.05      0.00      0.05      0.04      0.06   3307.72      1.00
+sigma[52,0]      0.02      0.00      0.02      0.02      0.03   2690.72      1.00
+   theta[0]      1.15      0.02      1.15      1.12      1.18   2436.00      1.00
+   theta[1]     -0.04      0.03     -0.04     -0.09      0.01   2309.01      1.00
+   theta[2]     -0.09      0.03     -0.09     -0.14     -0.05   2495.66      1.00
+   theta[3]      0.01      0.03      0.02     -0.03      0.06   3066.00      1.00
+   theta[4]     -0.09      0.03     -0.09     -0.14     -0.05   2544.24      1.00
+   theta[5]     -0.04      0.02     -0.04     -0.07     -0.01   2967.75      1.00
+theta_sd[0]      0.58      0.21      0.53      0.30      0.85   1543.27      1.00
+
+Number of divergences: 0
+
+MCMC elapsed time: 12.509992122650146
+/Users/trobacker/GitHub/idmodels/src/idmodels/sarix.py:35: FutureWarning: DataFrame.interpolate with object dtype is deprecated and will raise in a future version. Call obj.infer_objects(copy=False) before interpolating instead.
+  df = df.query("wk_end_date >= '2022-10-01'").interpolate()
+  0%|          | 0/4000 [00:00<?, ?it/s]warmup:   0%|          | 1/4000 [00:00<31:10,  2.14it/s, 1 steps of size 2.34e+00. acc. prob=0.00]warmup:   0%|          | 2/4000 [00:00<28:44,  2.32it/s, 1 steps of size 2.30e-01. acc. prob=0.00]warmup:   1%|          | 44/4000 [00:00<00:57, 68.49it/s, 511 steps of size 1.25e-03. acc. prob=0.72]warmup:   2%|▏         | 61/4000 [00:01<00:49, 80.07it/s, 127 steps of size 3.98e-03. acc. prob=0.74]warmup:   2%|▏         | 76/4000 [00:01<00:42, 93.15it/s, 127 steps of size 1.09e-03. acc. prob=0.74]warmup:   2%|▏         | 91/4000 [00:01<00:38, 100.96it/s, 511 steps of size 1.53e-03. acc. prob=0.75]warmup:   3%|▎         | 105/4000 [00:01<00:36, 106.83it/s, 63 steps of size 1.17e-01. acc. prob=0.76]warmup:   3%|▎         | 136/4000 [00:01<00:24, 155.40it/s, 63 steps of size 8.57e-02. acc. prob=0.77]warmup:   4%|▍         | 169/4000 [00:01<00:19, 199.95it/s, 63 steps of size 1.12e-01. acc. prob=0.77]warmup:   6%|▌         | 225/4000 [00:01<00:12, 293.85it/s, 127 steps of size 6.60e-02. acc. prob=0.78]warmup:   7%|▋         | 274/4000 [00:01<00:10, 341.85it/s, 255 steps of size 3.99e-02. acc. prob=0.78]warmup:   8%|▊         | 316/4000 [00:01<00:10, 361.16it/s, 127 steps of size 5.77e-02. acc. prob=0.78]warmup:   9%|▉         | 369/4000 [00:02<00:08, 406.30it/s, 63 steps of size 8.35e-02. acc. prob=0.78] warmup:  11%|█         | 424/4000 [00:02<00:07, 447.11it/s, 63 steps of size 1.27e-01. acc. prob=0.78]warmup:  12%|█▏        | 471/4000 [00:02<00:08, 429.79it/s, 127 steps of size 7.14e-02. acc. prob=0.78]warmup:  13%|█▎        | 518/4000 [00:02<00:07, 438.38it/s, 63 steps of size 6.26e-02. acc. prob=0.78] warmup:  14%|█▍        | 568/4000 [00:02<00:07, 452.96it/s, 63 steps of size 1.14e-01. acc. prob=0.79]warmup:  16%|█▌        | 625/4000 [00:02<00:06, 484.85it/s, 63 steps of size 9.61e-02. acc. prob=0.79]warmup:  17%|█▋        | 688/4000 [00:02<00:06, 524.12it/s, 63 steps of size 1.16e-01. acc. prob=0.79]warmup:  19%|█▊        | 748/4000 [00:02<00:05, 546.13it/s, 31 steps of size 1.65e-01. acc. prob=0.79]warmup:  20%|██        | 810/4000 [00:02<00:05, 565.44it/s, 63 steps of size 9.59e-02. acc. prob=0.79]warmup:  22%|██▏       | 867/4000 [00:03<00:05, 542.42it/s, 63 steps of size 1.39e-01. acc. prob=0.79]warmup:  23%|██▎       | 922/4000 [00:03<00:06, 496.09it/s, 63 steps of size 8.79e-02. acc. prob=0.79]warmup:  24%|██▍       | 977/4000 [00:03<00:05, 507.54it/s, 63 steps of size 1.18e-01. acc. prob=0.79]warmup:  26%|██▌       | 1031/4000 [00:03<00:05, 516.16it/s, 63 steps of size 7.53e-02. acc. prob=0.79]warmup:  27%|██▋       | 1091/4000 [00:03<00:05, 537.46it/s, 63 steps of size 8.46e-02. acc. prob=0.79]warmup:  29%|██▉       | 1150/4000 [00:03<00:05, 551.42it/s, 31 steps of size 8.70e-02. acc. prob=0.79]warmup:  30%|███       | 1214/4000 [00:03<00:04, 575.88it/s, 31 steps of size 1.03e-01. acc. prob=0.79]warmup:  32%|███▏      | 1285/4000 [00:03<00:04, 613.22it/s, 31 steps of size 1.12e-01. acc. prob=0.79]warmup:  34%|███▍      | 1352/4000 [00:03<00:04, 627.65it/s, 31 steps of size 9.73e-02. acc. prob=0.79]warmup:  36%|███▌      | 1422/4000 [00:03<00:03, 648.94it/s, 31 steps of size 1.24e-01. acc. prob=0.79]warmup:  37%|███▋      | 1492/4000 [00:04<00:03, 661.60it/s, 31 steps of size 1.22e-01. acc. prob=0.79]warmup:  39%|███▉      | 1560/4000 [00:04<00:03, 666.66it/s, 31 steps of size 9.26e-02. acc. prob=0.79]warmup:  41%|████      | 1627/4000 [00:04<00:03, 666.80it/s, 31 steps of size 1.21e-01. acc. prob=0.79]warmup:  42%|████▏     | 1694/4000 [00:04<00:03, 665.97it/s, 31 steps of size 1.28e-01. acc. prob=0.79]warmup:  44%|████▍     | 1766/4000 [00:04<00:03, 682.02it/s, 63 steps of size 1.09e-01. acc. prob=0.79]warmup:  46%|████▌     | 1841/4000 [00:04<00:03, 700.87it/s, 31 steps of size 9.95e-02. acc. prob=0.79]warmup:  48%|████▊     | 1912/4000 [00:04<00:03, 686.25it/s, 31 steps of size 1.17e-01. acc. prob=0.79]warmup:  50%|████▉     | 1981/4000 [00:04<00:03, 637.88it/s, 127 steps of size 6.49e-02. acc. prob=0.79]sample:  51%|█████     | 2046/4000 [00:04<00:03, 573.32it/s, 63 steps of size 9.06e-02. acc. prob=0.89] sample:  53%|█████▎    | 2105/4000 [00:05<00:03, 533.95it/s, 63 steps of size 9.06e-02. acc. prob=0.90]sample:  54%|█████▍    | 2160/4000 [00:05<00:03, 509.33it/s, 63 steps of size 9.06e-02. acc. prob=0.91]sample:  55%|█████▌    | 2212/4000 [00:05<00:03, 493.50it/s, 63 steps of size 9.06e-02. acc. prob=0.92]sample:  57%|█████▋    | 2262/4000 [00:05<00:03, 481.36it/s, 63 steps of size 9.06e-02. acc. prob=0.91]sample:  58%|█████▊    | 2311/4000 [00:05<00:03, 469.96it/s, 63 steps of size 9.06e-02. acc. prob=0.91]sample:  59%|█████▉    | 2359/4000 [00:05<00:03, 459.01it/s, 63 steps of size 9.06e-02. acc. prob=0.91]sample:  60%|██████    | 2405/4000 [00:05<00:03, 453.62it/s, 31 steps of size 9.06e-02. acc. prob=0.91]sample:  61%|██████▏   | 2451/4000 [00:05<00:03, 452.86it/s, 31 steps of size 9.06e-02. acc. prob=0.91]sample:  62%|██████▏   | 2497/4000 [00:05<00:03, 453.11it/s, 63 steps of size 9.06e-02. acc. prob=0.91]sample:  64%|██████▎   | 2543/4000 [00:06<00:03, 450.82it/s, 63 steps of size 9.06e-02. acc. prob=0.91]sample:  65%|██████▍   | 2592/4000 [00:06<00:03, 461.09it/s, 63 steps of size 9.06e-02. acc. prob=0.91]sample:  66%|██████▌   | 2639/4000 [00:06<00:03, 452.61it/s, 63 steps of size 9.06e-02. acc. prob=0.91]sample:  67%|██████▋   | 2685/4000 [00:06<00:02, 452.18it/s, 31 steps of size 9.06e-02. acc. prob=0.91]sample:  68%|██████▊   | 2731/4000 [00:06<00:02, 451.57it/s, 63 steps of size 9.06e-02. acc. prob=0.91]sample:  69%|██████▉   | 2777/4000 [00:06<00:02, 448.90it/s, 63 steps of size 9.06e-02. acc. prob=0.91]sample:  71%|███████   | 2824/4000 [00:06<00:02, 454.23it/s, 63 steps of size 9.06e-02. acc. prob=0.91]sample:  72%|███████▏  | 2872/4000 [00:06<00:02, 459.91it/s, 63 steps of size 9.06e-02. acc. prob=0.91]sample:  73%|███████▎  | 2920/4000 [00:06<00:02, 464.25it/s, 31 steps of size 9.06e-02. acc. prob=0.91]sample:  74%|███████▍  | 2967/4000 [00:06<00:02, 461.54it/s, 63 steps of size 9.06e-02. acc. prob=0.91]sample:  75%|███████▌  | 3015/4000 [00:07<00:02, 464.47it/s, 63 steps of size 9.06e-02. acc. prob=0.91]sample:  77%|███████▋  | 3062/4000 [00:07<00:02, 463.11it/s, 63 steps of size 9.06e-02. acc. prob=0.91]sample:  78%|███████▊  | 3109/4000 [00:07<00:01, 457.75it/s, 63 steps of size 9.06e-02. acc. prob=0.91]sample:  79%|███████▉  | 3155/4000 [00:07<00:01, 457.20it/s, 63 steps of size 9.06e-02. acc. prob=0.91]sample:  80%|████████  | 3201/4000 [00:07<00:01, 455.52it/s, 63 steps of size 9.06e-02. acc. prob=0.91]sample:  81%|████████  | 3247/4000 [00:07<00:01, 451.17it/s, 63 steps of size 9.06e-02. acc. prob=0.91]sample:  82%|████████▏ | 3293/4000 [00:07<00:01, 445.18it/s, 63 steps of size 9.06e-02. acc. prob=0.91]sample:  84%|████████▎ | 3340/4000 [00:07<00:01, 452.06it/s, 63 steps of size 9.06e-02. acc. prob=0.91]sample:  85%|████████▍ | 3386/4000 [00:07<00:01, 446.63it/s, 63 steps of size 9.06e-02. acc. prob=0.91]sample:  86%|████████▌ | 3432/4000 [00:08<00:01, 450.21it/s, 63 steps of size 9.06e-02. acc. prob=0.91]sample:  87%|████████▋ | 3480/4000 [00:08<00:01, 457.54it/s, 31 steps of size 9.06e-02. acc. prob=0.91]sample:  88%|████████▊ | 3526/4000 [00:08<00:01, 456.05it/s, 63 steps of size 9.06e-02. acc. prob=0.91]sample:  89%|████████▉ | 3575/4000 [00:08<00:00, 465.19it/s, 63 steps of size 9.06e-02. acc. prob=0.91]sample:  91%|█████████ | 3622/4000 [00:08<00:00, 462.87it/s, 63 steps of size 9.06e-02. acc. prob=0.91]sample:  92%|█████████▏| 3669/4000 [00:08<00:00, 464.87it/s, 63 steps of size 9.06e-02. acc. prob=0.91]sample:  93%|█████████▎| 3716/4000 [00:08<00:00, 456.58it/s, 63 steps of size 9.06e-02. acc. prob=0.91]sample:  94%|█████████▍| 3763/4000 [00:08<00:00, 460.47it/s, 63 steps of size 9.06e-02. acc. prob=0.91]sample:  95%|█████████▌| 3810/4000 [00:08<00:00, 450.38it/s, 63 steps of size 9.06e-02. acc. prob=0.91]sample:  96%|█████████▋| 3856/4000 [00:08<00:00, 449.26it/s, 63 steps of size 9.06e-02. acc. prob=0.91]sample:  98%|█████████▊| 3901/4000 [00:09<00:00, 445.24it/s, 63 steps of size 9.06e-02. acc. prob=0.91]sample:  99%|█████████▊| 3946/4000 [00:09<00:00, 441.13it/s, 63 steps of size 9.06e-02. acc. prob=0.91]sample: 100%|█████████▉| 3991/4000 [00:09<00:00, 439.87it/s, 63 steps of size 9.06e-02. acc. prob=0.91]sample: 100%|██████████| 4000/4000 [00:09<00:00, 430.99it/s, 63 steps of size 9.06e-02. acc. prob=0.91]
+
+                 mean       std    median      5.0%     95.0%     n_eff     r_hat
+ sigma[0,0]      0.04      0.00      0.04      0.04      0.05   3448.34      1.00
+ sigma[1,0]      0.08      0.01      0.08      0.07      0.09   3164.20      1.00
+ sigma[2,0]      0.04      0.00      0.04      0.04      0.05   3439.60      1.00
+ sigma[3,0]      0.04      0.00      0.04      0.03      0.05   3172.16      1.00
+ sigma[4,0]      0.03      0.00      0.03      0.03      0.04   3267.21      1.00
+ sigma[5,0]      0.04      0.00      0.04      0.04      0.05   2920.03      1.00
+ sigma[6,0]      0.05      0.00      0.04      0.04      0.05   3110.50      1.00
+ sigma[7,0]      0.09      0.01      0.09      0.07      0.10   3084.36      1.00
+ sigma[8,0]      0.07      0.01      0.07      0.06      0.08   2960.64      1.00
+ sigma[9,0]      0.03      0.00      0.03      0.02      0.03   2762.67      1.00
+sigma[10,0]      0.04      0.00      0.04      0.03      0.05   2894.74      1.00
+sigma[11,0]      0.08      0.01      0.08      0.07      0.09   2754.77      1.00
+sigma[12,0]      0.06      0.01      0.06      0.05      0.07   2873.73      1.00
+sigma[13,0]      0.03      0.00      0.03      0.03      0.04   3239.93      1.00
+sigma[14,0]      0.04      0.00      0.04      0.03      0.04   2940.99      1.00
+sigma[15,0]      0.05      0.00      0.04      0.04      0.05   2385.15      1.00
+sigma[16,0]      0.04      0.00      0.04      0.04      0.05   2847.45      1.00
+sigma[17,0]      0.04      0.00      0.04      0.04      0.05   3228.00      1.00
+sigma[18,0]      0.04      0.00      0.04      0.04      0.05   2873.30      1.00
+sigma[19,0]      0.05      0.01      0.05      0.05      0.06   3480.51      1.00
+sigma[20,0]      0.03      0.00      0.03      0.03      0.04   2959.82      1.00
+sigma[21,0]      0.04      0.00      0.04      0.03      0.04   2434.89      1.00
+sigma[22,0]      0.04      0.00      0.04      0.03      0.04   3520.73      1.00
+sigma[23,0]      0.03      0.00      0.03      0.03      0.04   3282.50      1.00
+sigma[24,0]      0.04      0.00      0.04      0.04      0.05   3330.09      1.00
+sigma[25,0]      0.04      0.00      0.04      0.03      0.05   3402.19      1.00
+sigma[26,0]      0.06      0.01      0.06      0.05      0.07   3183.74      1.00
+sigma[27,0]      0.05      0.00      0.05      0.04      0.05   3004.90      1.00
+sigma[28,0]      0.05      0.00      0.04      0.04      0.05   3451.60      1.00
+sigma[29,0]      0.06      0.01      0.06      0.05      0.07   3071.01      1.00
+sigma[30,0]      0.04      0.00      0.04      0.03      0.05   2455.56      1.00
+sigma[31,0]      0.05      0.00      0.05      0.04      0.06   3423.04      1.00
+sigma[32,0]      0.03      0.00      0.03      0.02      0.03   3510.25      1.00
+sigma[33,0]      0.04      0.00      0.04      0.03      0.04   3383.12      1.00
+sigma[34,0]      0.07      0.01      0.07      0.06      0.09   3277.88      1.00
+sigma[35,0]      0.03      0.00      0.03      0.03      0.03   3537.78      1.00
+sigma[36,0]      0.04      0.00      0.04      0.04      0.05   2239.91      1.00
+sigma[37,0]      0.04      0.00      0.04      0.03      0.05   2822.69      1.00
+sigma[38,0]      0.03      0.00      0.03      0.03      0.04   3193.56      1.00
+sigma[39,0]      0.07      0.01      0.07      0.06      0.08   3301.68      1.00
+sigma[40,0]      0.04      0.00      0.04      0.03      0.04   3524.51      1.00
+sigma[41,0]      0.07      0.01      0.07      0.06      0.08   3186.05      1.00
+sigma[42,0]      0.04      0.00      0.04      0.03      0.05   3698.78      1.00
+sigma[43,0]      0.03      0.00      0.03      0.02      0.03   3580.83      1.00
+sigma[44,0]      0.05      0.00      0.05      0.04      0.06   2992.93      1.00
+sigma[45,0]      0.07      0.01      0.07      0.06      0.08   3063.68      1.00
+sigma[46,0]      0.04      0.00      0.04      0.03      0.04   3309.42      1.00
+sigma[47,0]      0.04      0.00      0.04      0.03      0.05   3416.52      1.00
+sigma[48,0]      0.06      0.01      0.06      0.05      0.06   3075.41      1.00
+sigma[49,0]      0.04      0.00      0.04      0.03      0.04   2987.77      1.00
+sigma[50,0]      0.08      0.01      0.08      0.07      0.09   2921.89      1.00
+sigma[51,0]      0.05      0.00      0.05      0.04      0.06   3307.72      1.00
+sigma[52,0]      0.02      0.00      0.02      0.02      0.03   2690.72      1.00
+   theta[0]      1.15      0.02      1.15      1.12      1.18   2436.00      1.00
+   theta[1]     -0.04      0.03     -0.04     -0.09      0.01   2309.01      1.00
+   theta[2]     -0.09      0.03     -0.09     -0.14     -0.05   2495.66      1.00
+   theta[3]      0.01      0.03      0.02     -0.03      0.06   3066.00      1.00
+   theta[4]     -0.09      0.03     -0.09     -0.14     -0.05   2544.24      1.00
+   theta[5]     -0.04      0.02     -0.04     -0.07     -0.01   2967.75      1.00
+theta_sd[0]      0.58      0.21      0.53      0.30      0.85   1543.27      1.00
+
+Number of divergences: 0
+
+MCMC elapsed time: 12.374344825744629
+/Users/trobacker/GitHub/forecast-sandbox-2025-2026/src/flusion3/.venv/lib/python3.12/site-packages/iddata/loader.py:505: FutureWarning: DataFrameGroupBy.apply operated on the grouping columns. This behavior is deprecated, and in a future version of pandas the grouping columns will be excluded from the operation. Either pass `include_groups=False` to exclude the groupings or explicitly select the grouping columns after groupby to silence this warning.
+  .apply(lambda x: pd.DataFrame({"inc": [np.mean(x["inc"])]})) \
+/Users/trobacker/GitHub/forecast-sandbox-2025-2026/src/flusion3/.venv/lib/python3.12/site-packages/iddata/loader.py:189: FutureWarning: DataFrame.fillna with 'method' is deprecated and will raise in a future version. Use obj.ffill() or obj.bfill() instead.
+  df[fill_cols] = df[fill_cols].fillna(axis=0, method="ffill")
+/Users/trobacker/GitHub/forecast-sandbox-2025-2026/src/flusion3/.venv/lib/python3.12/site-packages/iddata/loader.py:189: FutureWarning: DataFrame.fillna with 'method' is deprecated and will raise in a future version. Use obj.ffill() or obj.bfill() instead.
+  df[fill_cols] = df[fill_cols].fillna(axis=0, method="ffill")
+/Users/trobacker/GitHub/forecast-sandbox-2025-2026/src/flusion3/.venv/lib/python3.12/site-packages/iddata/loader.py:189: FutureWarning: DataFrame.fillna with 'method' is deprecated and will raise in a future version. Use obj.ffill() or obj.bfill() instead.
+  df[fill_cols] = df[fill_cols].fillna(axis=0, method="ffill")
+/Users/trobacker/GitHub/forecast-sandbox-2025-2026/src/flusion3/.venv/lib/python3.12/site-packages/iddata/loader.py:189: FutureWarning: DataFrame.fillna with 'method' is deprecated and will raise in a future version. Use obj.ffill() or obj.bfill() instead.
+  df[fill_cols] = df[fill_cols].fillna(axis=0, method="ffill")
+/Users/trobacker/GitHub/forecast-sandbox-2025-2026/src/flusion3/.venv/lib/python3.12/site-packages/iddata/loader.py:189: FutureWarning: DataFrame.fillna with 'method' is deprecated and will raise in a future version. Use obj.ffill() or obj.bfill() instead.
+  df[fill_cols] = df[fill_cols].fillna(axis=0, method="ffill")
+/Users/trobacker/GitHub/forecast-sandbox-2025-2026/src/flusion3/.venv/lib/python3.12/site-packages/iddata/loader.py:189: FutureWarning: DataFrame.fillna with 'method' is deprecated and will raise in a future version. Use obj.ffill() or obj.bfill() instead.
+  df[fill_cols] = df[fill_cols].fillna(axis=0, method="ffill")
+/Users/trobacker/GitHub/forecast-sandbox-2025-2026/src/flusion3/.venv/lib/python3.12/site-packages/iddata/loader.py:189: FutureWarning: DataFrame.fillna with 'method' is deprecated and will raise in a future version. Use obj.ffill() or obj.bfill() instead.
+  df[fill_cols] = df[fill_cols].fillna(axis=0, method="ffill")
+/Users/trobacker/GitHub/forecast-sandbox-2025-2026/src/flusion3/.venv/lib/python3.12/site-packages/iddata/loader.py:189: FutureWarning: DataFrame.fillna with 'method' is deprecated and will raise in a future version. Use obj.ffill() or obj.bfill() instead.
+  df[fill_cols] = df[fill_cols].fillna(axis=0, method="ffill")
+/Users/trobacker/GitHub/forecast-sandbox-2025-2026/src/flusion3/.venv/lib/python3.12/site-packages/iddata/loader.py:189: FutureWarning: DataFrame.fillna with 'method' is deprecated and will raise in a future version. Use obj.ffill() or obj.bfill() instead.
+  df[fill_cols] = df[fill_cols].fillna(axis=0, method="ffill")
+/Users/trobacker/GitHub/forecast-sandbox-2025-2026/src/flusion3/.venv/lib/python3.12/site-packages/iddata/loader.py:189: FutureWarning: DataFrame.fillna with 'method' is deprecated and will raise in a future version. Use obj.ffill() or obj.bfill() instead.
+  df[fill_cols] = df[fill_cols].fillna(axis=0, method="ffill")
+/Users/trobacker/GitHub/forecast-sandbox-2025-2026/src/flusion3/.venv/lib/python3.12/site-packages/iddata/loader.py:189: FutureWarning: DataFrame.fillna with 'method' is deprecated and will raise in a future version. Use obj.ffill() or obj.bfill() instead.
+  df[fill_cols] = df[fill_cols].fillna(axis=0, method="ffill")
+/Users/trobacker/GitHub/forecast-sandbox-2025-2026/src/flusion3/.venv/lib/python3.12/site-packages/iddata/loader.py:189: FutureWarning: DataFrame.fillna with 'method' is deprecated and will raise in a future version. Use obj.ffill() or obj.bfill() instead.
+  df[fill_cols] = df[fill_cols].fillna(axis=0, method="ffill")
+/Users/trobacker/GitHub/forecast-sandbox-2025-2026/src/flusion3/.venv/lib/python3.12/site-packages/iddata/loader.py:189: FutureWarning: DataFrame.fillna with 'method' is deprecated and will raise in a future version. Use obj.ffill() or obj.bfill() instead.
+  df[fill_cols] = df[fill_cols].fillna(axis=0, method="ffill")
+/Users/trobacker/GitHub/forecast-sandbox-2025-2026/src/flusion3/.venv/lib/python3.12/site-packages/iddata/loader.py:189: FutureWarning: DataFrame.fillna with 'method' is deprecated and will raise in a future version. Use obj.ffill() or obj.bfill() instead.
+  df[fill_cols] = df[fill_cols].fillna(axis=0, method="ffill")
+/Users/trobacker/GitHub/forecast-sandbox-2025-2026/src/flusion3/.venv/lib/python3.12/site-packages/iddata/loader.py:189: FutureWarning: DataFrame.fillna with 'method' is deprecated and will raise in a future version. Use obj.ffill() or obj.bfill() instead.
+  df[fill_cols] = df[fill_cols].fillna(axis=0, method="ffill")
+/Users/trobacker/GitHub/forecast-sandbox-2025-2026/src/flusion3/.venv/lib/python3.12/site-packages/iddata/loader.py:539: FutureWarning: DataFrameGroupBy.apply operated on the grouping columns. This behavior is deprecated, and in a future version of pandas the grouping columns will be excluded from the operation. Either pass `include_groups=False` to exclude the groupings or explicitly select the grouping columns after groupby to silence this warning.
+  .apply(lambda x: pd.DataFrame({"inc": [np.mean(x["inc"])]})) \
+/Users/trobacker/GitHub/forecast-sandbox-2025-2026/src/flusion3/.venv/lib/python3.12/site-packages/timeseriesutils/featurize.py:502: FutureWarning: DataFrameGroupBy.apply operated on the grouping columns. This behavior is deprecated, and in a future version of pandas the grouping columns will be excluded from the operation. Either pass `include_groups=False` to exclude the groupings or explicitly select the grouping columns after groupby to silence this warning.
+  .apply(taylor_coefs_one_column_grp,
+/Users/trobacker/GitHub/forecast-sandbox-2025-2026/src/flusion3/.venv/lib/python3.12/site-packages/timeseriesutils/featurize.py:502: FutureWarning: DataFrameGroupBy.apply operated on the grouping columns. This behavior is deprecated, and in a future version of pandas the grouping columns will be excluded from the operation. Either pass `include_groups=False` to exclude the groupings or explicitly select the grouping columns after groupby to silence this warning.
+  .apply(taylor_coefs_one_column_grp,
+/Users/trobacker/GitHub/forecast-sandbox-2025-2026/src/flusion3/.venv/lib/python3.12/site-packages/timeseriesutils/featurize.py:502: FutureWarning: DataFrameGroupBy.apply operated on the grouping columns. This behavior is deprecated, and in a future version of pandas the grouping columns will be excluded from the operation. Either pass `include_groups=False` to exclude the groupings or explicitly select the grouping columns after groupby to silence this warning.
+  .apply(taylor_coefs_one_column_grp,
+/Users/trobacker/GitHub/forecast-sandbox-2025-2026/src/flusion3/.venv/lib/python3.12/site-packages/timeseriesutils/featurize.py:502: FutureWarning: DataFrameGroupBy.apply operated on the grouping columns. This behavior is deprecated, and in a future version of pandas the grouping columns will be excluded from the operation. Either pass `include_groups=False` to exclude the groupings or explicitly select the grouping columns after groupby to silence this warning.
+  .apply(taylor_coefs_one_column_grp,
+Bag number:   0%|          | 0/20 [00:00<?, ?it/s]Bag number:   5%|▌         | 1/20 [00:26<08:24, 26.53s/it]Bag number:  10%|█         | 2/20 [00:53<08:01, 26.74s/it]Bag number:  15%|█▌        | 3/20 [01:19<07:26, 26.27s/it]Bag number:  20%|██        | 4/20 [01:43<06:47, 25.49s/it]Bag number:  25%|██▌       | 5/20 [02:10<06:32, 26.17s/it]Bag number:  30%|███       | 6/20 [02:36<06:06, 26.15s/it]Bag number:  35%|███▌      | 7/20 [03:04<05:47, 26.69s/it]Bag number:  40%|████      | 8/20 [03:30<05:15, 26.31s/it]Bag number:  45%|████▌     | 9/20 [03:53<04:38, 25.33s/it]Bag number:  50%|█████     | 10/20 [04:20<04:17, 25.77s/it]Bag number:  55%|█████▌    | 11/20 [04:43<03:46, 25.17s/it]Bag number:  60%|██████    | 12/20 [05:10<03:23, 25.49s/it]Bag number:  65%|██████▌   | 13/20 [05:38<03:03, 26.23s/it]Bag number:  70%|███████   | 14/20 [06:03<02:36, 26.12s/it]Bag number:  75%|███████▌  | 15/20 [06:32<02:14, 26.86s/it]Bag number:  80%|████████  | 16/20 [06:59<01:47, 26.83s/it]Bag number:  85%|████████▌ | 17/20 [07:25<01:20, 26.75s/it]Bag number:  90%|█████████ | 18/20 [07:52<00:53, 26.69s/it]Bag number:  95%|█████████▌| 19/20 [08:19<00:26, 26.83s/it]Bag number: 100%|██████████| 20/20 [08:48<00:00, 27.33s/it]Bag number: 100%|██████████| 20/20 [08:48<00:00, 26.40s/it]
+
+Attaching package: ‘dplyr’
+
+The following objects are masked from ‘package:stats’:
+
+    filter, lag
+
+The following objects are masked from ‘package:base’:
+
+    intersect, setdiff, setequal, union
+
+Rows: 10070 Columns: 5
+── Column specification ────────────────────────────────────────────────────────
+Delimiter: ","
+chr  (2): location, location_name
+dbl  (2): value, weekly_rate
+date (1): date
+
+ℹ Use `spec()` to retrieve the full column specification for this data.
+ℹ Specify the column types or set `show_col_types = FALSE` to quiet this message.
+Rows: 53 Columns: 12
+── Column specification ────────────────────────────────────────────────────────
+Delimiter: ","
+chr (3): abbreviation, location, location_name
+dbl (9): population, count_rate0p3, count_rate0p5, count_rate0p7, count_rate...
+
+ℹ Use `spec()` to retrieve the full column specification for this data.
+ℹ Specify the column types or set `show_col_types = FALSE` to quiet this message.
+Running flusion3 ensemble for reference date: 2023-12-23
+============================================================
+
+1/4: Running AR6 (no Fourier)...
+
+2/4: Running AR6 with Fourier seasonality...
+
+3/4: Running GBQR...
+
+4/4: Creating ensemble...
+
+============================================================
+Flusion3 ensemble complete!
+Output saved to: ../../model-output/UMass-flusion3/2023-12-23-UMass-flusion3.csv
+✓ Successfully completed forecast for 2023-12-20
+
+============================================================
+Running flusion3 for date: 2023-12-27
+============================================================
+/Users/trobacker/GitHub/idmodels/src/idmodels/sarix.py:35: FutureWarning: DataFrame.interpolate with object dtype is deprecated and will raise in a future version. Call obj.infer_objects(copy=False) before interpolating instead.
+  df = df.query("wk_end_date >= '2022-10-01'").interpolate()
+  0%|          | 0/4000 [00:00<?, ?it/s]warmup:   0%|          | 1/4000 [00:00<30:02,  2.22it/s, 1 steps of size 2.34e+00. acc. prob=0.00]warmup:   0%|          | 2/4000 [00:00<26:55,  2.47it/s, 1 steps of size 2.30e-01. acc. prob=0.00]warmup:   1%|          | 31/4000 [00:00<01:16, 51.66it/s, 127 steps of size 2.66e-03. acc. prob=0.70]warmup:   1%|          | 44/4000 [00:01<01:00, 65.22it/s, 511 steps of size 1.18e-03. acc. prob=0.72]warmup:   1%|▏         | 57/4000 [00:01<00:50, 78.15it/s, 6 steps of size 7.77e-04. acc. prob=0.73]  warmup:   2%|▏         | 71/4000 [00:01<00:42, 91.79it/s, 511 steps of size 1.56e-03. acc. prob=0.74]warmup:   2%|▏         | 84/4000 [00:01<00:38, 100.65it/s, 127 steps of size 3.95e-03. acc. prob=0.75]warmup:   2%|▏         | 97/4000 [00:01<00:36, 108.19it/s, 127 steps of size 4.16e-03. acc. prob=0.76]warmup:   3%|▎         | 116/4000 [00:01<00:29, 129.83it/s, 63 steps of size 1.42e-01. acc. prob=0.77]warmup:   4%|▎         | 148/4000 [00:01<00:21, 182.34it/s, 31 steps of size 8.19e-02. acc. prob=0.77]warmup:   5%|▍         | 188/4000 [00:01<00:15, 243.94it/s, 12 steps of size 4.96e-02. acc. prob=0.77]warmup:   6%|▌         | 231/4000 [00:01<00:12, 297.19it/s, 63 steps of size 1.13e-01. acc. prob=0.78]warmup:   7%|▋         | 274/4000 [00:01<00:11, 332.04it/s, 255 steps of size 3.87e-02. acc. prob=0.78]warmup:   8%|▊         | 315/4000 [00:02<00:10, 354.74it/s, 31 steps of size 1.12e-01. acc. prob=0.78] warmup:   9%|▉         | 370/4000 [00:02<00:08, 411.57it/s, 63 steps of size 1.08e-01. acc. prob=0.78]warmup:  11%|█         | 428/4000 [00:02<00:07, 460.51it/s, 63 steps of size 1.03e-01. acc. prob=0.78]warmup:  12%|█▏        | 475/4000 [00:02<00:07, 452.52it/s, 31 steps of size 2.15e-01. acc. prob=0.78]warmup:  13%|█▎        | 521/4000 [00:02<00:08, 434.07it/s, 63 steps of size 9.69e-02. acc. prob=0.78]warmup:  14%|█▍        | 574/4000 [00:02<00:07, 461.19it/s, 63 steps of size 9.95e-02. acc. prob=0.79]warmup:  16%|█▌        | 630/4000 [00:02<00:06, 489.45it/s, 63 steps of size 8.26e-02. acc. prob=0.79]warmup:  17%|█▋        | 689/4000 [00:02<00:06, 517.29it/s, 31 steps of size 1.04e-01. acc. prob=0.79]warmup:  19%|█▊        | 746/4000 [00:02<00:06, 531.22it/s, 63 steps of size 1.17e-01. acc. prob=0.79]warmup:  20%|██        | 809/4000 [00:02<00:05, 556.21it/s, 63 steps of size 9.20e-02. acc. prob=0.79]warmup:  22%|██▏       | 865/4000 [00:03<00:05, 556.56it/s, 10 steps of size 2.01e-02. acc. prob=0.79]warmup:  23%|██▎       | 921/4000 [00:03<00:06, 485.03it/s, 9 steps of size 7.02e-02. acc. prob=0.79] warmup:  24%|██▍       | 972/4000 [00:03<00:06, 490.64it/s, 31 steps of size 1.43e-01. acc. prob=0.79]warmup:  26%|██▌       | 1024/4000 [00:03<00:05, 498.24it/s, 31 steps of size 1.44e-01. acc. prob=0.79]warmup:  27%|██▋       | 1083/4000 [00:03<00:05, 521.01it/s, 63 steps of size 9.43e-02. acc. prob=0.79]warmup:  28%|██▊       | 1140/4000 [00:03<00:05, 533.04it/s, 63 steps of size 9.11e-02. acc. prob=0.79]warmup:  30%|██▉       | 1199/4000 [00:03<00:05, 546.36it/s, 63 steps of size 1.04e-01. acc. prob=0.79]warmup:  31%|███▏      | 1256/4000 [00:03<00:04, 552.23it/s, 31 steps of size 1.11e-01. acc. prob=0.79]warmup:  33%|███▎      | 1318/4000 [00:03<00:04, 570.96it/s, 31 steps of size 1.17e-01. acc. prob=0.79]warmup:  35%|███▍      | 1385/4000 [00:04<00:04, 599.30it/s, 16 steps of size 1.13e-01. acc. prob=0.79]warmup:  36%|███▌      | 1446/4000 [00:04<00:04, 600.79it/s, 63 steps of size 8.52e-02. acc. prob=0.79]warmup:  38%|███▊      | 1509/4000 [00:04<00:04, 609.19it/s, 31 steps of size 8.73e-02. acc. prob=0.79]warmup:  39%|███▉      | 1571/4000 [00:04<00:04, 605.26it/s, 31 steps of size 1.21e-01. acc. prob=0.79]warmup:  41%|████      | 1637/4000 [00:04<00:03, 621.03it/s, 31 steps of size 1.05e-01. acc. prob=0.79]warmup:  43%|████▎     | 1701/4000 [00:04<00:03, 624.64it/s, 63 steps of size 1.07e-01. acc. prob=0.79]warmup:  44%|████▍     | 1770/4000 [00:04<00:03, 643.33it/s, 31 steps of size 1.07e-01. acc. prob=0.79]warmup:  46%|████▌     | 1838/4000 [00:04<00:03, 654.16it/s, 31 steps of size 1.14e-01. acc. prob=0.79]warmup:  48%|████▊     | 1904/4000 [00:04<00:03, 648.55it/s, 31 steps of size 1.10e-01. acc. prob=0.79]warmup:  49%|████▉     | 1969/4000 [00:04<00:03, 603.91it/s, 127 steps of size 8.41e-02. acc. prob=0.79]sample:  51%|█████     | 2031/4000 [00:05<00:03, 503.96it/s, 63 steps of size 7.75e-02. acc. prob=0.92] sample:  52%|█████▏    | 2085/4000 [00:05<00:04, 471.93it/s, 63 steps of size 7.75e-02. acc. prob=0.93]sample:  53%|█████▎    | 2135/4000 [00:05<00:04, 452.00it/s, 63 steps of size 7.75e-02. acc. prob=0.94]sample:  55%|█████▍    | 2182/4000 [00:05<00:04, 438.27it/s, 63 steps of size 7.75e-02. acc. prob=0.94]sample:  56%|█████▌    | 2227/4000 [00:05<00:04, 428.03it/s, 63 steps of size 7.75e-02. acc. prob=0.94]sample:  57%|█████▋    | 2271/4000 [00:05<00:04, 420.85it/s, 63 steps of size 7.75e-02. acc. prob=0.94]sample:  58%|█████▊    | 2314/4000 [00:05<00:04, 416.00it/s, 63 steps of size 7.75e-02. acc. prob=0.94]sample:  59%|█████▉    | 2356/4000 [00:05<00:03, 412.24it/s, 63 steps of size 7.75e-02. acc. prob=0.94]sample:  60%|█████▉    | 2398/4000 [00:06<00:03, 409.34it/s, 63 steps of size 7.75e-02. acc. prob=0.94]sample:  61%|██████    | 2440/4000 [00:06<00:03, 407.39it/s, 63 steps of size 7.75e-02. acc. prob=0.94]sample:  62%|██████▏   | 2481/4000 [00:06<00:03, 405.71it/s, 63 steps of size 7.75e-02. acc. prob=0.94]sample:  63%|██████▎   | 2522/4000 [00:06<00:03, 403.80it/s, 63 steps of size 7.75e-02. acc. prob=0.94]sample:  64%|██████▍   | 2563/4000 [00:06<00:03, 404.38it/s, 63 steps of size 7.75e-02. acc. prob=0.94]sample:  65%|██████▌   | 2604/4000 [00:06<00:03, 403.69it/s, 63 steps of size 7.75e-02. acc. prob=0.94]sample:  66%|██████▌   | 2645/4000 [00:06<00:03, 402.95it/s, 63 steps of size 7.75e-02. acc. prob=0.94]sample:  67%|██████▋   | 2686/4000 [00:06<00:03, 404.12it/s, 63 steps of size 7.75e-02. acc. prob=0.94]sample:  68%|██████▊   | 2727/4000 [00:06<00:03, 403.48it/s, 63 steps of size 7.75e-02. acc. prob=0.94]sample:  69%|██████▉   | 2769/4000 [00:06<00:03, 405.95it/s, 63 steps of size 7.75e-02. acc. prob=0.94]sample:  70%|███████   | 2810/4000 [00:07<00:02, 405.17it/s, 63 steps of size 7.75e-02. acc. prob=0.94]sample:  71%|███████▏  | 2851/4000 [00:07<00:02, 404.47it/s, 63 steps of size 7.75e-02. acc. prob=0.94]sample:  72%|███████▏  | 2892/4000 [00:07<00:02, 403.67it/s, 63 steps of size 7.75e-02. acc. prob=0.94]sample:  73%|███████▎  | 2933/4000 [00:07<00:02, 403.67it/s, 63 steps of size 7.75e-02. acc. prob=0.94]sample:  74%|███████▍  | 2974/4000 [00:07<00:02, 403.78it/s, 63 steps of size 7.75e-02. acc. prob=0.94]sample:  75%|███████▌  | 3015/4000 [00:07<00:02, 404.97it/s, 63 steps of size 7.75e-02. acc. prob=0.94]sample:  76%|███████▋  | 3056/4000 [00:07<00:02, 404.11it/s, 63 steps of size 7.75e-02. acc. prob=0.94]sample:  77%|███████▋  | 3097/4000 [00:07<00:02, 403.77it/s, 63 steps of size 7.75e-02. acc. prob=0.94]sample:  78%|███████▊  | 3138/4000 [00:07<00:02, 402.90it/s, 63 steps of size 7.75e-02. acc. prob=0.94]sample:  79%|███████▉  | 3179/4000 [00:08<00:02, 402.33it/s, 63 steps of size 7.75e-02. acc. prob=0.94]sample:  80%|████████  | 3220/4000 [00:08<00:01, 402.13it/s, 63 steps of size 7.75e-02. acc. prob=0.94]sample:  82%|████████▏ | 3261/4000 [00:08<00:01, 401.72it/s, 63 steps of size 7.75e-02. acc. prob=0.94]sample:  83%|████████▎ | 3302/4000 [00:08<00:01, 401.66it/s, 63 steps of size 7.75e-02. acc. prob=0.94]sample:  84%|████████▎ | 3343/4000 [00:08<00:01, 401.69it/s, 63 steps of size 7.75e-02. acc. prob=0.94]sample:  85%|████████▍ | 3384/4000 [00:08<00:01, 401.17it/s, 63 steps of size 7.75e-02. acc. prob=0.94]sample:  86%|████████▌ | 3425/4000 [00:08<00:01, 401.56it/s, 63 steps of size 7.75e-02. acc. prob=0.94]sample:  87%|████████▋ | 3466/4000 [00:08<00:01, 402.61it/s, 63 steps of size 7.75e-02. acc. prob=0.94]sample:  88%|████████▊ | 3507/4000 [00:08<00:01, 402.09it/s, 63 steps of size 7.75e-02. acc. prob=0.94]sample:  89%|████████▊ | 3548/4000 [00:08<00:01, 401.89it/s, 63 steps of size 7.75e-02. acc. prob=0.94]sample:  90%|████████▉ | 3589/4000 [00:09<00:01, 403.04it/s, 63 steps of size 7.75e-02. acc. prob=0.94]sample:  91%|█████████ | 3630/4000 [00:09<00:00, 402.59it/s, 63 steps of size 7.75e-02. acc. prob=0.94]sample:  92%|█████████▏| 3671/4000 [00:09<00:00, 402.20it/s, 63 steps of size 7.75e-02. acc. prob=0.94]sample:  93%|█████████▎| 3712/4000 [00:09<00:00, 403.41it/s, 63 steps of size 7.75e-02. acc. prob=0.94]sample:  94%|█████████▍| 3753/4000 [00:09<00:00, 402.74it/s, 63 steps of size 7.75e-02. acc. prob=0.94]sample:  95%|█████████▍| 3794/4000 [00:09<00:00, 402.28it/s, 63 steps of size 7.75e-02. acc. prob=0.94]sample:  96%|█████████▌| 3835/4000 [00:09<00:00, 402.01it/s, 63 steps of size 7.75e-02. acc. prob=0.94]sample:  97%|█████████▋| 3877/4000 [00:09<00:00, 404.51it/s, 63 steps of size 7.75e-02. acc. prob=0.94]sample:  98%|█████████▊| 3918/4000 [00:09<00:00, 405.01it/s, 63 steps of size 7.75e-02. acc. prob=0.94]sample:  99%|█████████▉| 3959/4000 [00:09<00:00, 403.49it/s, 63 steps of size 7.75e-02. acc. prob=0.94]sample: 100%|██████████| 4000/4000 [00:10<00:00, 402.92it/s, 63 steps of size 7.75e-02. acc. prob=0.94]sample: 100%|██████████| 4000/4000 [00:10<00:00, 398.18it/s, 63 steps of size 7.75e-02. acc. prob=0.94]
+
+                 mean       std    median      5.0%     95.0%     n_eff     r_hat
+ sigma[0,0]      0.05      0.00      0.05      0.04      0.05   4526.69      1.00
+ sigma[1,0]      0.08      0.01      0.08      0.07      0.09   3813.76      1.00
+ sigma[2,0]      0.04      0.00      0.04      0.04      0.05   4240.02      1.00
+ sigma[3,0]      0.04      0.00      0.04      0.04      0.05   4219.88      1.00
+ sigma[4,0]      0.03      0.00      0.03      0.03      0.04   4051.24      1.00
+ sigma[5,0]      0.04      0.00      0.04      0.03      0.05   5325.66      1.00
+ sigma[6,0]      0.05      0.00      0.04      0.04      0.05   4840.39      1.00
+ sigma[7,0]      0.09      0.01      0.09      0.08      0.10   5149.04      1.00
+ sigma[8,0]      0.07      0.01      0.07      0.06      0.08   4526.47      1.00
+ sigma[9,0]      0.03      0.00      0.03      0.02      0.03   5698.56      1.00
+sigma[10,0]      0.04      0.00      0.04      0.03      0.04   4493.82      1.00
+sigma[11,0]      0.08      0.01      0.08      0.07      0.09   3894.59      1.00
+sigma[12,0]      0.06      0.01      0.06      0.05      0.07   4650.14      1.00
+sigma[13,0]      0.04      0.00      0.04      0.03      0.04   5258.84      1.00
+sigma[14,0]      0.04      0.00      0.04      0.03      0.04   4383.76      1.00
+sigma[15,0]      0.05      0.00      0.05      0.04      0.05   4035.80      1.00
+sigma[16,0]      0.04      0.00      0.04      0.04      0.05   3931.07      1.00
+sigma[17,0]      0.04      0.00      0.04      0.04      0.05   5276.82      1.00
+sigma[18,0]      0.05      0.00      0.04      0.04      0.05   4210.88      1.00
+sigma[19,0]      0.05      0.00      0.05      0.05      0.06   5513.34      1.00
+sigma[20,0]      0.04      0.00      0.04      0.03      0.04   5545.63      1.00
+sigma[21,0]      0.04      0.00      0.03      0.03      0.04   4883.12      1.00
+sigma[22,0]      0.04      0.00      0.04      0.03      0.04   4195.14      1.00
+sigma[23,0]      0.03      0.00      0.03      0.03      0.04   4075.24      1.00
+sigma[24,0]      0.05      0.00      0.05      0.04      0.05   5007.88      1.00
+sigma[25,0]      0.04      0.00      0.04      0.03      0.04   3861.32      1.00
+sigma[26,0]      0.06      0.01      0.06      0.05      0.07   4375.16      1.00
+sigma[27,0]      0.05      0.00      0.05      0.04      0.06   3975.98      1.00
+sigma[28,0]      0.04      0.00      0.04      0.04      0.05   4895.19      1.00
+sigma[29,0]      0.06      0.01      0.06      0.05      0.07   4582.56      1.00
+sigma[30,0]      0.04      0.00      0.04      0.04      0.05   4507.32      1.00
+sigma[31,0]      0.05      0.00      0.05      0.04      0.06   4736.03      1.00
+sigma[32,0]      0.03      0.00      0.03      0.02      0.03   4400.49      1.00
+sigma[33,0]      0.04      0.00      0.04      0.03      0.05   4540.76      1.00
+sigma[34,0]      0.08      0.01      0.08      0.06      0.09   4527.28      1.00
+sigma[35,0]      0.03      0.00      0.03      0.03      0.04   3251.52      1.00
+sigma[36,0]      0.04      0.00      0.04      0.04      0.05   4205.69      1.00
+sigma[37,0]      0.04      0.00      0.04      0.03      0.05   4357.05      1.00
+sigma[38,0]      0.03      0.00      0.03      0.03      0.04   4347.07      1.00
+sigma[39,0]      0.07      0.01      0.07      0.06      0.08   3474.09      1.00
+sigma[40,0]      0.04      0.00      0.04      0.03      0.05   4833.80      1.00
+sigma[41,0]      0.07      0.01      0.07      0.06      0.08   4355.06      1.00
+sigma[42,0]      0.04      0.00      0.04      0.04      0.05   4909.75      1.00
+sigma[43,0]      0.03      0.00      0.03      0.02      0.03   3702.59      1.00
+sigma[44,0]      0.05      0.01      0.05      0.05      0.06   3668.12      1.00
+sigma[45,0]      0.07      0.01      0.07      0.06      0.08   3703.66      1.00
+sigma[46,0]      0.04      0.00      0.04      0.03      0.05   4247.06      1.00
+sigma[47,0]      0.04      0.00      0.04      0.04      0.05   4033.26      1.00
+sigma[48,0]      0.06      0.01      0.06      0.05      0.07   5211.85      1.00
+sigma[49,0]      0.04      0.00      0.04      0.03      0.04   3700.43      1.00
+sigma[50,0]      0.08      0.01      0.08      0.07      0.09   4021.78      1.00
+sigma[51,0]      0.05      0.00      0.05      0.04      0.06   3758.36      1.00
+sigma[52,0]      0.03      0.00      0.03      0.02      0.03   3407.77      1.00
+   theta[0]      1.18      0.02      1.18      1.15      1.21   2653.88      1.00
+   theta[1]     -0.06      0.03     -0.06     -0.11     -0.02   2633.13      1.00
+   theta[2]     -0.08      0.03     -0.08     -0.13     -0.04   3546.16      1.00
+   theta[3]     -0.00      0.03     -0.00     -0.05      0.04   3467.85      1.00
+   theta[4]     -0.09      0.03     -0.09     -0.14     -0.04   2798.20      1.00
+   theta[5]     -0.03      0.02     -0.03     -0.06     -0.01   3093.60      1.00
+theta_sd[0]      0.58      0.20      0.54      0.31      0.82   2216.47      1.00
+
+Number of divergences: 0
+
+MCMC elapsed time: 12.93769884109497
+/Users/trobacker/GitHub/idmodels/src/idmodels/sarix.py:35: FutureWarning: DataFrame.interpolate with object dtype is deprecated and will raise in a future version. Call obj.infer_objects(copy=False) before interpolating instead.
+  df = df.query("wk_end_date >= '2022-10-01'").interpolate()
+  0%|          | 0/4000 [00:00<?, ?it/s]warmup:   0%|          | 1/4000 [00:00<28:54,  2.31it/s, 1 steps of size 2.34e+00. acc. prob=0.00]warmup:   0%|          | 2/4000 [00:00<26:58,  2.47it/s, 1 steps of size 2.30e-01. acc. prob=0.00]warmup:   1%|          | 31/4000 [00:00<01:16, 51.61it/s, 127 steps of size 2.66e-03. acc. prob=0.70]warmup:   1%|          | 44/4000 [00:01<01:00, 65.34it/s, 511 steps of size 1.18e-03. acc. prob=0.72]warmup:   1%|▏         | 57/4000 [00:01<00:50, 78.45it/s, 6 steps of size 7.77e-04. acc. prob=0.73]  warmup:   2%|▏         | 71/4000 [00:01<00:42, 92.10it/s, 511 steps of size 1.56e-03. acc. prob=0.74]warmup:   2%|▏         | 84/4000 [00:01<00:39, 100.35it/s, 127 steps of size 3.95e-03. acc. prob=0.75]warmup:   2%|▏         | 97/4000 [00:01<00:36, 107.91it/s, 127 steps of size 4.16e-03. acc. prob=0.76]warmup:   3%|▎         | 116/4000 [00:01<00:29, 129.47it/s, 63 steps of size 1.42e-01. acc. prob=0.77]warmup:   4%|▎         | 148/4000 [00:01<00:21, 181.83it/s, 31 steps of size 8.19e-02. acc. prob=0.77]warmup:   5%|▍         | 186/4000 [00:01<00:16, 237.34it/s, 63 steps of size 1.60e-01. acc. prob=0.77]warmup:   6%|▌         | 231/4000 [00:01<00:12, 296.82it/s, 63 steps of size 1.13e-01. acc. prob=0.78]warmup:   7%|▋         | 274/4000 [00:01<00:11, 332.37it/s, 255 steps of size 3.87e-02. acc. prob=0.78]warmup:   8%|▊         | 316/4000 [00:02<00:10, 356.67it/s, 31 steps of size 7.73e-02. acc. prob=0.78] warmup:   9%|▉         | 371/4000 [00:02<00:08, 413.09it/s, 31 steps of size 6.94e-02. acc. prob=0.78]warmup:  11%|█         | 429/4000 [00:02<00:07, 459.88it/s, 63 steps of size 1.32e-01. acc. prob=0.78]warmup:  12%|█▏        | 476/4000 [00:02<00:07, 455.19it/s, 6 steps of size 3.23e-02. acc. prob=0.78] warmup:  13%|█▎        | 522/4000 [00:02<00:08, 434.02it/s, 63 steps of size 1.47e-01. acc. prob=0.79]warmup:  14%|█▍        | 577/4000 [00:02<00:07, 464.10it/s, 63 steps of size 9.97e-02. acc. prob=0.79]warmup:  16%|█▌        | 633/4000 [00:02<00:06, 490.83it/s, 31 steps of size 8.56e-02. acc. prob=0.79]warmup:  17%|█▋        | 692/4000 [00:02<00:06, 519.13it/s, 63 steps of size 8.56e-02. acc. prob=0.79]warmup:  19%|█▉        | 751/4000 [00:02<00:06, 536.35it/s, 63 steps of size 1.10e-01. acc. prob=0.79]warmup:  20%|██        | 814/4000 [00:02<00:05, 560.17it/s, 63 steps of size 1.05e-01. acc. prob=0.79]warmup:  22%|██▏       | 871/4000 [00:03<00:05, 540.51it/s, 127 steps of size 5.18e-02. acc. prob=0.79]warmup:  23%|██▎       | 926/4000 [00:03<00:06, 490.97it/s, 63 steps of size 9.60e-02. acc. prob=0.79] warmup:  24%|██▍       | 978/4000 [00:03<00:06, 497.97it/s, 31 steps of size 1.55e-01. acc. prob=0.79]warmup:  26%|██▌       | 1031/4000 [00:03<00:05, 504.53it/s, 63 steps of size 7.62e-02. acc. prob=0.79]warmup:  27%|██▋       | 1090/4000 [00:03<00:05, 526.01it/s, 63 steps of size 7.92e-02. acc. prob=0.79]warmup:  29%|██▊       | 1147/4000 [00:03<00:05, 537.83it/s, 63 steps of size 9.80e-02. acc. prob=0.79]warmup:  30%|███       | 1206/4000 [00:03<00:05, 552.78it/s, 63 steps of size 1.01e-01. acc. prob=0.79]warmup:  32%|███▏      | 1264/4000 [00:03<00:04, 558.27it/s, 63 steps of size 1.15e-01. acc. prob=0.79]warmup:  33%|███▎      | 1328/4000 [00:03<00:04, 581.98it/s, 31 steps of size 1.75e-01. acc. prob=0.79]warmup:  35%|███▍      | 1395/4000 [00:04<00:04, 605.86it/s, 31 steps of size 1.09e-01. acc. prob=0.79]warmup:  36%|███▋      | 1456/4000 [00:04<00:04, 603.12it/s, 31 steps of size 8.13e-02. acc. prob=0.79]warmup:  38%|███▊      | 1521/4000 [00:04<00:04, 615.12it/s, 63 steps of size 1.04e-01. acc. prob=0.79]warmup:  40%|███▉      | 1583/4000 [00:04<00:04, 603.03it/s, 31 steps of size 1.31e-01. acc. prob=0.79]warmup:  41%|████▏     | 1651/4000 [00:04<00:03, 625.54it/s, 31 steps of size 1.07e-01. acc. prob=0.79]warmup:  43%|████▎     | 1716/4000 [00:04<00:03, 631.70it/s, 31 steps of size 9.81e-02. acc. prob=0.79]warmup:  45%|████▍     | 1785/4000 [00:04<00:03, 648.71it/s, 31 steps of size 8.26e-02. acc. prob=0.79]warmup:  46%|████▋     | 1856/4000 [00:04<00:03, 666.43it/s, 31 steps of size 1.14e-01. acc. prob=0.79]warmup:  48%|████▊     | 1923/4000 [00:04<00:03, 660.45it/s, 31 steps of size 1.02e-01. acc. prob=0.79]warmup:  50%|████▉     | 1990/4000 [00:05<00:03, 550.89it/s, 31 steps of size 4.28e-02. acc. prob=0.79]sample:  51%|█████     | 2049/4000 [00:05<00:03, 500.01it/s, 63 steps of size 7.75e-02. acc. prob=0.93]sample:  53%|█████▎    | 2102/4000 [00:05<00:04, 471.07it/s, 63 steps of size 7.75e-02. acc. prob=0.93]sample:  54%|█████▍    | 2152/4000 [00:05<00:04, 452.19it/s, 63 steps of size 7.75e-02. acc. prob=0.94]sample:  55%|█████▍    | 2199/4000 [00:05<00:04, 439.41it/s, 63 steps of size 7.75e-02. acc. prob=0.94]sample:  56%|█████▌    | 2244/4000 [00:05<00:04, 431.51it/s, 63 steps of size 7.75e-02. acc. prob=0.94]sample:  57%|█████▋    | 2288/4000 [00:05<00:04, 424.00it/s, 63 steps of size 7.75e-02. acc. prob=0.94]sample:  58%|█████▊    | 2331/4000 [00:05<00:03, 418.73it/s, 63 steps of size 7.75e-02. acc. prob=0.94]sample:  59%|█████▉    | 2374/4000 [00:05<00:03, 414.70it/s, 63 steps of size 7.75e-02. acc. prob=0.94]sample:  60%|██████    | 2416/4000 [00:06<00:03, 412.15it/s, 63 steps of size 7.75e-02. acc. prob=0.94]sample:  61%|██████▏   | 2458/4000 [00:06<00:03, 409.94it/s, 63 steps of size 7.75e-02. acc. prob=0.94]sample:  62%|██████▎   | 2500/4000 [00:06<00:03, 408.46it/s, 63 steps of size 7.75e-02. acc. prob=0.94]sample:  64%|██████▎   | 2541/4000 [00:06<00:03, 407.83it/s, 63 steps of size 7.75e-02. acc. prob=0.94]sample:  65%|██████▍   | 2582/4000 [00:06<00:03, 406.59it/s, 63 steps of size 7.75e-02. acc. prob=0.94]sample:  66%|██████▌   | 2623/4000 [00:06<00:03, 406.04it/s, 63 steps of size 7.75e-02. acc. prob=0.94]sample:  67%|██████▋   | 2664/4000 [00:06<00:03, 404.81it/s, 63 steps of size 7.75e-02. acc. prob=0.94]sample:  68%|██████▊   | 2705/4000 [00:06<00:03, 403.90it/s, 63 steps of size 7.75e-02. acc. prob=0.94]sample:  69%|██████▊   | 2746/4000 [00:06<00:03, 405.36it/s, 63 steps of size 7.75e-02. acc. prob=0.94]sample:  70%|██████▉   | 2787/4000 [00:07<00:02, 404.67it/s, 63 steps of size 7.75e-02. acc. prob=0.94]sample:  71%|███████   | 2828/4000 [00:07<00:02, 404.97it/s, 63 steps of size 7.75e-02. acc. prob=0.94]sample:  72%|███████▏  | 2869/4000 [00:07<00:02, 405.28it/s, 63 steps of size 7.75e-02. acc. prob=0.94]sample:  73%|███████▎  | 2910/4000 [00:07<00:02, 404.72it/s, 63 steps of size 7.75e-02. acc. prob=0.94]sample:  74%|███████▍  | 2951/4000 [00:07<00:02, 404.22it/s, 63 steps of size 7.75e-02. acc. prob=0.94]sample:  75%|███████▍  | 2992/4000 [00:07<00:02, 405.52it/s, 63 steps of size 7.75e-02. acc. prob=0.94]sample:  76%|███████▌  | 3033/4000 [00:07<00:02, 404.54it/s, 63 steps of size 7.75e-02. acc. prob=0.94]sample:  77%|███████▋  | 3074/4000 [00:07<00:02, 403.93it/s, 63 steps of size 7.75e-02. acc. prob=0.94]sample:  78%|███████▊  | 3115/4000 [00:07<00:02, 403.94it/s, 63 steps of size 7.75e-02. acc. prob=0.94]sample:  79%|███████▉  | 3157/4000 [00:07<00:02, 406.01it/s, 63 steps of size 7.75e-02. acc. prob=0.94]sample:  80%|███████▉  | 3198/4000 [00:08<00:01, 406.99it/s, 63 steps of size 7.75e-02. acc. prob=0.94]sample:  81%|████████  | 3239/4000 [00:08<00:01, 406.62it/s, 63 steps of size 7.75e-02. acc. prob=0.94]sample:  82%|████████▏ | 3280/4000 [00:08<00:01, 405.90it/s, 63 steps of size 7.75e-02. acc. prob=0.94]sample:  83%|████████▎ | 3321/4000 [00:08<00:01, 405.18it/s, 63 steps of size 7.75e-02. acc. prob=0.94]sample:  84%|████████▍ | 3362/4000 [00:08<00:01, 404.40it/s, 63 steps of size 7.75e-02. acc. prob=0.94]sample:  85%|████████▌ | 3403/4000 [00:08<00:01, 403.79it/s, 63 steps of size 7.75e-02. acc. prob=0.94]sample:  86%|████████▌ | 3444/4000 [00:08<00:01, 405.03it/s, 63 steps of size 7.75e-02. acc. prob=0.94]sample:  87%|████████▋ | 3485/4000 [00:08<00:01, 404.49it/s, 63 steps of size 7.75e-02. acc. prob=0.94]sample:  88%|████████▊ | 3526/4000 [00:08<00:01, 404.12it/s, 63 steps of size 7.75e-02. acc. prob=0.94]sample:  89%|████████▉ | 3567/4000 [00:08<00:01, 405.45it/s, 63 steps of size 7.75e-02. acc. prob=0.94]sample:  90%|█████████ | 3608/4000 [00:09<00:00, 406.01it/s, 63 steps of size 7.75e-02. acc. prob=0.94]sample:  91%|█████████ | 3649/4000 [00:09<00:00, 405.04it/s, 63 steps of size 7.75e-02. acc. prob=0.94]sample:  92%|█████████▏| 3690/4000 [00:09<00:00, 405.54it/s, 63 steps of size 7.75e-02. acc. prob=0.94]sample:  93%|█████████▎| 3731/4000 [00:09<00:00, 406.78it/s, 63 steps of size 7.75e-02. acc. prob=0.94]sample:  94%|█████████▍| 3772/4000 [00:09<00:00, 405.81it/s, 63 steps of size 7.75e-02. acc. prob=0.94]sample:  95%|█████████▌| 3813/4000 [00:09<00:00, 405.42it/s, 63 steps of size 7.75e-02. acc. prob=0.94]sample:  96%|█████████▋| 3854/4000 [00:09<00:00, 406.40it/s, 63 steps of size 7.75e-02. acc. prob=0.94]sample:  97%|█████████▋| 3896/4000 [00:09<00:00, 410.00it/s, 63 steps of size 7.75e-02. acc. prob=0.94]sample:  98%|█████████▊| 3938/4000 [00:09<00:00, 407.86it/s, 63 steps of size 7.75e-02. acc. prob=0.94]sample:  99%|█████████▉| 3979/4000 [00:09<00:00, 406.96it/s, 63 steps of size 7.75e-02. acc. prob=0.94]sample: 100%|██████████| 4000/4000 [00:09<00:00, 400.29it/s, 63 steps of size 7.75e-02. acc. prob=0.94]
+
+                 mean       std    median      5.0%     95.0%     n_eff     r_hat
+ sigma[0,0]      0.05      0.00      0.05      0.04      0.05   4526.69      1.00
+ sigma[1,0]      0.08      0.01      0.08      0.07      0.09   3813.76      1.00
+ sigma[2,0]      0.04      0.00      0.04      0.04      0.05   4240.02      1.00
+ sigma[3,0]      0.04      0.00      0.04      0.04      0.05   4219.88      1.00
+ sigma[4,0]      0.03      0.00      0.03      0.03      0.04   4051.24      1.00
+ sigma[5,0]      0.04      0.00      0.04      0.03      0.05   5325.66      1.00
+ sigma[6,0]      0.05      0.00      0.04      0.04      0.05   4840.39      1.00
+ sigma[7,0]      0.09      0.01      0.09      0.08      0.10   5149.04      1.00
+ sigma[8,0]      0.07      0.01      0.07      0.06      0.08   4526.47      1.00
+ sigma[9,0]      0.03      0.00      0.03      0.02      0.03   5698.56      1.00
+sigma[10,0]      0.04      0.00      0.04      0.03      0.04   4493.82      1.00
+sigma[11,0]      0.08      0.01      0.08      0.07      0.09   3894.59      1.00
+sigma[12,0]      0.06      0.01      0.06      0.05      0.07   4650.14      1.00
+sigma[13,0]      0.04      0.00      0.04      0.03      0.04   5258.84      1.00
+sigma[14,0]      0.04      0.00      0.04      0.03      0.04   4383.76      1.00
+sigma[15,0]      0.05      0.00      0.05      0.04      0.05   4035.80      1.00
+sigma[16,0]      0.04      0.00      0.04      0.04      0.05   3931.07      1.00
+sigma[17,0]      0.04      0.00      0.04      0.04      0.05   5276.82      1.00
+sigma[18,0]      0.05      0.00      0.04      0.04      0.05   4210.88      1.00
+sigma[19,0]      0.05      0.00      0.05      0.05      0.06   5513.34      1.00
+sigma[20,0]      0.04      0.00      0.04      0.03      0.04   5545.63      1.00
+sigma[21,0]      0.04      0.00      0.03      0.03      0.04   4883.12      1.00
+sigma[22,0]      0.04      0.00      0.04      0.03      0.04   4195.14      1.00
+sigma[23,0]      0.03      0.00      0.03      0.03      0.04   4075.24      1.00
+sigma[24,0]      0.05      0.00      0.05      0.04      0.05   5007.88      1.00
+sigma[25,0]      0.04      0.00      0.04      0.03      0.04   3861.32      1.00
+sigma[26,0]      0.06      0.01      0.06      0.05      0.07   4375.16      1.00
+sigma[27,0]      0.05      0.00      0.05      0.04      0.06   3975.98      1.00
+sigma[28,0]      0.04      0.00      0.04      0.04      0.05   4895.19      1.00
+sigma[29,0]      0.06      0.01      0.06      0.05      0.07   4582.56      1.00
+sigma[30,0]      0.04      0.00      0.04      0.04      0.05   4507.32      1.00
+sigma[31,0]      0.05      0.00      0.05      0.04      0.06   4736.03      1.00
+sigma[32,0]      0.03      0.00      0.03      0.02      0.03   4400.49      1.00
+sigma[33,0]      0.04      0.00      0.04      0.03      0.05   4540.76      1.00
+sigma[34,0]      0.08      0.01      0.08      0.06      0.09   4527.28      1.00
+sigma[35,0]      0.03      0.00      0.03      0.03      0.04   3251.52      1.00
+sigma[36,0]      0.04      0.00      0.04      0.04      0.05   4205.69      1.00
+sigma[37,0]      0.04      0.00      0.04      0.03      0.05   4357.05      1.00
+sigma[38,0]      0.03      0.00      0.03      0.03      0.04   4347.07      1.00
+sigma[39,0]      0.07      0.01      0.07      0.06      0.08   3474.09      1.00
+sigma[40,0]      0.04      0.00      0.04      0.03      0.05   4833.80      1.00
+sigma[41,0]      0.07      0.01      0.07      0.06      0.08   4355.06      1.00
+sigma[42,0]      0.04      0.00      0.04      0.04      0.05   4909.75      1.00
+sigma[43,0]      0.03      0.00      0.03      0.02      0.03   3702.59      1.00
+sigma[44,0]      0.05      0.01      0.05      0.05      0.06   3668.12      1.00
+sigma[45,0]      0.07      0.01      0.07      0.06      0.08   3703.66      1.00
+sigma[46,0]      0.04      0.00      0.04      0.03      0.05   4247.06      1.00
+sigma[47,0]      0.04      0.00      0.04      0.04      0.05   4033.26      1.00
+sigma[48,0]      0.06      0.01      0.06      0.05      0.07   5211.85      1.00
+sigma[49,0]      0.04      0.00      0.04      0.03      0.04   3700.43      1.00
+sigma[50,0]      0.08      0.01      0.08      0.07      0.09   4021.78      1.00
+sigma[51,0]      0.05      0.00      0.05      0.04      0.06   3758.36      1.00
+sigma[52,0]      0.03      0.00      0.03      0.02      0.03   3407.77      1.00
+   theta[0]      1.18      0.02      1.18      1.15      1.21   2653.88      1.00
+   theta[1]     -0.06      0.03     -0.06     -0.11     -0.02   2633.13      1.00
+   theta[2]     -0.08      0.03     -0.08     -0.13     -0.04   3546.16      1.00
+   theta[3]     -0.00      0.03     -0.00     -0.05      0.04   3467.85      1.00
+   theta[4]     -0.09      0.03     -0.09     -0.14     -0.04   2798.20      1.00
+   theta[5]     -0.03      0.02     -0.03     -0.06     -0.01   3093.60      1.00
+theta_sd[0]      0.58      0.20      0.54      0.31      0.82   2216.47      1.00
+
+Number of divergences: 0
+
+MCMC elapsed time: 12.867849826812744
+/Users/trobacker/GitHub/forecast-sandbox-2025-2026/src/flusion3/.venv/lib/python3.12/site-packages/iddata/loader.py:505: FutureWarning: DataFrameGroupBy.apply operated on the grouping columns. This behavior is deprecated, and in a future version of pandas the grouping columns will be excluded from the operation. Either pass `include_groups=False` to exclude the groupings or explicitly select the grouping columns after groupby to silence this warning.
+  .apply(lambda x: pd.DataFrame({"inc": [np.mean(x["inc"])]})) \
+/Users/trobacker/GitHub/forecast-sandbox-2025-2026/src/flusion3/.venv/lib/python3.12/site-packages/iddata/loader.py:189: FutureWarning: DataFrame.fillna with 'method' is deprecated and will raise in a future version. Use obj.ffill() or obj.bfill() instead.
+  df[fill_cols] = df[fill_cols].fillna(axis=0, method="ffill")
+/Users/trobacker/GitHub/forecast-sandbox-2025-2026/src/flusion3/.venv/lib/python3.12/site-packages/iddata/loader.py:189: FutureWarning: DataFrame.fillna with 'method' is deprecated and will raise in a future version. Use obj.ffill() or obj.bfill() instead.
+  df[fill_cols] = df[fill_cols].fillna(axis=0, method="ffill")
+/Users/trobacker/GitHub/forecast-sandbox-2025-2026/src/flusion3/.venv/lib/python3.12/site-packages/iddata/loader.py:189: FutureWarning: DataFrame.fillna with 'method' is deprecated and will raise in a future version. Use obj.ffill() or obj.bfill() instead.
+  df[fill_cols] = df[fill_cols].fillna(axis=0, method="ffill")
+/Users/trobacker/GitHub/forecast-sandbox-2025-2026/src/flusion3/.venv/lib/python3.12/site-packages/iddata/loader.py:189: FutureWarning: DataFrame.fillna with 'method' is deprecated and will raise in a future version. Use obj.ffill() or obj.bfill() instead.
+  df[fill_cols] = df[fill_cols].fillna(axis=0, method="ffill")
+/Users/trobacker/GitHub/forecast-sandbox-2025-2026/src/flusion3/.venv/lib/python3.12/site-packages/iddata/loader.py:189: FutureWarning: DataFrame.fillna with 'method' is deprecated and will raise in a future version. Use obj.ffill() or obj.bfill() instead.
+  df[fill_cols] = df[fill_cols].fillna(axis=0, method="ffill")
+/Users/trobacker/GitHub/forecast-sandbox-2025-2026/src/flusion3/.venv/lib/python3.12/site-packages/iddata/loader.py:189: FutureWarning: DataFrame.fillna with 'method' is deprecated and will raise in a future version. Use obj.ffill() or obj.bfill() instead.
+  df[fill_cols] = df[fill_cols].fillna(axis=0, method="ffill")
+/Users/trobacker/GitHub/forecast-sandbox-2025-2026/src/flusion3/.venv/lib/python3.12/site-packages/iddata/loader.py:189: FutureWarning: DataFrame.fillna with 'method' is deprecated and will raise in a future version. Use obj.ffill() or obj.bfill() instead.
+  df[fill_cols] = df[fill_cols].fillna(axis=0, method="ffill")
+/Users/trobacker/GitHub/forecast-sandbox-2025-2026/src/flusion3/.venv/lib/python3.12/site-packages/iddata/loader.py:189: FutureWarning: DataFrame.fillna with 'method' is deprecated and will raise in a future version. Use obj.ffill() or obj.bfill() instead.
+  df[fill_cols] = df[fill_cols].fillna(axis=0, method="ffill")
+/Users/trobacker/GitHub/forecast-sandbox-2025-2026/src/flusion3/.venv/lib/python3.12/site-packages/iddata/loader.py:189: FutureWarning: DataFrame.fillna with 'method' is deprecated and will raise in a future version. Use obj.ffill() or obj.bfill() instead.
+  df[fill_cols] = df[fill_cols].fillna(axis=0, method="ffill")
+/Users/trobacker/GitHub/forecast-sandbox-2025-2026/src/flusion3/.venv/lib/python3.12/site-packages/iddata/loader.py:189: FutureWarning: DataFrame.fillna with 'method' is deprecated and will raise in a future version. Use obj.ffill() or obj.bfill() instead.
+  df[fill_cols] = df[fill_cols].fillna(axis=0, method="ffill")
+/Users/trobacker/GitHub/forecast-sandbox-2025-2026/src/flusion3/.venv/lib/python3.12/site-packages/iddata/loader.py:189: FutureWarning: DataFrame.fillna with 'method' is deprecated and will raise in a future version. Use obj.ffill() or obj.bfill() instead.
+  df[fill_cols] = df[fill_cols].fillna(axis=0, method="ffill")
+/Users/trobacker/GitHub/forecast-sandbox-2025-2026/src/flusion3/.venv/lib/python3.12/site-packages/iddata/loader.py:189: FutureWarning: DataFrame.fillna with 'method' is deprecated and will raise in a future version. Use obj.ffill() or obj.bfill() instead.
+  df[fill_cols] = df[fill_cols].fillna(axis=0, method="ffill")
+/Users/trobacker/GitHub/forecast-sandbox-2025-2026/src/flusion3/.venv/lib/python3.12/site-packages/iddata/loader.py:189: FutureWarning: DataFrame.fillna with 'method' is deprecated and will raise in a future version. Use obj.ffill() or obj.bfill() instead.
+  df[fill_cols] = df[fill_cols].fillna(axis=0, method="ffill")
+/Users/trobacker/GitHub/forecast-sandbox-2025-2026/src/flusion3/.venv/lib/python3.12/site-packages/iddata/loader.py:189: FutureWarning: DataFrame.fillna with 'method' is deprecated and will raise in a future version. Use obj.ffill() or obj.bfill() instead.
+  df[fill_cols] = df[fill_cols].fillna(axis=0, method="ffill")
+/Users/trobacker/GitHub/forecast-sandbox-2025-2026/src/flusion3/.venv/lib/python3.12/site-packages/iddata/loader.py:189: FutureWarning: DataFrame.fillna with 'method' is deprecated and will raise in a future version. Use obj.ffill() or obj.bfill() instead.
+  df[fill_cols] = df[fill_cols].fillna(axis=0, method="ffill")
+/Users/trobacker/GitHub/forecast-sandbox-2025-2026/src/flusion3/.venv/lib/python3.12/site-packages/iddata/loader.py:539: FutureWarning: DataFrameGroupBy.apply operated on the grouping columns. This behavior is deprecated, and in a future version of pandas the grouping columns will be excluded from the operation. Either pass `include_groups=False` to exclude the groupings or explicitly select the grouping columns after groupby to silence this warning.
+  .apply(lambda x: pd.DataFrame({"inc": [np.mean(x["inc"])]})) \
+/Users/trobacker/GitHub/forecast-sandbox-2025-2026/src/flusion3/.venv/lib/python3.12/site-packages/timeseriesutils/featurize.py:502: FutureWarning: DataFrameGroupBy.apply operated on the grouping columns. This behavior is deprecated, and in a future version of pandas the grouping columns will be excluded from the operation. Either pass `include_groups=False` to exclude the groupings or explicitly select the grouping columns after groupby to silence this warning.
+  .apply(taylor_coefs_one_column_grp,
+/Users/trobacker/GitHub/forecast-sandbox-2025-2026/src/flusion3/.venv/lib/python3.12/site-packages/timeseriesutils/featurize.py:502: FutureWarning: DataFrameGroupBy.apply operated on the grouping columns. This behavior is deprecated, and in a future version of pandas the grouping columns will be excluded from the operation. Either pass `include_groups=False` to exclude the groupings or explicitly select the grouping columns after groupby to silence this warning.
+  .apply(taylor_coefs_one_column_grp,
+/Users/trobacker/GitHub/forecast-sandbox-2025-2026/src/flusion3/.venv/lib/python3.12/site-packages/timeseriesutils/featurize.py:502: FutureWarning: DataFrameGroupBy.apply operated on the grouping columns. This behavior is deprecated, and in a future version of pandas the grouping columns will be excluded from the operation. Either pass `include_groups=False` to exclude the groupings or explicitly select the grouping columns after groupby to silence this warning.
+  .apply(taylor_coefs_one_column_grp,
+/Users/trobacker/GitHub/forecast-sandbox-2025-2026/src/flusion3/.venv/lib/python3.12/site-packages/timeseriesutils/featurize.py:502: FutureWarning: DataFrameGroupBy.apply operated on the grouping columns. This behavior is deprecated, and in a future version of pandas the grouping columns will be excluded from the operation. Either pass `include_groups=False` to exclude the groupings or explicitly select the grouping columns after groupby to silence this warning.
+  .apply(taylor_coefs_one_column_grp,
+Bag number:   0%|          | 0/20 [00:00<?, ?it/s]Bag number:   5%|▌         | 1/20 [00:24<07:53, 24.92s/it]Bag number:  10%|█         | 2/20 [00:50<07:39, 25.54s/it]Bag number:  15%|█▌        | 3/20 [01:17<07:25, 26.20s/it]Bag number:  20%|██        | 4/20 [01:43<06:54, 25.93s/it]Bag number:  25%|██▌       | 5/20 [02:08<06:26, 25.74s/it]Bag number:  30%|███       | 6/20 [02:34<05:59, 25.70s/it]Bag number:  35%|███▌      | 7/20 [03:00<05:35, 25.81s/it]Bag number:  40%|████      | 8/20 [03:25<05:05, 25.42s/it]Bag number:  45%|████▌     | 9/20 [03:51<04:44, 25.83s/it]Bag number:  50%|█████     | 10/20 [04:17<04:17, 25.71s/it]Bag number:  55%|█████▌    | 11/20 [04:44<03:55, 26.14s/it]Bag number:  60%|██████    | 12/20 [05:10<03:29, 26.21s/it]Bag number:  65%|██████▌   | 13/20 [05:38<03:06, 26.60s/it]Bag number:  70%|███████   | 14/20 [06:01<02:34, 25.72s/it]Bag number:  75%|███████▌  | 15/20 [06:27<02:07, 25.54s/it]Bag number:  80%|████████  | 16/20 [06:53<01:42, 25.72s/it]Bag number:  85%|████████▌ | 17/20 [07:19<01:17, 25.95s/it]Bag number:  90%|█████████ | 18/20 [07:45<00:51, 25.79s/it]Bag number:  95%|█████████▌| 19/20 [08:10<00:25, 25.64s/it]Bag number: 100%|██████████| 20/20 [08:37<00:00, 26.07s/it]Bag number: 100%|██████████| 20/20 [08:37<00:00, 25.87s/it]
+
+Attaching package: ‘dplyr’
+
+The following objects are masked from ‘package:stats’:
+
+    filter, lag
+
+The following objects are masked from ‘package:base’:
+
+    intersect, setdiff, setequal, union
+
+Rows: 10070 Columns: 5
+── Column specification ────────────────────────────────────────────────────────
+Delimiter: ","
+chr  (2): location, location_name
+dbl  (2): value, weekly_rate
+date (1): date
+
+ℹ Use `spec()` to retrieve the full column specification for this data.
+ℹ Specify the column types or set `show_col_types = FALSE` to quiet this message.
+Rows: 53 Columns: 12
+── Column specification ────────────────────────────────────────────────────────
+Delimiter: ","
+chr (3): abbreviation, location, location_name
+dbl (9): population, count_rate0p3, count_rate0p5, count_rate0p7, count_rate...
+
+ℹ Use `spec()` to retrieve the full column specification for this data.
+ℹ Specify the column types or set `show_col_types = FALSE` to quiet this message.
+Running flusion3 ensemble for reference date: 2023-12-30
+============================================================
+
+1/4: Running AR6 (no Fourier)...
+
+2/4: Running AR6 with Fourier seasonality...
+
+3/4: Running GBQR...
+
+4/4: Creating ensemble...
+
+============================================================
+Flusion3 ensemble complete!
+Output saved to: ../../model-output/UMass-flusion3/2023-12-30-UMass-flusion3.csv
