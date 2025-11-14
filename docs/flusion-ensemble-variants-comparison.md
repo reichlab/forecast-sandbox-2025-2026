@@ -323,6 +323,13 @@ The comprehensive evaluation across all available forecasts revealed several imp
 - Explore whether the GBQR component is actually adding value
 - Test other component combinations beyond current choices
 
+**Future Enhancement - Weight Tracking:**
+- For weighted ensembles, consider saving the learned weights as artifacts for each forecast date
+- This would enable analysis of how weights change week by week
+- Could provide insights into model performance dynamics over time
+- Useful for understanding when and why certain components receive higher/lower weights
+- Note: Not implemented in this PR to avoid re-running all forecasts
+
 ### What We Learned
 
 The investigation into weighted ensembles and additional components revealed that **more sophisticated methods don't always yield better results**. The original UMass-flusion's simplicity and careful component selection proved superior to more complex alternatives.
