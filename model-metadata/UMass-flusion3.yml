@@ -20,7 +20,9 @@ model_contributors: [
   }
 ]
 license: "CC-BY-4.0"
+designated_model: false
+methods: "Ensemble of statistical and machine learning time series models including both AR models with and without Fourier seasonality."
+data_inputs: "Weekly incident flu hospitalizations from NHSN, FluSurv-NET, and ILINet."
 ensemble_of_models: true
 ensemble_of_hub_models: false
-methods: "Ensemble of statistical and machine learning time series models including both AR models with and without Fourier seasonality."
 methods_long: "A quantile average of three models: 1. Gradient boosting quantile regression on time series of hospitalization admissions data, 2. An AR(6) model, and 3. An AR(6) model with Fourier seasonality (K=2 harmonics). The AR(6) models use a 4th root power transformation and pool AR parameters across locations while keeping variance parameters location-specific. The gradient boosting model includes features derived from multiple surveillance streams (NHSN, FluSurv-NET, ILINet) and uses bagged quantile regression. All three component models are combined using equal-weighted quantile averaging."
