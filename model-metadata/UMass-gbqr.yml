@@ -1,0 +1,26 @@
+team_name: "UMass-Amherst"
+team_abbr: "UMass"
+model_name: "GBQR vanilla"
+model_abbr: "gbqr"
+model_version: "1.0"
+model_contributors: [
+  {
+    "name": "Evan Ray",
+    "affiliation": "UMass Amherst",
+    "email": "elray@umass.edu"
+  },
+    {
+    "name": "Nick Reich",
+    "affiliation": "UMass Amherst",
+    "email": "nick@umass.edu"
+  }
+]
+license: "CC-BY-4.0"
+designated_model: true
+methods: "Standard flusion GBQR approach."
+methods_long: "
+  Gradient boosting quantile regression, fit to NHSN data only and using standard flusion hyperparameters.
+"
+data_inputs: "Weekly incident flu hospitalizations from NHSN."
+ensemble_of_models: false
+ensemble_of_hub_models: false
