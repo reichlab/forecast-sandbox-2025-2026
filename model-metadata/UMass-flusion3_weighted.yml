@@ -1,0 +1,28 @@
+team_name: "UMass-Amherst"
+team_abbr: "UMass"
+model_name: "Three-component weighted ensemble of time series models"
+model_abbr: "flusion3_weighted"
+model_contributors: [
+  {
+    "name": "Evan L Ray",
+    "affiliation": "University of Massachusetts Amherst",
+    "email": "elray@umass.edu"
+  },
+  {
+    "name": "Thomas Robacker",
+    "affiliation": "University of Massachusetts Amherst",
+    "email": "trobacker@umass.edu"
+  },
+  {
+    "name": "Nick Reich",
+    "affiliation": "University of Massachusetts Amherst",
+    "email": "nick@umass.edu"
+  }
+]
+license: "CC-BY-4.0"
+designated_model: false
+methods: "Weighted ensemble of statistical and machine learning time series models with weights learned from historical WIS performance."
+data_inputs: "Weekly incident flu hospitalizations from NHSN, FluSurv-NET, and ILINet."
+ensemble_of_models: true
+ensemble_of_hub_models: false
+methods_long: "A weighted linear pool of three models: 1. Gradient boosting quantile regression on time series of hospitalization admissions data, 2. An AR(6) model, and 3. An AR(6) model with Fourier seasonality (K=2 harmonics). The AR(6) models use a 4th root power transformation and pool AR parameters across locations while keeping variance parameters location-specific. The gradient boosting model includes features derived from multiple surveillance streams (NHSN, FluSurv-NET, ILINet) and uses bagged quantile regression. Component models are combined using weighted linear pooling where weights are learned from historical forecast performance. Weights are computed as inverse Weighted Interval Score (WIS) from all historical forecasts, normalized to sum to 1. Models with lower historical WIS receive higher weight. If no historical data is available, equal weights are used."
