@@ -5,7 +5,7 @@
 #SBATCH --mem=32G                       # Memory per node
 #SBATCH -p cpu                          # Partition name
 #SBATCH -t 01:00:00                     # Time limit (1 hours)
-#SBATCH --array=0-55                    # Array indices (56 dates total)
+#SBATCH --array=0-54                    # Array indices (55 dates total)
 #SBATCH -o logs/slurm-%A_%a.out         # Output file (%A=job ID, %a=array index)
 #SBATCH -e logs/slurm-%A_%a.err         # Error file
 #SBATCH --mail-type=FAIL,TIME_LIMIT_80  # Email on failure or 80% time reached
@@ -15,7 +15,7 @@
 dates=(
   "2023-10-18"
   "2023-10-25"
-  "2023-11-01"
+  "2023-11-01" ## rerun
   "2023-11-08"
   "2023-11-15"
   "2023-11-22"
@@ -25,13 +25,13 @@ dates=(
   "2023-12-20"
   "2023-12-27"
   "2024-01-03"
-  "2024-01-10"
-  "2024-01-17"
+  "2024-01-10" # rerun
+  "2024-01-17" # rerun
   "2024-01-24"
   "2024-01-31"
   "2024-02-07"
   "2024-02-14"
-  "2024-02-21"
+  "2024-02-21" # rerun
   "2024-02-28"
   "2024-03-06"
   "2024-03-13"
@@ -48,7 +48,7 @@ dates=(
   "2024-12-11"
   "2024-12-18"
   "2024-12-25"
-  "2025-01-01"
+  "2025-01-01" # rerun
   "2025-01-08"
   "2025-01-15"
   "2025-01-22"
@@ -65,7 +65,7 @@ dates=(
   "2025-04-09"
   "2025-04-16"
   "2025-04-23"
-  "2025-04-30"
+  "2025-04-30" # rerun
   "2025-05-07"
   "2025-05-14"
 )
