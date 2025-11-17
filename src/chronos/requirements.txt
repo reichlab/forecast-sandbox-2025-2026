@@ -1,0 +1,6 @@
+click
+numpy
+pandas
+torch
+chronos-forecasting
+iddata @ git+https://github.com/reichlab/iddata@main

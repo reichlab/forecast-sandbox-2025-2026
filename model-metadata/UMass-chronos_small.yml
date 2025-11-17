@@ -1,0 +1,37 @@
+team_name: "UMass-Amherst"
+team_abbr: "UMass"
+model_name: "Chronos Time Series Foundation Model (Small)"
+model_abbr: "chronos_small"
+model_version: "1.0"
+model_contributors: [
+  {
+    "name": "Thomas Robacker",
+    "affiliation": "UMass Amherst",
+    "email": "trobacker@umass.edu"
+  }
+]
+license: "CC-BY-4.0"
+designated_model: true
+methods: "Chronos-T5-Small foundation model for zero-shot time series forecasting using pre-trained transformer architecture."
+data_inputs: "Weekly incident flu hospitalizations from NHSN."
+methods_long: "
+  This model uses Amazon's Chronos-T5-Small, a pre-trained time series foundation model
+  based on the T5 language model architecture with 46M parameters. Chronos treats time
+  series as sequences of tokens and was trained on a large corpus of diverse time series
+  data, enabling zero-shot forecasting without requiring training on flu-specific data.
+
+  The model uses the most recent 104 weeks (2 years) of weekly flu hospitalization counts
+  from NHSN as context. Unlike traditional statistical models, no data transformations
+  (scaling, power transforms, etc.) are applied - the model learns appropriate scaling
+  internally. For each location, Chronos generates 200 trajectory samples for horizons
+  -1 through 3, from which the required 23 quantile levels are computed.
+
+  Forecasts are generated independently for each location (US and 52 states/territories),
+  with no pooling of information across locations. The model naturally handles seasonality,
+  trends, and irregular patterns through its pre-trained transformer architecture.
+
+  Reference: Ansari et al. (2024). Chronos: Learning the Language of Time Series.
+  arXiv:2403.07815.
+  "
+ensemble_of_models: false
+ensemble_of_hub_models: false
