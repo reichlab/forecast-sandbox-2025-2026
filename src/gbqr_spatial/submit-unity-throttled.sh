@@ -5,7 +5,7 @@
 #SBATCH --mem=16G                       # Memory per node
 #SBATCH -p cpu                          # Partition name
 #SBATCH -t 04:00:00                     # Time limit (4 hours)
-#SBATCH --array=0-55%10                 # Array indices with max 10 concurrent jobs
+#SBATCH --array=0-54%10                 # Array indices (55 dates) with max 10 concurrent jobs
 #SBATCH -o logs/slurm-%A_%a.out         # Output file (%A=job ID, %a=array index)
 #SBATCH -e logs/slurm-%A_%a.err         # Error file
 #SBATCH --mail-type=FAIL,TIME_LIMIT_80  # Email on failure or 80% time reached

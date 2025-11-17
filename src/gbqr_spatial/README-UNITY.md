@@ -156,7 +156,7 @@ Based on typical GBQR model runs:
 ### Some jobs succeed, others fail
 - Check individual error logs: `logs/slurm-*_ARRAYINDEX.err`
 - Identify which dates failed: `grep -l "Error" logs/*.err`
-- Resubmit specific failed indices: `sbatch --array=5,12,33 submit-unity-parallel.sh`
+- Resubmit specific failed indices: `sbatch --array=2,12,13,18,35,52 submit-unity-parallel.sh`
 
 ## Example Workflow
 
