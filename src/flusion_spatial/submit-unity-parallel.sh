@@ -81,9 +81,6 @@ echo "Node: $SLURM_NODELIST"
 echo "Start time: $(date)"
 echo "=========================================="
 
-# Load required modules on Unity
-module load R/4.4.1
-
 # Set up Python virtual environment
 # Option 1: If using venv (uncomment and adjust path)
 # source /path/to/your/venv/bin/activate
@@ -99,6 +96,12 @@ else
     echo "Error: Virtual environment not found at .venv"
     exit 1
 fi
+
+# Load required modules on Unity (after venv activation)
+module load R/4.4.1
+
+# Explicitly export PATH to ensure R is available to subprocesses
+export PATH
 
 # Verify Python environment
 echo "Python: $(which python)"

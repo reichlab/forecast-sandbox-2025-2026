@@ -2,6 +2,8 @@ import click
 import datetime
 from dateutil import relativedelta
 import subprocess
+import shutil
+import sys
 from typing import Optional
 
 @click.command()
@@ -43,7 +45,15 @@ def main(today_date: Optional[str] = None, short_run: bool = False):
                    check=True)
 
     print("\n[3/3] Creating ensemble forecast...")
-    subprocess.run(["Rscript", "2_flusion_spatial_ensemble.R", str(reference_date)],
+    # Find Rscript in PATH
+    rscript_path = shutil.which("Rscript")
+    if rscript_path is None:
+        print("ERROR: Rscript not found in PATH", file=sys.stderr)
+        print("Please ensure R is installed and in your PATH", file=sys.stderr)
+        sys.exit(1)
+
+    print(f"Using Rscript: {rscript_path}")
+    subprocess.run([rscript_path, "2_flusion_spatial_ensemble.R", str(reference_date)],
                    check=True)
 
     print("\n" + "=" * 60)
