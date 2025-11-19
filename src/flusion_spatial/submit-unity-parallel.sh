@@ -98,7 +98,23 @@ else
 fi
 
 # Load required modules on Unity (after venv activation)
-module load R/4.4.1
+# Try multiple R module versions in order of preference
+# Unity has both EasyBuild (R/x.x.x-xxx) and Spack (r/x.x.x) modules
+r_loaded=false
+for r_module in r/4.4.0 R/4.3.2-gfbf-2023a R/4.2.1-foss-2022a R/4.2.0-foss-2021b R/4.0.0-foss-2020a R/4.4 R/4.3 R/4.2 R/4 R r; do
+    if module load $r_module 2>/dev/null; then
+        echo "Loaded R module: $r_module"
+        r_loaded=true
+        break
+    fi
+done
+
+if [ "$r_loaded" = false ]; then
+    echo "ERROR: Could not load any R module"
+    echo "Available R modules on this system:"
+    module spider R 2>&1 | grep "R/" | head -10
+    exit 1
+fi
 
 # Explicitly export PATH to ensure R is available to subprocesses
 export PATH

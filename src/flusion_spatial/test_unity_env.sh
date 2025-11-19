@@ -40,9 +40,18 @@ fi
 # Test 3: Load R module and check
 echo ""
 echo "[3/5] Checking R availability..."
-module load R/4.4.1 2>/dev/null
-if [ $? -ne 0 ]; then
-    echo "⚠ Could not load R module (might work differently on Unity)"
+r_loaded=false
+for r_module in r/4.4.0 R/4.3.2-gfbf-2023a R/4.2.1-foss-2022a R/4.2.0-foss-2021b R; do
+    if module load $r_module 2>/dev/null; then
+        echo "✓ Loaded R module: $r_module"
+        r_loaded=true
+        break
+    fi
+done
+
+if [ "$r_loaded" = false ]; then
+    echo "⚠ Could not load any R module automatically"
+    echo "  Trying manual load..."
 fi
 
 which Rscript >/dev/null 2>&1
