@@ -56,23 +56,65 @@ The `--short_run` flag reduces computation time by:
 
 This model includes a SLURM submission script for parallel execution on the Unity cluster.
 
-### Setup
+### One-Time Setup
 
-1. Create and activate a virtual environment:
+**Step 1: Clone and navigate to model**
 ```bash
-python -m venv .venv
-source .venv/bin/activate
-python -m pip install -r requirements.txt
+cd ~/forecast-sandbox-2025-2026
+git checkout flusion-spatial-ensemble
+git pull origin flusion-spatial-ensemble
+cd src/flusion_spatial
 ```
 
-2. Ensure the `logs/` directory exists:
+**Step 2: Create logs directory**
 ```bash
 mkdir -p logs
 ```
 
+**Step 3: Set up Python virtual environment**
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+**Step 4: Install R packages** (takes 10-20 minutes first time)
+```bash
+module load r/4.4.0
+Rscript install_r_packages.R
+```
+
+This installs required R packages to your user library (`~/R/library`):
+- CRAN packages: dplyr, readr, remotes
+- Hubverse packages: hubData, hubEnsembles (from GitHub)
+- Reich Lab packages: idforecastutils (from GitHub)
+
+**Step 5: Verify setup**
+```bash
+./test_unity_env.sh
+```
+
+All 5 checks should pass with ✓:
+1. ✓ Virtual environment found and activated
+2. ✓ Python packages installed
+3. ✓ R module loaded (auto-detects r/4.4.0 or R/4.3.2-gfbf-2023a)
+4. ✓ R packages installed
+5. ✓ Python can find Rscript
+
+If any checks fail, see `SETUP.md` for troubleshooting.
+
+**Step 6: Test a single forecast** (optional but recommended)
+```bash
+source .venv/bin/activate
+module load r/4.4.0
+python main.py --today_date=2024-12-28 --short_run
+```
+
+Should complete in ~3-5 minutes with the `--short_run` flag.
+
 ### Submit Jobs
 
-The `submit-unity-parallel.sh` script runs the model for multiple forecast dates in parallel:
+Once setup is complete:
 
 ```bash
 sbatch submit-unity-parallel.sh
@@ -83,6 +125,7 @@ This will submit 55 array jobs (one for each forecast date) to the Unity cluster
 - Requests 32GB memory
 - Has a 2-hour time limit
 - Runs the full ensemble pipeline (AR6 + GBQR + Ensemble)
+- Expected runtime: ~15-20 minutes per forecast date
 
 ### Monitor Jobs
 
@@ -97,6 +140,11 @@ ls -lh logs/
 tail logs/slurm-<JOB_ID>_<ARRAY_ID>.out
 ```
 
+Check for errors:
+```bash
+grep -r "Error\|error" logs/ | head -20
+```
+
 ### Job Configuration
 
 The dates array in `submit-unity-parallel.sh` covers:
@@ -104,6 +152,14 @@ The dates array in `submit-unity-parallel.sh` covers:
 - 2024-25 season: November 2024 through May 2025
 
 To modify the dates or add new forecast dates, edit the `dates` array in the script.
+
+### Troubleshooting
+
+See `SETUP.md` for detailed troubleshooting steps, including:
+- R package installation issues
+- Module loading problems
+- Memory/timeout issues
+- Performance tuning
 
 ## Model Metadata
 
