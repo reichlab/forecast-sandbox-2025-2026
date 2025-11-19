@@ -81,6 +81,9 @@ echo "Node: $SLURM_NODELIST"
 echo "Start time: $(date)"
 echo "=========================================="
 
+# Load required modules on Unity
+module load R/4.4.1
+
 # Set up Python virtual environment
 # Option 1: If using venv (uncomment and adjust path)
 # source /path/to/your/venv/bin/activate
