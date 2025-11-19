@@ -89,6 +89,17 @@ This installs required R packages to your user library (`~/R/library`):
 - Hubverse packages: hubData, hubEnsembles (from GitHub)
 - Reich Lab packages: idforecastutils (from GitHub)
 
+**Note**: If `hubData` fails to install, you may need to install it manually:
+```bash
+R
+```
+Then in R console:
+```r
+install.packages("remotes")
+remotes::install_github("hubverse-org/hubData")
+quit()
+```
+
 **Step 5: Verify setup**
 ```bash
 ./test_unity_env.sh
@@ -105,10 +116,12 @@ If any checks fail, see `SETUP.md` for troubleshooting.
 
 **Step 6: Test a single forecast** (optional but recommended)
 ```bash
-source .venv/bin/activate
+source .venv/bin/activate  # IMPORTANT: Must activate venv first!
 module load r/4.4.0
 python main.py --today_date=2024-12-28 --short_run
 ```
+
+**Note**: Always activate the virtual environment with `source .venv/bin/activate` before running Python scripts. You should see `(.venv)` at the start of your prompt when activated.
 
 Should complete in ~3-5 minutes with the `--short_run` flag.
 
@@ -155,7 +168,20 @@ To modify the dates or add new forecast dates, edit the `dates` array in the scr
 
 ### Troubleshooting
 
-See `SETUP.md` for detailed troubleshooting steps, including:
+**Common Issues:**
+
+1. **ModuleNotFoundError: No module named 'dateutil'**
+   - Solution: Activate the virtual environment first: `source .venv/bin/activate`
+   - You should see `(.venv)` at the start of your prompt
+
+2. **hubData installation fails**
+   - Solution: Install manually in R:
+     ```r
+     install.packages("remotes")
+     remotes::install_github("hubverse-org/hubData")
+     ```
+
+See `SETUP.md` for more detailed troubleshooting steps, including:
 - R package installation issues
 - Module loading problems
 - Memory/timeout issues

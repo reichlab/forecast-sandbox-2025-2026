@@ -43,6 +43,25 @@ The script will:
 - Install Reich Lab packages: idforecastutils
 - Verify all packages installed correctly
 
+**If hubData fails to install**, you may need to install it manually in R:
+
+```bash
+module load r/4.4.0
+R
+```
+
+Then in the R console:
+```r
+install.packages("remotes")
+remotes::install_github("hubverse-org/hubData")
+quit()
+```
+
+After manual installation, verify with:
+```bash
+Rscript install_r_packages.R
+```
+
 ### 5. Verify Setup
 
 ```bash
@@ -135,7 +154,18 @@ module load r/4.4.0
 Rscript -e "library(hubData); library(hubEnsembles); library(idforecastutils)"
 ```
 
-If any fail, re-run:
+If `hubData` fails, install it manually:
+```bash
+R
+```
+Then in R:
+```r
+install.packages("remotes")
+remotes::install_github("hubverse-org/hubData")
+quit()
+```
+
+For other packages, re-run:
 ```bash
 Rscript install_r_packages.R
 ```
