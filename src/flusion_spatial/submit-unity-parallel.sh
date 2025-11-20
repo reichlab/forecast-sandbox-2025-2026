@@ -9,7 +9,7 @@
 #SBATCH -o logs/slurm-%A_%a.out        # Output file (%A=job ID, %a=array index)
 #SBATCH -e logs/slurm-%A_%a.err        # Error file
 #SBATCH --mail-type=FAIL,TIME_LIMIT_80 # Email on failure or 80% time reached
-#SBATCH --mail-user=nick@umass.edu
+#SBATCH --mail-user=trobacker@umass.edu
 
 # Array of dates to process
 dates=(
