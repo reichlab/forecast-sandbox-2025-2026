@@ -42,18 +42,31 @@ def categorize_feature(feature_name):
 
 def load_feature_importance(model_dir, date):
     """Load feature importance from saved artifacts."""
-    artifact_path = Path(model_dir) / "artifacts" / date
+    # The artifacts are nested: artifacts/{date}/UMass-{model}/feat_importance/*.csv
+    model_dir_path = Path(model_dir)
+
+    # Extract model name from directory (e.g., gbqr_3src from src/gbqr_3src)
+    model_name = model_dir_path.name
+
+    # Construct path to feature importance file
+    artifact_path = model_dir_path / "artifacts" / date / f"UMass-{model_name}" / "feat_importance"
 
     if not artifact_path.exists():
-        raise FileNotFoundError(f"Artifact directory not found: {artifact_path}")
+        print(f"Warning: Artifact directory not found: {artifact_path}")
+        # Try alternate structure without UMass prefix
+        artifact_path = model_dir_path / "artifacts" / date
+        if not artifact_path.exists():
+            raise FileNotFoundError(f"Artifact directory not found: {artifact_path}")
 
-    # Look for feature importance files (format may vary based on idmodels implementation)
-    # Common patterns: feature_importance.csv, feat_importance.csv, or similar
-    importance_files = list(artifact_path.glob("*importance*.csv")) + \
-                      list(artifact_path.glob("*importance*.parquet"))
+    # Look for feature importance files
+    importance_files = list(artifact_path.glob("*.csv")) + \
+                      list(artifact_path.glob("*.parquet")) + \
+                      list(artifact_path.glob("**/*.csv")) + \
+                      list(artifact_path.glob("**/*.parquet"))
 
     if not importance_files:
         print(f"Warning: No feature importance files found in {artifact_path}")
+        print(f"Looking in: {artifact_path}")
         print(f"Contents: {list(artifact_path.glob('*'))}")
         return None
 
@@ -67,6 +80,19 @@ def load_feature_importance(model_dir, date):
         df = pd.read_parquet(importance_file)
     else:
         raise ValueError(f"Unsupported file format: {importance_file.suffix}")
+
+    # Feature importance files have one row per (feature, bag, quantile) combination
+    # Aggregate across bags and quantiles to get overall feature importance
+    if 'feat' in df.columns or 'feature' in df.columns:
+        feat_col = 'feat' if 'feat' in df.columns else 'feature'
+        importance_col = 'importance' if 'importance' in df.columns else 'gain'
+
+        # Sum importance across all bags and quantile levels
+        df_agg = df.groupby(feat_col)[importance_col].sum().reset_index()
+        df_agg.columns = ['feature', 'importance']
+
+        print(f"  Aggregated from {len(df)} rows to {len(df_agg)} features")
+        return df_agg
 
     return df
 
@@ -127,19 +153,12 @@ def main(date, base_dir, spatial_dir, output_dir):
         print(f"  {spatial_dir}/artifacts/{date}/*importance*.csv")
         return
 
-    # Standardize column names
-    importance_col = 'importance' if 'importance' in df_base.columns else 'gain'
-    if importance_col not in df_base.columns:
-        importance_col = df_base.columns[1]  # Assume second column is importance
-
-    df_base = df_base.rename(columns={importance_col: 'importance'})
-    df_spatial = df_spatial.rename(columns={importance_col: 'importance'})
-
-    # Ensure 'feature' column exists
-    if 'feature' not in df_base.columns:
-        df_base['feature'] = df_base.iloc[:, 0]
-    if 'feature' not in df_spatial.columns:
-        df_spatial['feature'] = df_spatial.iloc[:, 0]
+    # Column names should already be standardized by load function
+    # Just verify they exist
+    if 'feature' not in df_base.columns or 'importance' not in df_base.columns:
+        raise ValueError(f"Base model missing required columns. Found: {df_base.columns.tolist()}")
+    if 'feature' not in df_spatial.columns or 'importance' not in df_spatial.columns:
+        raise ValueError(f"Spatial model missing required columns. Found: {df_spatial.columns.tolist()}")
 
     print(f"Base model: {len(df_base)} features")
     print(f"Spatial model: {len(df_spatial)} features\n")

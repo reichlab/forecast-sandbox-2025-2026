@@ -166,11 +166,10 @@ def main(date, output_dir):
     # 1. State-level differences bar chart
     fig, ax = plt.subplots(figsize=(14, 10))
     top_states = state_diffs.head(30)
-    colors = [sns.color_palette()[i] for i in [REGIONS[region] for region in top_states['region']].index(top_states['region'].iloc[0])]
 
     # Color by region
-    region_colors = {'Northeast': 0, 'Midwest': 1, 'South': 2, 'West': 3}
-    colors = [sns.color_palette()[region_colors[r]] for r in top_states['region']]
+    region_colors = {'Northeast': 0, 'Midwest': 1, 'South': 2, 'West': 3, 'Other': 4}
+    colors = [sns.color_palette()[region_colors.get(r, 4)] for r in top_states['region']]
 
     ax.barh(range(len(top_states)), top_states['abs_diff'], color=colors)
     ax.set_yticks(range(len(top_states)))
