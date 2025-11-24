@@ -4,18 +4,18 @@ This document tracks forecast dates that have been excluded from the Chronos mod
 
 ## Excluded Dates
 
-### 2025-01-18
+### 2025-01-25
 
-**Reason**: Data availability issues due to U.S. Presidential Inauguration
+**Reason**: Data inconsistencies following Presidential Inauguration period
 
-On January 20, 2025, the U.S. Presidential Inauguration caused disruptions to CDC data reporting systems. This resulted in incomplete or delayed surveillance data for the week ending 2025-01-18, creating a mismatch between the Chronos forecasts and baseline model forecasts that were generated with different data vintages or availability.
+The week following the U.S. Presidential Inauguration (January 20, 2025) showed unusual data patterns and reporting irregularities. The forecast for reference date 2025-01-25 exhibited inconsistencies with baseline models that suggest lingering data quality issues from the inauguration period disruptions.
 
 **Impact**:
-- Chronos forecast generated with pre-inauguration data assumptions
-- Baseline (AR6_pooled) and other models show different horizon patterns for this date
-- Data quality concerns make evaluation unreliable for this week
+- Data vintage and reporting timing issues may affect forecast accuracy
+- Baseline models show varying horizon patterns for dates in this period
+- Evaluation comparability concerns due to data inconsistencies
 
-**Status**: Excluded from evaluation until data consistency can be verified
+**Status**: Excluded from evaluation due to data quality concerns
 
 ---
 
@@ -42,7 +42,7 @@ This date appears to have special circumstances that affect horizon availability
 ## Summary
 
 **Total Chronos forecasts**: 55 originally generated
-**Excluded forecasts**: 2 (2025-01-18, 2025-04-26)
+**Excluded forecasts**: 2 (2025-01-25, 2025-04-26)
 **Available for evaluation**: 53 forecasts
 
 The excluded forecasts remain in the git history but have been removed from the model submission to ensure evaluation metrics are calculated on comparable data.
@@ -51,7 +51,7 @@ The excluded forecasts remain in the git history but have been removed from the 
 
 After exclusions, Chronos provides:
 - **2023-24 Season**: 30 forecasts (2023-10-21 to 2024-05-11)
-- **2024-25 Season**: 23 forecasts (2024-11-30 to 2025-05-17, excluding 2025-01-18 and 2025-04-26)
+- **2024-25 Season**: 23 forecasts (2024-11-30 to 2025-05-17, excluding 2025-01-25 and 2025-04-26)
 
 ---
 
