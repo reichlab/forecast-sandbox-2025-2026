@@ -4,6 +4,21 @@ This document tracks forecast dates that have been excluded from the Chronos mod
 
 ## Excluded Dates
 
+### 2024-05-11
+
+**Reason**: Data quality issues at end of 2023-24 season
+
+The forecast for 2024-05-11 exhibits data inconsistencies similar to those observed during the January 2025 inauguration period. While the specific cause is unclear (potentially CDC data pipeline or reporting irregularities at the end of the flu season), the forecast shows patterns that suggest data quality concerns.
+
+**Impact**:
+- Potential data pipeline or reporting issues at season end
+- Inconsistencies that could affect evaluation reliability
+- Better to exclude than include questionable data
+
+**Status**: Excluded from evaluation due to data quality concerns
+
+---
+
 ### 2025-01-25
 
 **Reason**: Data inconsistencies following Presidential Inauguration period
@@ -42,15 +57,15 @@ This date appears to have special circumstances that affect horizon availability
 ## Summary
 
 **Total Chronos forecasts**: 55 originally generated
-**Excluded forecasts**: 2 (2025-01-25, 2025-04-26)
-**Available for evaluation**: 53 forecasts
+**Excluded forecasts**: 3 (2024-05-11, 2025-01-25, 2025-04-26)
+**Available for evaluation**: 52 forecasts
 
 The excluded forecasts remain in the git history but have been removed from the model submission to ensure evaluation metrics are calculated on comparable data.
 
 ## Forecast Coverage
 
 After exclusions, Chronos provides:
-- **2023-24 Season**: 30 forecasts (2023-10-21 to 2024-05-11)
+- **2023-24 Season**: 29 forecasts (2023-10-21 to 2024-05-04, excluding 2024-05-11)
 - **2024-25 Season**: 23 forecasts (2024-11-30 to 2025-05-17, excluding 2025-01-25 and 2025-04-26)
 
 ---
