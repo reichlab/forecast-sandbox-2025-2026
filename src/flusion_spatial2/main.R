@@ -32,8 +32,8 @@ if (!all.equal(date_list[[1]], date_list[[2]])) {
 
 ## loop through and ensemble
 hub_con <- connect_hub(hub_path = ".", skip_checks = TRUE)
-us_models <- paste0("UMass-", state_models_to_blend)
-state_models <- paste0("UMass-", us_models_to_blend)
+us_models <- paste0("UMass-", us_models_to_blend)
+state_models <- paste0("UMass-", state_models_to_blend)
 
 for (i in 1:length(file_list[[1]])) {
   state_dat <- hub_con |>
@@ -57,7 +57,9 @@ for (i in 1:length(file_list[[1]])) {
     all_dat,
     model_id = new_model,
     agg_fun = "median"
-  )
+  ) |>
+    select(-model_id)
+
   write_csv(
     ens_model,
     file = file.path(
