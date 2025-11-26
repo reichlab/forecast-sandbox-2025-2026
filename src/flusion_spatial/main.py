@@ -35,12 +35,12 @@ def main(today_date: Optional[str] = None, short_run: bool = False):
     print("=" * 60)
 
     print("\n[1/3] Running AR(6) pooled model...")
-    subprocess.run(["python", "0_ar6_pooled.py",
+    subprocess.run([sys.executable, "0_ar6_pooled.py",
                     "--reference_date", str(reference_date)] + short_run_flag,
                    check=True)
 
     print("\n[2/3] Running GBQR 3-source spatial model...")
-    subprocess.run(["python", "1_gbqr_3src_spatial.py",
+    subprocess.run([sys.executable, "1_gbqr_3src_spatial.py",
                     "--reference_date", str(reference_date)] + short_run_flag,
                    check=True)
 
