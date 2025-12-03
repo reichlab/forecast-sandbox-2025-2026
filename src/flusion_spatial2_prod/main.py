@@ -34,17 +34,22 @@ def main(today_date: Optional[str] = None, short_run: bool = False):
     print(f"Running flusion_spatial ensemble for reference date: {reference_date}")
     print("=" * 60)
 
-    print("\n[1/3] Running AR(6) pooled model...")
+    print("\n[1/4] Running AR(6) pooled model...")
     subprocess.run([sys.executable, "0_ar6_pooled.py",
                     "--reference_date", str(reference_date)] + short_run_flag,
                    check=True)
 
-    print("\n[2/3] Running GBQR 3-source spatial model...")
-    subprocess.run([sys.executable, "1_gbqr_3src_spatial.py",
+    print("\n[2/4] Running GBQR 3-source spatial model...")
+    subprocess.run([sys.executable, "1_gbqr_3src_spatial2.py",
                     "--reference_date", str(reference_date)] + short_run_flag,
                    check=True)
 
-    print("\n[3/3] Creating ensemble forecast...")
+    print("\n[3/4] Running GBQR 3-source spatial model...")
+    subprocess.run([sys.executable, "2_gbqr_3src.py",
+                    "--reference_date", str(reference_date)] + short_run_flag,
+                   check=True)
+
+    print("\n[4/4] Creating ensemble forecast...")
     # Find Rscript in PATH
     rscript_path = shutil.which("Rscript")
     if rscript_path is None:
@@ -53,7 +58,7 @@ def main(today_date: Optional[str] = None, short_run: bool = False):
         sys.exit(1)
 
     print(f"Using Rscript: {rscript_path}")
-    subprocess.run([rscript_path, "2_flusion_spatial_ensemble.R", str(reference_date)],
+    subprocess.run([rscript_path, "3_flusion_spatial_ensemble.R", str(reference_date)],
                    check=True)
 
     print("\n" + "=" * 60)
