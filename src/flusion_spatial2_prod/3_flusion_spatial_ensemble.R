@@ -6,15 +6,18 @@ library(hubEnsembles)
 args <- commandArgs(trailingOnly = TRUE)
 ref_date <- as.Date(args[1])
 
-hub_con <- hubData::connect_model_output("intermediate-output/model-output")
+hub_con <- hubData::connect_model_output(
+  "intermediate-output/model-output",
+  schema = arrow::schema(location = arrow::utf8())
+)
 
-state_models_to_blend <- c("gbqr_3src_spatial2", "AR6_pooled")
-us_models_to_blend <- c("gbqr_3src", "AR6_pooled")
+state_models_to_blend <- c("UMass-gbqr_3src_spatial2", "UMass-AR6_pooled")
+us_models_to_blend <- c("UMass-gbqr_3src", "UMass-AR6_pooled")
 
 state_dat <- hub_con |>
   filter(
     reference_date == ref_date,
-    model_id %in% state_models,
+    model_id %in% state_models_to_blend,
     location != "US",
     horizon >= 0
   ) |>
@@ -23,7 +26,7 @@ state_dat <- hub_con |>
 us_dat <- hub_con |>
   filter(
     reference_date == ref_date,
-    model_id %in% us_models,
+    model_id %in% us_models_to_blend,
     location == "US",
     horizon >= 0
   ) |>
@@ -41,7 +44,7 @@ if (!dir.exists(output_dir)) {
 }
 
 utils::write.csv(
-  model_out_tbl |> dplyr::select(-model_id),
+  ens_model |> dplyr::select(-model_id),
   file = file.path(
     output_dir,
     paste0(ref_date, "-UMass-flusion_spatial2_prod.csv")
