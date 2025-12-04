@@ -30,11 +30,11 @@ us_dat <- hub_con |>
   collect_hub()
 
 ens_model <- bind_rows(state_dat, us_dat) |>
-  simple_ensemble(model_id = "UMass-flusion")
+  simple_ensemble(model_id = "UMass-flusion_spatial2_prod")
 
 
 # save
-output_dir <- "../../model-output/UMass-flusion"
+output_dir <- "../../model-output/UMass-flusion_spatial2_prod"
 
 if (!dir.exists(output_dir)) {
   dir.create(output_dir, recursive = TRUE)
@@ -44,7 +44,7 @@ utils::write.csv(
   model_out_tbl |> dplyr::select(-model_id),
   file = file.path(
     output_dir,
-    paste0(ref_date, "-UMass-flusion.csv")
+    paste0(ref_date, "-UMass-flusion_spatial2_prod.csv")
   ),
   row.names = FALSE
 )
