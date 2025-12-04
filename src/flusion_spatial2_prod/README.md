@@ -32,6 +32,9 @@ Restore R packages from the lockfile:
 Rscript -e "renv::restore()"
 ```
 
+On Unity, you can log in to an RStudio Server, navigate to the `src/flusion_spatial2_prod` folder, set it as your working directory and type `renv::restore()` to activate the project and create a project library. 
+It may require restarting the R session and re-running `renv::restore()`.
+
 ### Running the model
 
 ```bash
