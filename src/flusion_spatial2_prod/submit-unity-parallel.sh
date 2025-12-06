@@ -1,10 +1,10 @@
 #!/bin/bash
 #SBATCH -J flusion_spatial2_prod       # Job name
 #SBATCH -N 1                           # Number of nodes
-#SBATCH -c 8                           # Number of cores per task
-#SBATCH --mem=32G                      # Memory per node
+#SBATCH -c 12                           # Number of cores per task
+#SBATCH --mem=64G                      # Memory per node
 #SBATCH -p cpu                         # Partition name
-#SBATCH -t 08:00:00                    # Time limit (2 hours)
+#SBATCH -t 10:00:00                    # Time limit (2 hours)
 #SBATCH --array=0-51                   # Array indices (55 dates total)
 #SBATCH -o logs/slurm-%A_%a.out        # Output file (%A=job ID, %a=array index)
 #SBATCH -e logs/slurm-%A_%a.err        # Error file
