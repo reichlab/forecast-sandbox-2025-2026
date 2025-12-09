@@ -1,10 +1,10 @@
 #!/bin/bash
-#SBATCH -J gbqr_3src_spatial_forecast   # Job name
+#SBATCH -J gbqr_3src_spatial2_forecast  # Job name
 #SBATCH -N 1                            # Number of nodes
 #SBATCH -c 8                            # Number of cores per task
 #SBATCH --mem=32G                       # Memory per node
 #SBATCH -p cpu                          # Partition name
-#SBATCH -t 01:00:00                     # Time limit (1 hours)
+#SBATCH -t 06:00:00                     # Time limit (6 hours)
 #SBATCH --array=0-54                    # Array indices (55 dates total)
 #SBATCH -o logs/slurm-%A_%a.out         # Output file (%A=job ID, %a=array index)
 #SBATCH -e logs/slurm-%A_%a.err         # Error file
