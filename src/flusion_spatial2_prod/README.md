@@ -34,15 +34,7 @@ Rscript -e "renv::restore()"
 
 ### R setup on Unity
 
-The renv lockfile requires **R 4.5.1**. On Unity, we use the Rocker ML Verse container via Apptainer to get this version.
-
-#### About the R module
-
-The module `r-rocker-ml-verse/4.5.1_cuda12.8.1+apptainer` is:
-- **r-rocker-ml-verse**: A container image from the [Rocker Project](https://rocker-project.org/) that includes R, tidyverse, and machine learning libraries
-- **4.5.1**: R version 4.5.1
-- **cuda12.8.1**: CUDA toolkit for GPU computing (not used by this model, but included in the container)
-- **apptainer**: The container runtime (formerly Singularity) that runs the R environment
+The renv lockfile was created with R 4.4.3. On Unity, we use the `r/4.4.1-4oqw6bx` module.
 
 #### Quick installation check
 
@@ -50,22 +42,22 @@ Before setting up renv, verify the module is available and working:
 
 ```bash
 # Check if the module exists
-module spider r-rocker-ml-verse/4.5.1
+module spider r/4.4.1
 
 # Load the module
-module load r-rocker-ml-verse/4.5.1_cuda12.8.1+apptainer
+module load r/4.4.1-4oqw6bx
 
-# Verify R version and that it can see your project files
+# Verify R version
 Rscript -e "print(R.version.string); print(.libPaths())"
 ```
 
-If successful, you should see `R version 4.5.1` in the output.
+If successful, you should see `R version 4.4.1` in the output.
 
-#### Option 1: Interactive setup via command line
+#### Interactive setup via command line
 
 ```bash
-# Load the required R module (containerized R 4.5.1)
-module load r-rocker-ml-verse/4.5.1_cuda12.8.1+apptainer
+# Load the required R module
+module load r/4.4.1-4oqw6bx
 
 # Navigate to the project directory
 cd /path/to/forecast-sandbox-2025-2026/src/flusion_spatial2_prod
@@ -74,28 +66,17 @@ cd /path/to/forecast-sandbox-2025-2026/src/flusion_spatial2_prod
 Rscript -e "renv::restore()"
 ```
 
-#### Option 2: Interactive setup via RStudio Server
-
-1. Log in to Unity's RStudio Server (https://unity.rc.umass.edu)
-2. In the terminal pane, load the R module:
-   ```bash
-   module load r-rocker-ml-verse/4.5.1_cuda12.8.1+apptainer
-   ```
-3. Restart R (Session > Restart R) to pick up the new R version
-4. Navigate to `src/flusion_spatial2_prod` and set it as your working directory
-5. Run `renv::restore()` to install packages into the project library
-
 **Important**: If renv was previously initialized with a different R version, you may need to:
 1. Delete the `renv/library/` directory
-2. Run `renv::restore()` again with R 4.5.1 loaded
+2. Run `renv::restore()` again with the r/4.4.1 module loaded
 
 #### Verifying your setup
 
 Before submitting jobs, verify R is correctly configured:
 
 ```bash
-module load r-rocker-ml-verse/4.5.1_cuda12.8.1+apptainer
-Rscript --version  # Should show R version 4.5.1
+module load r/4.4.1-4oqw6bx
+Rscript --version  # Should show R version 4.4.1
 cd src/flusion_spatial2_prod
 Rscript -e "renv::status()"  # Should show all packages are installed
 ```

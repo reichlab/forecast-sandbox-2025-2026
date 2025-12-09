@@ -98,18 +98,14 @@ else
 fi
 
 # Load required modules on Unity (after venv activation)
-# We require R 4.5.1 specifically to match the renv lockfile
-# Using the Rocker ML Verse container via Apptainer
-R_MODULE="r-rocker-ml-verse/4.5.1_cuda12.8.1+apptainer"
+# Using R 4.4.1 module (renv lockfile created with R 4.4.3)
+R_MODULE="r/4.4.1-4oqw6bx"
 if module load $R_MODULE 2>/dev/null; then
     echo "Loaded R module: $R_MODULE"
 else
     echo "ERROR: Could not load R module: $R_MODULE"
     echo "Available R modules on this system:"
-    module spider r-rocker 2>&1 | head -20
-    echo ""
-    echo "The renv lockfile was created with R 4.5.1. Using a different version"
-    echo "may cause package compatibility issues. Please ensure R 4.5.1 is available."
+    module spider r 2>&1 | head -20
     exit 1
 fi
 
