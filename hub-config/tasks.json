@@ -201,7 +201,8 @@
             "submissions_due": {
                 "start": "1900-01-01",
                 "end": "2900-12-31"
-            }
+            },
+            "derived_task_ids": ["target_end_date"]
         }
     ],
     "output_type_id_datatype": "auto",
