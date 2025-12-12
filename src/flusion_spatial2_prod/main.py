@@ -63,7 +63,7 @@ def main(today_date: Optional[str] = None, short_run: bool = False):
 
     print("\n" + "=" * 60)
     print(f"Ensemble forecast complete for {reference_date}")
-    print(f"Output saved to: ../../model-output/UMass-flusion_spatial/")
+    print(f"Output saved to: ../../model-output/UMass-flusion_spatial2_prod/")
 
 
 if __name__ == "__main__":
