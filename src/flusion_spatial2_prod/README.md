@@ -99,7 +99,7 @@ This runs all four steps:
 3. GBQR 3-source model
 4. R ensemble combining the outputs
 
-Output is saved to `model-output/UMass-flusion_spatial/`.
+Output is saved to `model-output/UMass-flusion_spatial2_prod/`.
 
 ## requirements.txt and renv.lock details
 
