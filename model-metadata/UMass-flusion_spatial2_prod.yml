@@ -1,0 +1,41 @@
+team_name: "UMass-Amherst"
+team_abbr: "UMass"
+model_name: "Ensemble of time series models with spatial features"
+model_abbr: "flusion_spatial2_prod"
+model_version: "1.0"
+model_contributors: [
+  {
+    "name": "Evan Ray",
+    "affiliation": "UMass Amherst",
+    "email": "elray@umass.edu"
+  },
+    {
+    "name": "Thomas Robacker",
+    "affiliation": "UMass Amherst",
+    "email": "trobacker@umass.edu"
+  },
+    {
+    "name": "Nicholas Reich",
+    "affiliation": "UMass Amherst",
+    "email": "nick@umass.edu"
+  }
+]
+license: "CC-BY-4.0"
+designated_model: true
+methods: "Ensemble of statistical and machine learning time series models with spatial features."
+data_inputs: "Weekly incident flu hospitalizations from NHSN, FluSurv-NET, and ILINet."
+methods_long: "
+  This model is a replicate of UMass-flusion_spatial2, run using a different codebase to ensure replicability in production. 
+  A quantile average (median ensemble) of two models:
+   1. Gradient boosting quantile regression with spatial features (directional wave features), fit to NHSN, FluSurv-NET, and ILINet data. 
+   The spatial features capture disease spread patterns across geographic directions using 4 cardinal directional waves
+   with temporal lags of 1 weeks, maximum distance of 1500km, and both velocity and aggregate features.
+   2. An AR(6) model fit to NHSN only, with AR coefficients shared across locations and per-location variance parameters.
+
+  The spatial features are only present in state-level forecasts. For US level forecasts, the gbqr_3src model is used.
+
+  Both component models apply fourth root power transformation to hospitalization data. The ensemble combines quantile forecasts from both 
+  models using the median across models.
+  "
+ensemble_of_models: true
+ensemble_of_hub_models: false

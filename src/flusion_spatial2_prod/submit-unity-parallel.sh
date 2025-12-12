@@ -1,14 +1,14 @@
 #!/bin/bash
-#SBATCH -J gbqr_3src_spatial2_forecast  # Job name
-#SBATCH -N 1                            # Number of nodes
-#SBATCH -c 8                            # Number of cores per task
-#SBATCH --mem=32G                       # Memory per node
-#SBATCH -p cpu                          # Partition name
-#SBATCH -t 06:00:00                     # Time limit (6 hours)
-#SBATCH --array=0-54                    # Array indices (55 dates total)
-#SBATCH -o logs/slurm-%A_%a.out         # Output file (%A=job ID, %a=array index)
-#SBATCH -e logs/slurm-%A_%a.err         # Error file
-#SBATCH --mail-type=FAIL,TIME_LIMIT_80  # Email on failure or 80% time reached
+#SBATCH -J flusion_spatial2_prod       # Job name
+#SBATCH -N 1                           # Number of nodes
+#SBATCH -c 12                           # Number of cores per task
+#SBATCH --mem=64G                      # Memory per node
+#SBATCH -p cpu                         # Partition name
+#SBATCH -t 10:00:00                    # Time limit (2 hours)
+#SBATCH --array=0-51                   # Array indices (55 dates total)
+#SBATCH -o logs/slurm-%A_%a.out        # Output file (%A=job ID, %a=array index)
+#SBATCH -e logs/slurm-%A_%a.err        # Error file
+#SBATCH --mail-type=FAIL               # Email on failure or 80% time reached
 #SBATCH --mail-user=nick@umass.edu
 
 # Array of dates to process
@@ -42,7 +42,7 @@ dates=(
   "2024-04-17"
   "2024-04-24"
   "2024-05-01"
-  "2024-05-08"
+  # "2024-05-08" # removing due to no new data
   "2024-11-27"
   "2024-12-04"
   "2024-12-11"
@@ -51,7 +51,7 @@ dates=(
   "2025-01-01"
   "2025-01-08"
   "2025-01-15"
-  "2025-01-22"
+  # "2025-01-22" # removing due to data errors for this date
   "2025-01-29"
   "2025-02-05"
   "2025-02-12"
@@ -64,7 +64,7 @@ dates=(
   "2025-04-02"
   "2025-04-09"
   "2025-04-16"
-  "2025-04-23"
+  # "2025-04-23" # missing data for this date
   "2025-04-30"
   "2025-05-07"
   "2025-05-14"
@@ -76,7 +76,7 @@ date="${dates[$SLURM_ARRAY_TASK_ID]}"
 echo "=========================================="
 echo "Job ID: $SLURM_JOB_ID"
 echo "Array Task ID: $SLURM_ARRAY_TASK_ID"
-echo "Running forecast for date: $date"
+echo "Running flusion_spatial ensemble forecast for date: $date"
 echo "Node: $SLURM_NODELIST"
 echo "Start time: $(date)"
 echo "=========================================="
@@ -97,18 +97,37 @@ else
     exit 1
 fi
 
+# Load required modules on Unity (after venv activation)
+# Using R 4.4.1 module (renv lockfile created with R 4.4.3)
+R_MODULE="r/4.4.1-4oqw6bx"
+if module load $R_MODULE 2>/dev/null; then
+    echo "Loaded R module: $R_MODULE"
+else
+    echo "ERROR: Could not load R module: $R_MODULE"
+    echo "Available R modules on this system:"
+    module spider r 2>&1 | head -20
+    exit 1
+fi
+
+# Explicitly export PATH to ensure R is available to subprocesses
+export PATH
+
 # Verify Python environment
 echo "Python: $(which python)"
 echo "Python version: $(python --version)"
 
-# Run the forecast
+# Verify R is available
+echo "R: $(which Rscript)"
+echo "R version: $(Rscript --version 2>&1 | head -1)"
+
+# Run the ensemble forecast
 python main.py --today_date="$date"
 
 # Check exit status
 if [ $? -eq 0 ]; then
-    echo "Successfully completed forecast for $date"
+    echo "Successfully completed ensemble forecast for $date"
 else
-    echo "Error: Forecast failed for $date"
+    echo "Error: Ensemble forecast failed for $date"
     exit 1
 fi
 
