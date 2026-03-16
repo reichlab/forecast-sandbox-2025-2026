@@ -1,0 +1,2 @@
+click
+idmodels @ git+https://github.com/reichlab/idmodels@2a24d6357e31692847ac38d494349c64848e548a
