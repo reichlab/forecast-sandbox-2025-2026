@@ -1,0 +1,54 @@
+team_name: "UMass-Amherst"
+team_abbr: "UMass"
+model_name: "Ensemble with MEM-based adaptive weighting"
+model_abbr: "flusion_spatial_mem"
+model_version: "0.1"
+model_contributors: [
+  {
+    "name": "Thomas Robacker",
+    "affiliation": "UMass Amherst",
+    "email": "trobacker@umass.edu"
+  },
+  {
+    "name": "Evan Ray",
+    "affiliation": "UMass Amherst",
+    "email": "elray@umass.edu"
+  },
+  {
+    "name": "Nicholas Reich",
+    "affiliation": "UMass Amherst",
+    "email": "nick@umass.edu"
+  }
+]
+license: "CC-BY-4.0"
+designated_model: false
+methods: "Ensemble of statistical and machine learning models with Moving Epidemic Method (MEM) based adaptive weighting."
+data_inputs: "Weekly incident flu hospitalizations from NHSN, FluSurv-NET, and ILINet."
+methods_long: "
+  EXPERIMENTAL MODEL: This model incorporates the Moving Epidemic Method (MEM) to adaptively weight ensemble components
+  based on epidemic phase and intensity. It combines the same component models as flusion_spatial2_prod but uses
+  phase-aware weighting instead of simple median ensemble.
+
+  Component models:
+   1. Gradient boosting quantile regression with spatial features (directional wave features), fit to NHSN, FluSurv-NET, and ILINet data.
+   The spatial features capture disease spread patterns across geographic directions using 4 cardinal directional waves
+   with temporal lags of 1 week, maximum distance of 1500km, and both velocity and aggregate features.
+   2. An AR(6) model fit to NHSN only, with AR coefficients shared across locations and per-location variance parameters.
+
+  MEM-based adaptive weighting:
+  The Moving Epidemic Method is used to calculate epidemic thresholds and intensity levels from historical NHSN hospitalization data.
+  At forecast time, the current epidemic phase (baseline, low, medium, high, very high intensity) is determined, and ensemble
+  weights are adjusted accordingly:
+   - Baseline/Low intensity: Higher weight to AR(6) model for stability
+   - Medium intensity: Balanced weights across models
+   - High/Very high intensity: Higher weight to GBQR spatial models to capture rapid changes
+
+  The spatial features are only present in state-level forecasts. For US level forecasts, the gbqr_3src model is used.
+
+  Both component models apply fourth root power transformation to hospitalization data.
+
+  This is an experimental model designed to test whether MEM-based adaptive weighting improves forecast accuracy
+  compared to simple median ensemble (flusion_spatial2_prod).
+  "
+ensemble_of_models: true
+ensemble_of_hub_models: false
