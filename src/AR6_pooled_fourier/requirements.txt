@@ -1,3 +1,0 @@
-click
-sarix @ git+https://github.com/reichlab/sarix@1c8995942d49afbb66637f0dc0662e1248606af4
-idmodels @ git+https://github.com/reichlab/idmodels@44692ec77cbd46695b236ae5b76ea905c68e7313
