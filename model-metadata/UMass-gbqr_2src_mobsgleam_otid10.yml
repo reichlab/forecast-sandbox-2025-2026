@@ -1,0 +1,33 @@
+team_name: "UMass-Amherst"
+team_abbr: "UMass"
+model_name: "GBQR with SMH synthetic trajectories (MOBS_NEU-GLEAM, n=10)"
+model_abbr: "gbqr_2src_mobsgleam_otid10"
+model_version: "1.0"
+model_contributors: [
+  {
+    "name": "Li Shandross",
+    "affiliation": "UMass Amherst",
+    "email": "lshandross@umass.edu"
+  },
+  {
+    "name": "Evan Ray",
+    "affiliation": "UMass Amherst",
+    "email": "elray@umass.edu"
+  },
+  {
+    "name": "Nick Reich",
+    "affiliation": "UMass Amherst",
+    "email": "nick@umass.edu"
+  }
+]
+license: "CC-BY-4.0"
+designated_model: true
+methods: "Gradient boosting quantile regression fit to NHSN data, augmented with SMH synthetic trajectories from the MOBS_NEU-GLEAM model (n=10 sampled output_type_ids)."
+methods_long: "
+  Gradient boosting quantile regression, fit to NHSN data.
+  Supplemented with synthetic weekly incident hospitalization trajectories from rounds 4, 5, and 6 of the Flu Scenario Modeling Hub, filtered to the MOBS_NEU-GLEAM model.
+  Output_type_ids (trajectory samples) are randomly sampled to n=10 per (round, location) group, using a fixed seed (42) for reproducibility.
+"
+data_inputs: "Weekly incident laboratory-confirmed influenza hospitalizations from NHSN. Synthetic weekly incident hospitalization trajectories from rounds 4, 5, and 6 of the Flu Scenario Modeling Hub, filtered to the MOBS_NEU-GLEAM model (n=10 sampled output_type_ids)."
+ensemble_of_models: false
+ensemble_of_hub_models: false
