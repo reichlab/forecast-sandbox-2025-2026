@@ -1,3 +1,0 @@
-click
--e ../../../sarix
--e ../../../idmodels
