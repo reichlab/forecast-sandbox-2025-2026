@@ -5,7 +5,7 @@ filtering.
 
 - Main source: NHSN
 - Supplementary sources: SMH
-- SMH model filter: NIH-FLU_TS
+- SMH model filter: NIH-Flu_TS
 - SMH output_type_id sample size (`smh_num_otid`): 100
 - SMH otid sampling seed (`smh_otid_seed`): 42
 

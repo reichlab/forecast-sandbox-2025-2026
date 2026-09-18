@@ -28,7 +28,7 @@ def main(today_date: str | None = None, short_run: bool = False):
         save_feat_importance=False,
         main_source=SourceType.NHSN,
         supplementary_sources=[SourceType.SMH],
-        smh_model=["NIH-FLU_TS"],
+        smh_model=["NIH-Flu_TS"],
         smh_num_otid=50,
         smh_otid_seed=42,
         fit_locations_separately=False,

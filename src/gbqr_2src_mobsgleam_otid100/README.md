@@ -5,7 +5,7 @@ filtering.
 
 - Main source: NHSN
 - Supplementary sources: SMH
-- SMH model filter: MOBS_NEU-GLEAM
+- SMH model filter: MOBS_NEU-GLEAM_FLU
 - SMH output_type_id sample size (`smh_num_otid`): 100
 - SMH otid sampling seed (`smh_otid_seed`): 42
 
