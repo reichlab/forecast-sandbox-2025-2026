@@ -2,9 +2,9 @@
 #SBATCH -J gbqr_5src_all_otid100             # Job name
 #SBATCH -N 1                            # Number of nodes
 #SBATCH -c 8                            # Number of cores per task
-#SBATCH --mem=32G                       # Memory per node
+#SBATCH --mem=128G                       # Memory per node
 #SBATCH -p cpu                          # Partition name
-#SBATCH -t 01:00:00                     # Time limit (1 hours)
+#SBATCH -t 04:00:00                     # Time limit (4 hours)
 #SBATCH --array=0-27                    # Array indices (28 dates total; NSSP requires as_of >= 2025-09-17)
 #SBATCH -o logs/slurm-%A_%a.out         # Output file (%A=job ID, %a=array index)
 #SBATCH -e logs/slurm-%A_%a.err         # Error file
