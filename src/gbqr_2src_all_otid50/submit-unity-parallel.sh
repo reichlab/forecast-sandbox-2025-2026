@@ -4,7 +4,7 @@
 #SBATCH -c 8                            # Number of cores per task
 #SBATCH --mem=128G                       # Memory per node
 #SBATCH -p cpu                          # Partition name
-#SBATCH -t 04:00:00                     # Time limit (4 hours)
+#SBATCH -t 06:00:00                     # Time limit (6 hours)
 #SBATCH --array=0-79                   # Array indices (80 dates total)
 #SBATCH -o logs/slurm-%A_%a.out         # Output file (%A=job ID, %a=array index)
 #SBATCH -e logs/slurm-%A_%a.err         # Error file
