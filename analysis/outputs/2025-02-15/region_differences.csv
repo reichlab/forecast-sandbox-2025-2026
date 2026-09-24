@@ -1,0 +1,7 @@
+,abs_diff,abs_diff,abs_diff,rel_diff,location
+,mean,median,max,mean,count
+region,,,,,
+Midwest,93.09,66.82,411.43,0.11,48
+Northeast,174.34,42.06,748.64,0.16,36
+South,60.41,31.96,266.17,0.08,72
+West,25.41,8.69,292.98,0.07,52

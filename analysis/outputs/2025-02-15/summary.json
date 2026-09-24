@@ -1,0 +1,9 @@
+{
+  "date": "2025-02-15",
+  "base_model_features": 101,
+  "spatial_model_features": 135,
+  "spatial_only_features": 36,
+  "top_category_base": "other",
+  "top_category_spatial": "other",
+  "spatial_feature_importance_pct": 39.67520289855073
+}
