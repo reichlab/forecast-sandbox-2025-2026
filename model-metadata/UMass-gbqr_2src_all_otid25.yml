@@ -1,7 +1,7 @@
 team_name: "UMass-Amherst"
 team_abbr: "UMass"
-model_name: "GBQR with SMH synthetic trajectories (all models, n=10)"
-model_abbr: "gbqr_2src_all_otid10"
+model_name: "GBQR with SMH synthetic trajectories (all models, n=25)"
+model_abbr: "gbqr_2src_all_otid25"
 model_version: "1.0"
 model_contributors: [
   {
@@ -22,12 +22,12 @@ model_contributors: [
 ]
 license: "CC-BY-4.0"
 designated_model: true
-methods: "Gradient boosting quantile regression fit to NHSN data, augmented with SMH synthetic trajectories from all available SMH models (n=10 sampled per model)."
+methods: "Gradient boosting quantile regression fit to NHSN data, augmented with SMH synthetic trajectories from all available SMH models (n=25 sampled per model)."
 methods_long: "
   Gradient boosting quantile regression, fit to NHSN data.
   Supplemented with synthetic weekly incident hospitalization trajectories from rounds 4, 5, and 6 of the Flu Scenario Modeling Hub, using all available SMH models.
-  Output_type_ids (trajectory samples) are randomly sampled independently for each SMH model, to n=10 per (round, location) group, using a fixed seed (42) for reproducibility.
+  Output_type_ids (trajectory samples) are randomly sampled independently for each SMH model, to n=25 per (round, location) group, using a fixed seed (42) for reproducibility.
 "
-data_inputs: "Weekly incident laboratory-confirmed influenza hospitalizations from NHSN. Synthetic weekly incident hospitalization trajectories from rounds 4, 5, and 6 of the Flu Scenario Modeling Hub, using all available SMH models (n=10 sampled per model)."
+data_inputs: "Weekly incident laboratory-confirmed influenza hospitalizations from NHSN. Synthetic weekly incident hospitalization trajectories from rounds 4, 5, and 6 of the Flu Scenario Modeling Hub, using all available SMH models (n=25 sampled per model)."
 ensemble_of_models: false
 ensemble_of_hub_models: false

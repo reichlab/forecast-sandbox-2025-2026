@@ -12,7 +12,7 @@ from idmodels.gbqr import GBQRModel
 @click.option("--today_date", type=str, required=False, help="Date to use as effective model run date (YYYY-MM-DD)")
 @click.option("--short_run", is_flag=True, help="Run with reduced parameters for faster testing")
 def main(today_date: str | None = None, short_run: bool = False):
-    """Generate flu predictions from the gbqr_5src_all_otid100 gbqr variant."""
+    """Generate flu predictions from the gbqr_2src_all_otid25 gbqr variant."""
     try:
         today_date = datetime.date.fromisoformat(today_date)
     except (TypeError, ValueError):  # if today_date is None or a bad format
@@ -20,16 +20,16 @@ def main(today_date: str | None = None, short_run: bool = False):
     reference_date = today_date + relativedelta.relativedelta(weekday=5)
 
     model_config = GBQRModelConfig(
-        model_name="gbqr_5src_all_otid100",
+        model_name="gbqr_2src_all_otid25",
         incl_level_feats=True,
         num_bags=100,
         bag_frac_samples=0.7,
         reporting_adj=False,
         save_feat_importance=False,
         main_source=SourceType.NHSN,
-        supplementary_sources=[SourceType.NSSP, SourceType.ILINET, SourceType.FLUSURVNET, SourceType.SMH],
+        supplementary_sources=[SourceType.SMH],
         smh_model=[],
-        smh_num_otid=100,
+        smh_num_otid=25,
         smh_otid_seed=42,
         fit_locations_separately=False,
         power_transform=PowerTransform.FOURTH_ROOT)

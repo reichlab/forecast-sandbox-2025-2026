@@ -1,17 +1,17 @@
-# gbqr_2src_all_otid100
+# gbqr_2src_all_otid25
 
 GBQR flu model variant exploring supplementary data sources and SMH scenario-hub trajectory
 filtering.
 
 - Main source: NHSN
 - Supplementary sources: SMH
-- SMH model filter: None (no filter -- all SMH models pooled)
-- SMH output_type_id sample size (`smh_num_otid`): 100
+- SMH model filter: None (all available SMH models, sampled independently per model)
+- SMH output_type_id sample size (`smh_num_otid`): 25 per SMH model
 - SMH otid sampling seed (`smh_otid_seed`): 42
 
 # To run locally without Docker
 
-To test this out locally, run the following with this directory (`gbqr_2src_all_otid100`) as your
+To test this out locally, run the following with this directory (`gbqr_2src_all_otid25`) as your
 working directory.
 
 ```bash
@@ -22,7 +22,7 @@ python -m pip install -r requirements.txt
 python main.py --today_date=2024-01-06 --short_run
 ```
 
-This should result in a model output file under `../../model-output/UMass-gbqr_2src_all_otid100/`.
+This should result in a model output file under `../../model-output/UMass-gbqr_2src_all_otid25/`.
 
 # Generating forecasts for all reference dates
 

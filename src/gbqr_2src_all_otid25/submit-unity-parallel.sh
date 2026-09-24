@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH -J gbqr_2src_all_otid100             # Job name
+#SBATCH -J gbqr_2src_all_otid25             # Job name
 #SBATCH -N 1                            # Number of nodes
 #SBATCH -c 8                            # Number of cores per task
 #SBATCH --mem=128G                       # Memory per node

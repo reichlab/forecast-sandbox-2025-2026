@@ -5,8 +5,8 @@ filtering.
 
 - Main source: NHSN
 - Supplementary sources: NSSP, ILINet, FluSurvNet, SMH
-- SMH model filter: None (no filter -- all SMH models pooled)
-- SMH output_type_id sample size (`smh_num_otid`): 10
+- SMH model filter: None (all available SMH models, sampled independently per model)
+- SMH output_type_id sample size (`smh_num_otid`): 10 per SMH model
 - SMH otid sampling seed (`smh_otid_seed`): 42
 
 # To run locally without Docker

@@ -22,12 +22,12 @@ model_contributors: [
 ]
 license: "CC-BY-4.0"
 designated_model: true
-methods: "Gradient boosting quantile regression fit to NHSN, NSSP, ILINet, FluSurv-NET data, augmented with SMH synthetic trajectories from all available SMH models (no model filter applied) (n=50 sampled output_type_ids)."
+methods: "Gradient boosting quantile regression fit to NHSN, NSSP, ILINet, FluSurv-NET data, augmented with SMH synthetic trajectories from all available SMH models (n=50 sampled per model)."
 methods_long: "
   Gradient boosting quantile regression, fit to NHSN, NSSP, ILINet, FluSurv-NET data.
-  Supplemented with synthetic weekly incident hospitalization trajectories from rounds 4, 5, and 6 of the Flu Scenario Modeling Hub, filtered to all available SMH models (no model filter applied).
-  Output_type_ids (trajectory samples) are randomly sampled to n=50 per (round, location) group, using a fixed seed (42) for reproducibility.
+  Supplemented with synthetic weekly incident hospitalization trajectories from rounds 4, 5, and 6 of the Flu Scenario Modeling Hub, using all available SMH models.
+  Output_type_ids (trajectory samples) are randomly sampled independently for each SMH model, to n=50 per (round, location) group, using a fixed seed (42) for reproducibility.
 "
-data_inputs: "Weekly incident laboratory-confirmed influenza hospitalizations from NHSN. Weekly percentage of emergency department visits with an influenza diagnosis from NSSP. Weekly percentage of outpatient visits for influenza-like illness from ILINet. Weekly influenza hospitalization surveillance rates from FluSurv-NET. Synthetic weekly incident hospitalization trajectories from rounds 4, 5, and 6 of the Flu Scenario Modeling Hub, filtered to all available SMH models (no model filter applied) (n=50 sampled output_type_ids)."
+data_inputs: "Weekly incident laboratory-confirmed influenza hospitalizations from NHSN. Weekly percentage of emergency department visits with an influenza diagnosis from NSSP. Weekly percentage of outpatient visits for influenza-like illness from ILINet. Weekly influenza hospitalization surveillance rates from FluSurv-NET. Synthetic weekly incident hospitalization trajectories from rounds 4, 5, and 6 of the Flu Scenario Modeling Hub, using all available SMH models (n=50 sampled per model)."
 ensemble_of_models: false
 ensemble_of_hub_models: false
