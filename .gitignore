@@ -5,3 +5,5 @@
 .Rhistory
 *.Rproj
 docs/
+**/.weather_cache/
+**/__pycache__/
