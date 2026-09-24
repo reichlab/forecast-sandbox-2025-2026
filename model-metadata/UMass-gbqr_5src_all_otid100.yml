@@ -22,7 +22,7 @@ model_contributors: [
 ]
 license: "CC-BY-4.0"
 designated_model: true
-methods: "Gradient boosting quantile regression fit to NHSN, NSSP, ILINet, FluSurv-NET data, augmented with SMH synthetic trajectories from all available SMH models (no model filter applied) (n=100 sampled output_type_ids)."
+methods: "Gradient boosting quantile regression fit to NHSN, NSSP, ILINet, FluSurv-NET data, augmented with SMH synthetic trajectories from all available SMH models (n=100 sampled output_type_ids)."
 methods_long: "
   Gradient boosting quantile regression, fit to NHSN, NSSP, ILINet, FluSurv-NET data.
   Supplemented with synthetic weekly incident hospitalization trajectories from rounds 4, 5, and 6 of the Flu Scenario Modeling Hub, filtered to all available SMH models (no model filter applied).
