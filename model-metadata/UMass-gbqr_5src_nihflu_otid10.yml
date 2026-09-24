@@ -1,0 +1,33 @@
+team_name: "UMass-Amherst"
+team_abbr: "UMass"
+model_name: "GBQR with NSSP, ILINet, FluSurv-NET and SMH synthetic trajectories (NIH-Flu_TS, n=10)"
+model_abbr: "gbqr_5src_nihflu_otid10"
+model_version: "1.0"
+model_contributors: [
+  {
+    "name": "Li Shandross",
+    "affiliation": "UMass Amherst",
+    "email": "lshandross@umass.edu"
+  },
+  {
+    "name": "Evan Ray",
+    "affiliation": "UMass Amherst",
+    "email": "elray@umass.edu"
+  },
+  {
+    "name": "Nick Reich",
+    "affiliation": "UMass Amherst",
+    "email": "nick@umass.edu"
+  }
+]
+license: "CC-BY-4.0"
+designated_model: true
+methods: "Gradient boosting quantile regression fit to NHSN, NSSP, ILINet, FluSurv-NET data, augmented with SMH synthetic trajectories from the NIH-Flu_TS model (n=10 sampled output_type_ids)."
+methods_long: "
+  Gradient boosting quantile regression, fit to NHSN, NSSP, ILINet, FluSurv-NET data.
+  Supplemented with synthetic weekly incident hospitalization trajectories from rounds 4, 5, and 6 of the Flu Scenario Modeling Hub, filtered to the NIH-Flu_TS model.
+  Output_type_ids (trajectory samples) are randomly sampled to n=10 per (round, location) group, using a fixed seed (42) for reproducibility.
+"
+data_inputs: "Weekly incident laboratory-confirmed influenza hospitalizations from NHSN. Weekly percentage of emergency department visits with an influenza diagnosis from NSSP. Weekly percentage of outpatient visits for influenza-like illness from ILINet. Weekly influenza hospitalization surveillance rates from FluSurv-NET. Synthetic weekly incident hospitalization trajectories from rounds 4, 5, and 6 of the Flu Scenario Modeling Hub, filtered to the NIH-Flu_TS model (n=10 sampled output_type_ids)."
+ensemble_of_models: false
+ensemble_of_hub_models: false
