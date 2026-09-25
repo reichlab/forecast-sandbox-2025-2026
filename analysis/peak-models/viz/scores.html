@@ -1,0 +1,329 @@
+<title>Peak Score Explorer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root {
+  --bg: #f6f7f9; --panel: #ffffff; --ink: #141820; --ink-2: #4c5563; --ink-3: #7a8391;
+  --rule: #e2e5ea; --rule-strong: #c9ced6; --control: #eef0f3; --control-on: #141820; --control-on-ink: #ffffff;
+  --focus: #2a78d6; --peak: #d9531e; --band: rgba(217, 83, 30, 0.06); --ref: #9aa1ab;
+  --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100; --s5: #e87ba4; --s6: #008300; --s7: #4a3aa7; --s8: #e34948;
+  --neutral: #6b7280; --other: #b7bdc6;
+  --good: #e7f3ec; --good-ink: #116b3a;
+  --font-ui: "Public Sans", "Helvetica Neue", Arial, sans-serif;
+  --font-num: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #111317; --panel: #181b20; --ink: #eceef2; --ink-2: #b4bac4; --ink-3: #858c98;
+    --rule: #2a2e35; --rule-strong: #3a3f48; --control: #22262d; --control-on: #eceef2; --control-on-ink: #111317;
+    --focus: #5598e7; --peak: #f07a45; --band: rgba(240, 122, 69, 0.08); --ref: #6b7280;
+    --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767;
+    --neutral: #a3a9b3; --other: #4a505a; --good: #173323; --good-ink: #7fd1a0;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #111317; --panel: #181b20; --ink: #eceef2; --ink-2: #b4bac4; --ink-3: #858c98;
+  --rule: #2a2e35; --rule-strong: #3a3f48; --control: #22262d; --control-on: #eceef2; --control-on-ink: #111317;
+  --focus: #5598e7; --peak: #f07a45; --band: rgba(240, 122, 69, 0.08); --ref: #6b7280;
+  --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767;
+  --neutral: #a3a9b3; --other: #4a505a; --good: #173323; --good-ink: #7fd1a0;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--font-ui); font-size: 14px; line-height: 1.45; }
+.wrap { max-width: 1240px; margin: 0 auto; padding-inline: 20px; padding-block: 20px 48px; display: grid; gap: 16px; }
+h1 { font-size: 22px; font-weight: 700; letter-spacing: -0.01em; margin: 0; }
+.sub { color: var(--ink-2); margin: 2px 0 0; max-width: 78ch; }
+.controls { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--panel); border: 1px solid var(--rule); border-radius: 10px; padding: 10px 12px; display: grid; gap: 10px; }
+.row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; }
+.lbl { font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-3); }
+.field { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.seg { display: inline-flex; flex-wrap: wrap; background: var(--control); border-radius: 8px; padding: 2px; gap: 2px; }
+.seg .gl { font-size: 11px; color: var(--ink-3); padding: 5px 4px 5px 8px; align-self: center; }
+.seg button, .chip { font: inherit; font-size: 13px; color: var(--ink); background: transparent; border: 0; border-radius: 6px; padding: 5px 10px; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--control-on); color: var(--control-on-ink); }
+select { font: inherit; color: var(--ink); background: var(--control); border: 0; border-radius: 7px; padding: 6px 10px; max-width: 240px; }
+.chip { background: var(--control); display: inline-flex; align-items: center; gap: 6px; }
+.chip[aria-pressed="false"] { color: var(--ink-3); }
+.chip .sw { width: 16px; height: 0; border-top: 3px solid var(--c); border-radius: 2px; }
+.chip .sw.dash { border-top-style: dashed; }
+.chip[aria-pressed="false"] .sw { border-top-color: var(--rule-strong); }
+.chipgroup { display: inline-flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.chipgroup .gl { font-size: 11px; color: var(--ink-3); }
+button:focus-visible, select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.panel { background: var(--panel); border: 1px solid var(--rule); border-radius: 10px; padding: 14px; display: grid; gap: 8px; }
+.panel h2 { font-size: 13px; font-weight: 600; margin: 0; }
+.note { font-size: 12px; color: var(--ink-2); margin: 0; max-width: 90ch; }
+.facets { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; }
+.facet h3 { font-size: 13px; font-weight: 600; margin: 0 0 4px; }
+.facet h3 span { font-weight: 400; color: var(--ink-3); font-family: var(--font-num); font-size: 11px; margin-left: 6px; }
+svg { display: block; width: 100%; height: auto; overflow: visible; }
+svg text { font-family: var(--font-ui); fill: var(--ink-2); font-size: 11px; }
+svg .num { font-family: var(--font-num); font-size: 10.5px; }
+.tip { position: fixed; pointer-events: none; z-index: 20; background: var(--panel); color: var(--ink); border: 1px solid var(--rule-strong); box-shadow: 0 4px 16px rgba(0,0,0,.12); font-size: 12px; padding: 8px 10px; border-radius: 8px; min-width: 200px; }
+.tip .t { font-weight: 600; margin-bottom: 4px; }
+.tip table { border-collapse: collapse; width: 100%; font-family: var(--font-num); font-size: 11.5px; }
+.tip td { padding: 1px 4px; }
+.tip td:last-child { text-align: right; }
+.tip .k { display: inline-block; width: 12px; height: 0; border-top: 3px solid; margin-right: 6px; vertical-align: middle; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12px; color: var(--ink-2); align-items: center; }
+.legend .k { display: inline-block; width: 18px; height: 0; border-top: 3px solid; margin-right: 6px; vertical-align: middle; }
+.legend .k.dash { border-top-style: dashed; }
+.tablewrap { overflow-x: auto; }
+table.sum { border-collapse: collapse; font-size: 12.5px; min-width: 640px; }
+table.sum th, table.sum td { padding: 5px 10px; border-bottom: 1px solid var(--rule); text-align: right; font-variant-numeric: tabular-nums; font-family: var(--font-num); }
+table.sum th { font-family: var(--font-ui); font-weight: 600; color: var(--ink-2); font-size: 12px; }
+table.sum th:first-child, table.sum td:first-child { text-align: left; font-family: var(--font-ui); }
+table.sum td.best { background: var(--good); color: var(--good-ink); font-weight: 600; }
+table.sum td .n { color: var(--ink-3); font-size: 10.5px; margin-left: 4px; }
+.empty { color: var(--ink-3); padding: 20px 0; text-align: center; }
+@media (max-width: 640px) { .wrap { padding-inline: 16px; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Peak score explorer</h1>
+    <p class="sub">Hindcast and real-time scores for the seasonal peak targets, by weeks from each location's observed peak. The sandbox models are retrospective hindcasts; the FluSight models are the forecasts teams actually submitted during 2024/25 and 2025/26.</p>
+  </header>
+
+  <section class="controls" aria-label="Score controls">
+    <div class="row">
+      <div class="field"><span class="lbl">Score</span><div class="seg" id="metric" role="group" aria-label="Score"></div></div>
+    </div>
+    <div class="row">
+      <label class="field"><span class="lbl">Locations</span><select id="loc"></select></label>
+      <div class="field"><span class="lbl">Weeks from peak</span><div class="seg" id="win" role="group" aria-label="Window around the peak"></div></div>
+    </div>
+    <div class="row"><div class="field"><span class="lbl">Models</span><div class="row" id="models" style="gap:6px 14px"></div></div></div>
+  </section>
+
+  <section class="panel" aria-labelledby="h-curves">
+    <h2 id="h-curves"><span id="metricTitle"></span> by weeks from the observed peak</h2>
+    <p class="note" id="metricNote"></p>
+    <div class="legend" id="legend"></div>
+    <div class="facets" id="facets"></div>
+    <p class="note">x = forecast (reference) date minus the observed peak week, in weeks. At 0 the forecast is made in the peak week itself, with data through the week before. Each point averages over locations with a forecast at that offset; the y-axis is shared across seasons.</p>
+  </section>
+
+  <section class="panel" aria-labelledby="h-table">
+    <h2 id="h-table">Average over the selected window</h2>
+    <p class="note" id="tableNote"></p>
+    <div class="tablewrap" id="table"></div>
+  </section>
+</div>
+<div class="tip" id="tip" hidden></div>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const NS = "http://www.w3.org/2000/svg";
+  const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+  const el = (tag, attrs = {}, parent) => { const n = document.createElementNS(NS, tag); for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v); if (parent) parent.appendChild(n); return n; };
+  const store = { get(k) { try { return localStorage.getItem("peakscores:" + k); } catch (e) { return null; } },
+                  set(k, v) { try { localStorage.setItem("peakscores:" + k, v); } catch (e) { /* unavailable */ } } };
+
+  const METRICS = {
+    log_score: { label: "Log score", group: "Peak week", better: "higher", fmt: (v) => v.toFixed(2),
+      note: "Natural log of the probability placed on the observed peak week, floored at log(1e-4) = -9.2 so that a few zero-probability forecasts do not dominate the averages. Higher is better." },
+    rps: { label: "RPS", group: "Peak week", better: "lower", fmt: (v) => v.toFixed(2),
+      note: "Ranked probability score over the 34 window weeks: squared distance between the forecast and observed cumulative distributions, so near misses cost less than far ones. Lower is better." },
+    prob_pm1: { label: "P(within 1 week)", group: "Peak week", better: "higher", fmt: (v) => (v * 100).toFixed(0) + "%",
+      note: "Probability the forecast placed within one week of the observed peak week. Higher is better." },
+    wis_log: { label: "WIS (log scale)", group: "Peak size", better: "lower", fmt: (v) => v.toFixed(3),
+      note: "Weighted interval score of the 23 peak-size quantiles on the log(count + 1) scale, so errors are relative and every location counts about equally. Lower is better." },
+    wis: { label: "WIS (count)", group: "Peak size", better: "lower", fmt: (v) => Math.round(v).toLocaleString("en-US"),
+      note: "Weighted interval score in admissions. Dominated by the national forecast and large states; pick one location to read it directly. Lower is better." },
+    cov50: { label: "50% coverage", group: "Peak size", better: "target", target: 0.5, fmt: (v) => (v * 100).toFixed(0) + "%",
+      note: "Share of forecasts whose central 50% interval contains the observed peak. Well calibrated is 50% (dotted line)." },
+    cov95: { label: "95% coverage", group: "Peak size", better: "target", target: 0.95, fmt: (v) => (v * 100).toFixed(0) + "%",
+      note: "Share of forecasts whose central 95% interval contains the observed peak. Well calibrated is 95% (dotted line)." },
+  };
+  const WINDOWS = [{ id: "near", label: "−8 to +6", lo: -8, hi: 6 }, { id: "core", label: "−4 to +4", lo: -4, hi: 4 }, { id: "wide", label: "−14 to +12", lo: -14, hi: 12 }];
+  const SEASONS = ["2023/24", "2024/25", "2025/26"];
+  // fixed color per model (identity never depends on what is selected); GBQR versions share a hue, the offset variant dashed
+  const STYLE = {
+    "UMass-peak_gbqr": { c: "--s1" }, "UMass-peak_gbqr_offset": { c: "--s1", dash: true }, "UMass-peak_kcde": { c: "--s2" },
+    "UMass-peak_baseline": { c: "--neutral" }, "FluSight-ensemble": { c: "--s3" }, "NAU-vulPES": { c: "--s4" },
+    "UGA_flucast-Copycat": { c: "--s5" }, "PSI-PROF": { c: "--s6" }, "CU-ensemble": { c: "--s7" }, "FluSight-base_seasonal": { c: "--s8" },
+  };
+  const styleOf = (id) => STYLE[id] || { c: "--other", thin: true };
+
+  let D, state = { metric: store.get("metric") || "wis_log", loc: store.get("loc") || "all", win: store.get("win") || "near", models: new Set() };
+
+  fetch("scores.json").then((r) => r.json()).then((d) => { D = d; init(); })
+    .catch(() => { $("facets").innerHTML = '<div class="empty">Could not load the scores.</div>'; });
+
+  function init() {
+    D.models.forEach((m) => { if (m.on) state.models.add(m.id); });
+    const mseg = $("metric");
+    ["Peak week", "Peak size"].forEach((g) => {
+      const gl = document.createElement("span"); gl.className = "gl"; gl.textContent = g; mseg.appendChild(gl);
+      Object.entries(METRICS).filter(([, m]) => m.group === g).forEach(([k, m]) => {
+        const b = document.createElement("button"); b.textContent = m.label; b.dataset.k = k;
+        b.addEventListener("click", () => { state.metric = k; store.set("metric", k); render(); });
+        mseg.appendChild(b);
+      });
+    });
+    const wseg = $("win");
+    WINDOWS.forEach((w) => { const b = document.createElement("button"); b.textContent = w.label; b.dataset.k = w.id;
+      b.addEventListener("click", () => { state.win = w.id; store.set("win", w.id); render(); }); wseg.appendChild(b); });
+    const sel = $("loc");
+    [["all", "All locations (US + states)"], ["states", "States only"], ["US", "United States (national)"]].forEach(([v, t]) => {
+      const o = document.createElement("option"); o.value = v; o.textContent = t; sel.appendChild(o); });
+    const og = document.createElement("optgroup"); og.label = "Single state";
+    D.locations.filter((l) => l.id !== "US").forEach((l) => { const o = document.createElement("option"); o.value = l.id; o.textContent = l.name; og.appendChild(o); });
+    sel.appendChild(og); sel.value = state.loc;
+    sel.addEventListener("change", () => { state.loc = sel.value; store.set("loc", state.loc); render(); });
+
+    const mbox = $("models");
+    [[true, "Sandbox"], [false, "FluSight hub"]].forEach(([sb, name]) => {
+      const grp = document.createElement("span"); grp.className = "chipgroup"; grp.innerHTML = `<span class="gl">${name}</span>`;
+      D.models.filter((m) => m.sandbox === sb).forEach((m) => {
+        const st = styleOf(m.id);
+        const b = document.createElement("button"); b.className = "chip"; b.setAttribute("aria-pressed", state.models.has(m.id));
+        b.style.setProperty("--c", `var(${st.c})`);
+        b.innerHTML = `<span class="sw${st.dash ? " dash" : ""}"></span>${m.label}`;
+        b.addEventListener("click", () => { if (state.models.has(m.id)) state.models.delete(m.id); else state.models.add(m.id); b.setAttribute("aria-pressed", state.models.has(m.id)); render(); });
+        grp.appendChild(b);
+      });
+      mbox.appendChild(grp);
+    });
+    window.addEventListener("resize", render);
+    render();
+  }
+
+  function filteredRows() {
+    const mi = D.columns.indexOf(state.metric);
+    const ids = D.models.map((m) => m.id);
+    return D.rows.filter((r) => {
+      if (!state.models.has(ids[r[0]]) || r[mi] == null) return false;
+      if (state.loc === "all") return true;
+      if (state.loc === "states") return r[2] !== "US";
+      return r[2] === state.loc;
+    }).map((r) => ({ model: ids[r[0]], season: r[1], loc: r[2], wfp: r[3], v: r[mi] }));
+  }
+
+  function aggregate(rows, lo, hi) {
+    // mean by (season, model, wfp) within [lo, hi]
+    const acc = new Map();
+    rows.forEach((r) => { if (r.wfp < lo || r.wfp > hi) return; const k = r.season + "|" + r.model + "|" + r.wfp; const a = acc.get(k) || [0, 0]; a[0] += r.v; a[1] += 1; acc.set(k, a); });
+    const out = {};
+    acc.forEach(([s, n], k) => { const [season, model, wfp] = k.split("|"); ((out[season] ||= {})[model] ||= {})[wfp] = { mean: s / n, n }; });
+    return out;
+  }
+
+  function render() {
+    if (!D) return;
+    const M = METRICS[state.metric], W = WINDOWS.find((w) => w.id === state.win);
+    document.querySelectorAll("#metric button").forEach((b) => b.setAttribute("aria-pressed", b.dataset.k === state.metric));
+    document.querySelectorAll("#win button").forEach((b) => b.setAttribute("aria-pressed", b.dataset.k === state.win));
+    $("metricTitle").textContent = `${M.group}: ${M.label}`;
+    $("metricNote").textContent = M.note;
+    const rows = filteredRows();
+    const agg = aggregate(rows, W.lo, W.hi);
+    const models = D.models.filter((m) => state.models.has(m.id));
+    const minN = state.loc === "all" || state.loc === "states" ? 5 : 1;
+
+    // legend
+    $("legend").innerHTML = models.map((m) => { const st = styleOf(m.id); return `<span><span class="k${st.dash ? " dash" : ""}" style="border-top-color:var(${st.c})"></span>${m.label}</span>`; }).join("");
+
+    // shared y-domain across seasons
+    let vals = [];
+    SEASONS.forEach((s) => models.forEach((m) => Object.values(agg[s]?.[m.id] || {}).forEach((p) => { if (p.n >= minN) vals.push(p.mean); })));
+    if (M.target != null) vals.push(M.target);
+    const box = $("facets"); box.innerHTML = "";
+    if (!vals.length) { box.innerHTML = '<div class="empty">No scores for this selection.</div>'; $("table").innerHTML = ""; return; }
+    let yLo = Math.min(...vals), yHi = Math.max(...vals);
+    if (M.group === "Peak size" && state.metric.startsWith("cov")) { yLo = Math.min(yLo, 0); yHi = 1; }
+    const pad = (yHi - yLo) * 0.08 || 0.1; yLo -= pad; yHi += pad;
+    if (["rps", "wis_log", "wis", "prob_pm1"].includes(state.metric)) yLo = Math.max(0, yLo);
+
+    SEASONS.forEach((season) => {
+      const f = document.createElement("div"); f.className = "facet";
+      const nForecasts = rows.filter((r) => r.season === season && r.wfp >= W.lo && r.wfp <= W.hi).length;
+      f.innerHTML = `<h3>${season}<span>${nForecasts.toLocaleString("en-US")} scored forecasts</span></h3>`;
+      box.appendChild(f);
+      drawFacet(f, season, agg[season] || {}, models, W, yLo, yHi, M, minN);
+    });
+    drawTable(rows, W, M, models);
+  }
+
+  function drawFacet(host, season, aggS, models, W, yLo, yHi, M, minN) {
+    const Wd = 380, H = 230, l = 44, r = 10, t = 10, b = 30;
+    const svg = el("svg", { viewBox: `0 0 ${Wd} ${H}`, role: "img", "aria-label": `${M.label} by weeks from peak, ${season}` }, host);
+    const x = (w) => l + (w - W.lo) / (W.hi - W.lo) * (Wd - l - r);
+    const y = (v) => t + (1 - (v - yLo) / (yHi - yLo)) * (H - t - b);
+    // peak band and line
+    el("rect", { x: x(-0.5), y: t, width: x(0.5) - x(-0.5), height: H - t - b, fill: css("--band") }, svg);
+    // grid + y ticks
+    niceTicks(yLo, yHi, 5).forEach((v) => {
+      el("line", { x1: l, x2: Wd - r, y1: y(v), y2: y(v), stroke: css("--rule") }, svg);
+      const tx = el("text", { x: l - 6, y: y(v) + 3.5, "text-anchor": "end", class: "num" }, svg); tx.textContent = M.fmt(v);
+    });
+    if (M.target != null) el("line", { x1: l, x2: Wd - r, y1: y(M.target), y2: y(M.target), stroke: css("--ref"), "stroke-dasharray": "2 3", "stroke-width": 1.5 }, svg);
+    for (let w = W.lo; w <= W.hi; w++) {
+      if (w % 2 !== 0 && W.hi - W.lo > 14) continue;
+      const tx = el("text", { x: x(w), y: H - b + 14, "text-anchor": "middle", class: "num" }, svg); tx.textContent = w > 0 ? "+" + w : String(w);
+    }
+    el("line", { x1: x(0), x2: x(0), y1: t, y2: H - b, stroke: css("--peak"), "stroke-width": 1 }, svg);
+    const pk = el("text", { x: x(0) + 4, y: t + 10, fill: css("--peak") }, svg); pk.textContent = "peak"; pk.style.fill = css("--peak");
+    const xl = el("text", { x: Wd - r, y: H - 2, "text-anchor": "end" }, svg); xl.textContent = "weeks from observed peak";
+    // lines (reference / thin models first so the main models sit on top)
+    const order = [...models].sort((a, bb) => (styleOf(bb.id).thin ? 1 : 0) - (styleOf(a.id).thin ? 1 : 0));
+    order.forEach((m) => {
+      const pts = [];
+      for (let w = W.lo; w <= W.hi; w++) { const p = aggS[m.id]?.[w]; if (p && p.n >= minN) pts.push([x(w), y(p.mean)]); else pts.push(null); }
+      const st = styleOf(m.id);
+      let d = "", pen = false;
+      pts.forEach((p) => { if (!p) { pen = false; return; } d += (pen ? "L" : "M") + p[0].toFixed(1) + " " + p[1].toFixed(1); pen = true; });
+      if (d) el("path", { d, fill: "none", stroke: css(st.c), "stroke-width": st.thin ? 1.25 : 2, "stroke-dasharray": st.dash ? "5 3" : "none", "stroke-linejoin": "round", "stroke-linecap": "round" }, svg);
+    });
+    // hover: crosshair + tooltip listing every model at that offset
+    const cross = el("line", { x1: 0, x2: 0, y1: t, y2: H - b, stroke: css("--ink-3"), "stroke-width": 1, visibility: "hidden" }, svg);
+    const hit = el("rect", { x: l, y: t, width: Wd - l - r, height: H - t - b, fill: "transparent" }, svg);
+    hit.addEventListener("mousemove", (e) => {
+      const rect = svg.getBoundingClientRect();
+      const px = (e.clientX - rect.left) / rect.width * Wd;
+      const w = Math.round(W.lo + (px - l) / (Wd - l - r) * (W.hi - W.lo));
+      if (w < W.lo || w > W.hi) return;
+      cross.setAttribute("x1", x(w)); cross.setAttribute("x2", x(w)); cross.setAttribute("visibility", "visible");
+      const items = models.map((m) => ({ m, p: aggS[m.id]?.[w] })).filter((o) => o.p && o.p.n >= minN)
+        .sort((a, bb) => (M.better === "lower" ? a.p.mean - bb.p.mean : M.better === "higher" ? bb.p.mean - a.p.mean : Math.abs(a.p.mean - M.target) - Math.abs(bb.p.mean - M.target)));
+      const tip = $("tip");
+      tip.innerHTML = `<div class="t">${season} · ${w === 0 ? "peak week" : (w > 0 ? w + " wk after peak" : -w + " wk before peak")}</div>` +
+        (items.length ? `<table>${items.map((o) => `<tr><td><span class="k" style="border-top-color:var(${styleOf(o.m.id).c})"></span>${o.m.label}</td><td>${M.fmt(o.p.mean)}</td><td style="color:var(--ink-3)">n=${o.p.n}</td></tr>`).join("")}</table>` : "No forecasts at this offset");
+      tip.hidden = false;
+      const tx = Math.min(window.innerWidth - tip.offsetWidth - 12, e.clientX + 14);
+      tip.style.left = tx + "px"; tip.style.top = Math.max(8, e.clientY - tip.offsetHeight / 2) + "px";
+    });
+    hit.addEventListener("mouseleave", () => { $("tip").hidden = true; cross.setAttribute("visibility", "hidden"); });
+  }
+
+  function drawTable(rows, W, M, models) {
+    const inWin = rows.filter((r) => r.wfp >= W.lo && r.wfp <= W.hi);
+    const cols = [...SEASONS, "All seasons"];
+    const cell = (m, s) => { const rr = inWin.filter((r) => r.model === m.id && (s === "All seasons" || r.season === s)); if (!rr.length) return null; return { mean: rr.reduce((a, r) => a + r.v, 0) / rr.length, n: rr.length }; };
+    const grid = models.map((m) => ({ m, cells: cols.map((s) => cell(m, s)) }));
+    const best = cols.map((_, j) => {
+      const vs = grid.map((g) => g.cells[j]?.mean).filter((v) => v != null);
+      if (!vs.length) return null;
+      if (M.better === "lower") return Math.min(...vs);
+      if (M.better === "higher") return Math.max(...vs);
+      return vs.reduce((a, v) => (Math.abs(v - M.target) < Math.abs(a - M.target) ? v : a));
+    });
+    $("tableNote").textContent = `Mean ${M.label} for forecasts made ${W.label} weeks from the observed peak. Highlighted: best in each column (${M.better === "target" ? "closest to " + (M.target * 100) + "%" : M.better + " is better"}). Models are compared on whatever forecasts they submitted, so hub columns can cover fewer dates or locations; n is the number of forecasts.`;
+    $("table").innerHTML = `<table class="sum"><thead><tr><th>Model</th>${cols.map((c) => `<th>${c}</th>`).join("")}</tr></thead><tbody>` +
+      grid.map((g) => `<tr><td><span class="legend" style="display:inline"><span class="k${styleOf(g.m.id).dash ? " dash" : ""}" style="border-top-color:var(${styleOf(g.m.id).c})"></span></span>${g.m.label}</td>` +
+        g.cells.map((c, j) => c ? `<td class="${c.mean === best[j] ? "best" : ""}">${M.fmt(c.mean)}<span class="n">${c.n}</span></td>` : `<td style="color:var(--ink-3)">–</td>`).join("") + "</tr>").join("") +
+      "</tbody></table>";
+  }
+
+  function niceTicks(lo, hi, n) {
+    const span = hi - lo, step0 = span / n, mag = Math.pow(10, Math.floor(Math.log10(step0)));
+    const step = [1, 2, 2.5, 5, 10].map((m) => m * mag).find((s) => s >= step0) || 10 * mag;
+    const out = []; for (let v = Math.ceil(lo / step) * step; v <= hi + 1e-9; v += step) out.push(+v.toFixed(10));
+    return out;
+  }
+})();
+</script>

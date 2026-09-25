@@ -1,0 +1,22 @@
+team_name: "UMass-Amherst"
+team_abbr: "UMass"
+model_name: "Peak conditional climatology baseline"
+model_abbr: "peak_baseline"
+model_version: "0.1"
+model_contributors: [
+  {
+    "name": "Nick Reich",
+    "affiliation": "UMass Amherst",
+    "email": "nick@umass.edu"
+  }
+]
+license: "CC-BY-4.0"
+designated_model: false
+methods: "Conditional climatology for peak week and peak size: historical frequencies conditioned on season week and weeks since the running maximum."
+methods_long: "
+  Baseline model (FluSight baseline_model: true) for the seasonal targets peak week inc flu hosp and peak inc flu hosp. The probability that the season has already peaked is the smoothed empirical frequency, in historical seasons of NHSN, ILINet x WHO-NREVSS percent positive and FluSurv-NET data, with which the running maximum at the same season week and weeks-since-maximum was the final peak; remaining probability is spread over later weeks by the smoothed climatological peak-week distribution. Peak size is the running maximum times exp(z), with z drawn from the empirical distribution of the remaining log growth among historical rows at a similar season week. Training uses only seasons before the forecast season.
+  Backfill adjustment: revisions to the most recent 10 weeks of NHSN counts are simulated by resampling historical revision vectors (log ratio of final to first-reported counts) estimated from NHSN data vintages; features and predictions are recomputed for each of 200 simulated revised series and averaged, which puts probability on past weeks that could be revised to become the peak. Every peak-week probability is floored at 1e-4.
+"
+data_inputs: "NHSN weekly laboratory-confirmed influenza hospital admissions (with data vintages); ILINet weighted ILI x WHO-NREVSS percent positive; FluSurv-NET hospitalization rates."
+ensemble_of_models: false
+ensemble_of_hub_models: false

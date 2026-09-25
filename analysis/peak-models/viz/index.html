@@ -1,0 +1,539 @@
+<title>Flu Peak Viewer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root {
+  --bg: #f6f7f9;
+  --panel: #ffffff;
+  --ink: #141820;
+  --ink-2: #4c5563;
+  --ink-3: #7a8391;
+  --rule: #e2e5ea;
+  --rule-strong: #c9ced6;
+  --control: #eef0f3;
+  --control-on: #141820;
+  --control-on-ink: #ffffff;
+  --seq-0: #eef3fa;
+  --seq-1: #cde2fb; --seq-2: #9ec5f4; --seq-3: #6da7ec; --seq-4: #3987e5;
+  --seq-5: #256abf; --seq-6: #184f95; --seq-7: #0d366b;
+  --truth: #d9531e;
+  --future: #b7bdc6;
+  --now: #141820;
+  --interval-95: #b7d3f6;
+  --interval-50: #5598e7;
+  --median: #0d366b;
+  --focus: #2a78d6;
+  --font-ui: "Public Sans", "Helvetica Neue", Arial, sans-serif;
+  --font-num: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #111317; --panel: #181b20; --ink: #eceef2; --ink-2: #b4bac4; --ink-3: #858c98;
+    --rule: #2a2e35; --rule-strong: #3a3f48; --control: #22262d; --control-on: #eceef2; --control-on-ink: #111317;
+    --seq-0: #1d2229;
+    --seq-1: #16345c; --seq-2: #184f95; --seq-3: #1c5cab; --seq-4: #2a78d6;
+    --seq-5: #5598e7; --seq-6: #86b6ef; --seq-7: #cde2fb;
+    --truth: #f07a45; --future: #4a505a; --now: #eceef2;
+    --interval-95: #1c3f6e; --interval-50: #3987e5; --median: #cde2fb; --focus: #5598e7;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #111317; --panel: #181b20; --ink: #eceef2; --ink-2: #b4bac4; --ink-3: #858c98;
+  --rule: #2a2e35; --rule-strong: #3a3f48; --control: #22262d; --control-on: #eceef2; --control-on-ink: #111317;
+  --seq-0: #1d2229;
+  --seq-1: #16345c; --seq-2: #184f95; --seq-3: #1c5cab; --seq-4: #2a78d6;
+  --seq-5: #5598e7; --seq-6: #86b6ef; --seq-7: #cde2fb;
+  --truth: #f07a45; --future: #4a505a; --now: #eceef2;
+  --interval-95: #1c3f6e; --interval-50: #3987e5; --median: #cde2fb; --focus: #5598e7;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--font-ui); font-size: 14px; line-height: 1.45; }
+.wrap { max-width: 1180px; margin: 0 auto; padding-inline: 20px; padding-block: 20px 48px; display: grid; gap: 16px; }
+header.top { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 24px; }
+h1 { font-size: 22px; font-weight: 700; letter-spacing: -0.01em; margin: 0; text-wrap: balance; }
+.sub { color: var(--ink-2); margin: 2px 0 0; max-width: 68ch; }
+.status { font-family: var(--font-num); font-size: 12px; color: var(--ink-3); }
+
+/* control bar */
+.controls { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--panel); border: 1px solid var(--rule); border-radius: 10px; padding: 10px 12px; display: grid; gap: 10px; }
+.row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; }
+.field { display: flex; align-items: center; gap: 8px; }
+.field > .lbl { font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-3); }
+select { font: inherit; color: var(--ink); background: var(--control); border: 1px solid transparent; border-radius: 7px; padding: 6px 28px 6px 10px; appearance: none;
+  background-image: linear-gradient(45deg, transparent 50%, var(--ink-2) 50%), linear-gradient(135deg, var(--ink-2) 50%, transparent 50%);
+  background-position: calc(100% - 14px) 52%, calc(100% - 9px) 52%; background-size: 5px 5px; background-repeat: no-repeat; max-width: 220px; }
+.seg { display: inline-flex; background: var(--control); border-radius: 8px; padding: 2px; gap: 2px; }
+.seg button, .chip, .step { font: inherit; font-size: 13px; color: var(--ink); background: transparent; border: 0; border-radius: 6px; padding: 5px 10px; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--control-on); color: var(--control-on-ink); }
+.seg button:disabled { color: var(--ink-3); cursor: not-allowed; }
+.chip { background: var(--control); display: inline-flex; align-items: center; gap: 6px; }
+.chip[aria-pressed="false"] { color: var(--ink-3); text-decoration: line-through; }
+.chipgroup { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.chipgroup .glbl { font-size: 11px; color: var(--ink-3); margin-right: 2px; }
+.chip:disabled { opacity: 0.4; cursor: not-allowed; text-decoration: none; }
+.chip .sw { width: 10px; height: 10px; border-radius: 3px; background: var(--seq-5); }
+.chip[aria-pressed="false"] .sw { background: var(--rule-strong); }
+.timeline { display: grid; grid-template-columns: auto auto 1fr auto; align-items: center; gap: 8px 10px; }
+.step { background: var(--control); width: 32px; height: 30px; padding: 0; font-size: 15px; line-height: 1; }
+.step:disabled { color: var(--ink-3); opacity: 0.45; cursor: not-allowed; }
+.refdate { font-family: var(--font-num); font-size: 13px; white-space: nowrap; }
+.refdate b { font-weight: 500; }
+.refdate .count { color: var(--ink-3); margin-left: 6px; }
+input[type="range"] { width: 100%; accent-color: var(--ink); }
+button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+/* panels */
+.panel { background: var(--panel); border: 1px solid var(--rule); border-radius: 10px; padding: 14px 14px 10px; display: grid; gap: 6px; }
+.panel h2 { font-size: 13px; font-weight: 600; margin: 0; letter-spacing: 0.01em; }
+.panel .note { font-size: 12px; color: var(--ink-2); margin: 0; }
+.chart { width: 100%; overflow-x: auto; }
+svg { display: block; }
+svg text { font-family: var(--font-ui); fill: var(--ink-2); font-size: 11px; }
+svg .num { font-family: var(--font-num); }
+svg .strong { fill: var(--ink); font-weight: 600; font-size: 12px; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: center; font-size: 12px; color: var(--ink-2); }
+.ramp { display: inline-grid; grid-auto-flow: column; gap: 2px; vertical-align: middle; }
+.ramp { gap: 2px 3px; }
+.ramp span { display: grid; gap: 2px; justify-items: center; font-family: var(--font-num); font-size: 10px; color: var(--ink-3); }
+.ramp i { width: 26px; height: 10px; border-radius: 2px; display: block; }
+.key { display: inline-flex; align-items: center; gap: 6px; }
+.key .tri { width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 8px solid var(--truth); }
+.key .bar { width: 2px; height: 12px; background: var(--now); }
+.key .fut { width: 14px; height: 2px; background: var(--future); }
+.empty { padding: 28px 8px; text-align: center; color: var(--ink-3); }
+
+.tip { position: fixed; pointer-events: none; z-index: 20; background: var(--ink); color: var(--bg); font-size: 12px; padding: 6px 8px; border-radius: 6px; font-family: var(--font-num); white-space: nowrap; transform: translate(-50%, calc(-100% - 10px)); }
+details { font-size: 13px; }
+summary { cursor: pointer; color: var(--ink-2); }
+table { border-collapse: collapse; font-family: var(--font-num); font-size: 12px; margin-top: 8px; }
+th, td { text-align: right; padding: 3px 10px; border-bottom: 1px solid var(--rule); font-variant-numeric: tabular-nums; }
+th:first-child, td:first-child { text-align: left; }
+th { font-family: var(--font-ui); font-weight: 600; color: var(--ink-2); }
+@media (max-width: 640px) {
+  .wrap { padding-inline: 16px; }
+  .timeline { grid-template-columns: auto 1fr auto; }
+  .timeline .play { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>Flu season peak forecasts</h1>
+      <p class="sub">Probability that weekly flu hospital admissions (NHSN) peak in each week of the season, and forecasts of the peak weekly count, from the sandbox peak models and the real-time FluSight hub submissions.</p>
+    </div>
+    <span class="status" id="status"></span>
+  </header>
+
+  <section class="controls" aria-label="Forecast controls">
+    <div class="row">
+      <label class="field"><span class="lbl">Location</span><select id="loc"></select></label>
+      <div class="field"><span class="lbl">Season</span><div class="seg" id="season" role="group" aria-label="Season"></div></div>
+      <div class="field"><span class="lbl">Models</span><div class="row" id="models" style="gap:6px"></div></div>
+    </div>
+    <div class="timeline">
+      <button class="step" id="prev" aria-label="Previous forecast date" title="Previous (←)">‹</button>
+      <div class="refdate">Forecast date <b id="refLabel">–</b> <span id="refCount" class="count"></span></div>
+      <input type="range" id="ref" min="0" max="0" value="0" aria-label="Forecast date">
+      <div style="display:flex;gap:6px">
+        <button class="step" id="next" aria-label="Next forecast date" title="Next (→)">›</button>
+        <button class="step play" id="play" aria-label="Play through the season" title="Play">▶</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel" aria-labelledby="h-obs">
+    <h2 id="h-obs">Weekly hospital admissions</h2>
+    <p class="note" id="obsNote"></p>
+    <div class="chart" id="obsChart"></div>
+  </section>
+
+  <section class="panel" aria-labelledby="h-week">
+    <h2 id="h-week">When will admissions peak?</h2>
+    <div class="legend">
+      <span class="key">Probability of peaking that week <span class="ramp" id="rampKey"></span></span>
+      <span class="key"><span class="tri"></span>Observed peak week</span>
+      <span class="key"><span class="bar"></span>Forecast date</span>
+    </div>
+    <div class="chart" id="weekChart"></div>
+  </section>
+
+  <section class="panel" aria-labelledby="h-size">
+    <h2 id="h-size">How high will the peak be?</h2>
+    <p class="note">Peak weekly admissions: median (dot), 50% and 95% prediction intervals. The orange line is the observed peak. The axis is fixed for each location; an arrow means the interval extends past it.</p>
+    <div class="chart" id="sizeChart"></div>
+    <details><summary>Show forecast values as a table</summary><div id="table"></div></details>
+  </section>
+</div>
+<div class="tip" id="tip" hidden></div>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const NS = "http://www.w3.org/2000/svg";
+  const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+  const fmt = new Intl.NumberFormat("en-US");
+  const dfmt = (d, opts = { month: "short", day: "numeric" }) =>
+    new Date(d + "T12:00:00").toLocaleDateString("en-US", opts);
+  const store = {
+    get(k) { try { return localStorage.getItem("peakviz:" + k); } catch (e) { return null; } },
+    set(k, v) { try { localStorage.setItem("peakviz:" + k, v); } catch (e) { /* storage unavailable */ } },
+  };
+  const el = (tag, attrs = {}, parent) => {
+    const n = document.createElementNS(NS, tag);
+    for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v);
+    if (parent) parent.appendChild(n);
+    return n;
+  };
+
+  // fixed probability bins for color, identical for every date, location and model;
+  // finer at the low end, where most weeks' probabilities fall
+  const BINS = [
+    { lo: 0, label: "<1%" }, { lo: 0.01, label: "1%" }, { lo: 0.02, label: "2%" }, { lo: 0.05, label: "5%" },
+    { lo: 0.1, label: "10%" }, { lo: 0.2, label: "20%" }, { lo: 0.4, label: "40%" }, { lo: 0.7, label: "70%+" },
+  ];
+  let D, state = { loc: "US", season: null, refIdx: 0, models: new Set(), playing: null };
+
+  fetch("data.json").then((r) => r.json()).then((data) => { D = normalize(data); init(); })
+    .catch(() => { $("status").textContent = "Could not load forecast data."; });
+
+  function normalize(data) {
+    const k = data.p_scale || 1;
+    Object.values(data.seasons).forEach((S) => Object.values(S.forecasts).forEach((bym) =>
+      Object.values(bym).forEach((byl) => Object.values(byl).forEach((f) => { if (f.p) f.p = f.p.map((v) => v / k); }))));
+    return data;
+  }
+  const inSeason = (m) => (D.seasons[state.season].models || []).includes(m.id);
+  const shown = () => D.models.filter((m) => state.models.has(m.id) && inSeason(m));
+  const short = (label) => (label.length > 22 ? label.slice(0, 21) + "…" : label);
+
+  function init() {
+    const seasons = Object.keys(D.seasons).filter((s) => D.seasons[s].refs.length > 0);
+    state.season = store.get("season") && seasons.includes(store.get("season")) ? store.get("season") : seasons[seasons.length - 1];
+    state.loc = store.get("loc") || "US";
+    D.models.forEach((m) => { if (m.on) state.models.add(m.id); });
+
+    const sel = $("loc");
+    D.locations.forEach((l) => { const o = document.createElement("option"); o.value = l.id; o.textContent = l.name; sel.appendChild(o); });
+    sel.value = state.loc;
+    sel.addEventListener("change", () => { state.loc = sel.value; store.set("loc", state.loc); render(); });
+
+    const seg = $("season");
+    Object.keys(D.seasons).forEach((s) => {
+      const b = document.createElement("button");
+      b.textContent = s; b.dataset.season = s;
+      b.disabled = D.seasons[s].refs.length === 0;
+      if (b.disabled) b.title = "No forecasts yet";
+      b.addEventListener("click", () => { state.season = s; store.set("season", s); state.refIdx = defaultRef(); syncControls(); render(); });
+      seg.appendChild(b);
+    });
+
+    const mbox = $("models");
+    [["sandbox", "Sandbox"], ["hub", "FluSight hub"]].forEach(([g, name]) => {
+      const ms = D.models.filter((m) => m.group === g);
+      if (!ms.length) return;
+      const grp = document.createElement("span");
+      grp.className = "chipgroup";
+      grp.innerHTML = `<span class="glbl">${name}</span>`;
+      ms.forEach((m) => {
+        const b = document.createElement("button");
+        b.className = "chip"; b.dataset.model = m.id; b.setAttribute("aria-pressed", state.models.has(m.id));
+        b.innerHTML = `<span class="sw"></span>${m.label}`;
+        b.addEventListener("click", () => {
+          if (state.models.has(m.id)) state.models.delete(m.id); else state.models.add(m.id);
+          b.setAttribute("aria-pressed", state.models.has(m.id)); render();
+        });
+        grp.appendChild(b);
+      });
+      mbox.appendChild(grp);
+    });
+
+    $("ref").addEventListener("input", (e) => { state.refIdx = +e.target.value; render(); });
+    $("prev").addEventListener("click", () => stepRef(-1));
+    $("next").addEventListener("click", () => stepRef(1));
+    $("play").addEventListener("click", togglePlay);
+    document.addEventListener("keydown", (e) => {
+      if (e.target.tagName === "SELECT" || e.target.tagName === "INPUT") return;
+      if (e.key === "ArrowLeft") stepRef(-1);
+      if (e.key === "ArrowRight") stepRef(1);
+    });
+    const ramp = $("rampKey");
+    BINS.forEach((b, i) => {
+      const cell = document.createElement("span");
+      cell.innerHTML = `<i style="background:var(--seq-${i})"></i>${b.label}`;
+      ramp.appendChild(cell);
+    });
+    window.addEventListener("resize", () => render());
+    state.refIdx = defaultRef();
+    syncControls(); render();
+  }
+
+  function defaultRef() {
+    // open on the forecast date closest to the national observed peak, where the models disagree most
+    const S = D.seasons[state.season];
+    const t = S.truth["US"];
+    if (!t) return S.refs.length - 1;
+    const peakDate = S.dates[t.week];
+    let best = 0;
+    S.refs.forEach((r, i) => { if (Math.abs(new Date(r) - new Date(peakDate)) < Math.abs(new Date(S.refs[best]) - new Date(peakDate))) best = i; });
+    return best;
+  }
+
+  function stepRef(d) {
+    const n = D.seasons[state.season].refs.length;
+    state.refIdx = Math.min(n - 1, Math.max(0, state.refIdx + d));
+    render();
+  }
+
+  function togglePlay() {
+    if (state.playing) { clearInterval(state.playing); state.playing = null; $("play").textContent = "▶"; return; }
+    const n = D.seasons[state.season].refs.length;
+    if (state.refIdx >= n - 1) state.refIdx = 0;
+    $("play").textContent = "❚❚";
+    state.playing = setInterval(() => {
+      if (state.refIdx >= D.seasons[state.season].refs.length - 1) { togglePlay(); return; }
+      stepRef(1);
+    }, 900);
+  }
+
+  function syncControls() {
+    document.querySelectorAll("#season button").forEach((b) => b.setAttribute("aria-pressed", b.dataset.season === state.season));
+    const avail = new Set(D.seasons[state.season].models || []);
+    document.querySelectorAll("#models .chip").forEach((b) => {
+      b.disabled = !avail.has(b.dataset.model);
+      b.title = b.disabled ? "No peak forecasts from this model in " + state.season : "";
+    });
+  }
+
+  // ---------- rendering
+  function render() {
+    if (!D) return;
+    const S = D.seasons[state.season];
+    const n = S.refs.length;
+    const ref = S.refs[state.refIdx];
+    const range = $("ref");
+    range.max = n - 1; range.value = state.refIdx;
+    $("prev").disabled = state.refIdx === 0; $("next").disabled = state.refIdx === n - 1;
+    $("refLabel").textContent = dfmt(ref, { month: "short", day: "numeric", year: "numeric" });
+    $("refCount").textContent = n === 1 ? "(only forecast date so far)" : `${state.refIdx + 1} of ${n}`;
+    const loc = D.locations.find((l) => l.id === state.loc);
+    const vis = shown();
+    const complete = vis.filter((m) => (S.forecasts[ref] || {})[m.id]).length;
+    $("status").textContent = `${n} forecast date${n === 1 ? "" : "s"} in ${state.season} · ${complete} of ${vis.length} selected models on this date`;
+
+    const W = Math.max(560, $("weekChart").clientWidth);
+    const layout = { W, left: 172, right: 14 };
+    layout.cw = (W - layout.left - layout.right) / S.dates.length;
+    drawObserved(S, ref, loc, layout);
+    drawWeeks(S, ref, layout);
+    drawSize(S, ref, loc);
+  }
+
+  const xOf = (L, i) => L.left + i * L.cw;
+  const refIndex = (S, ref) => {
+    // forecast date's week within the window (data run through the week before it)
+    const i = S.dates.indexOf(ref);
+    if (i >= 0) return i;
+    return ref < S.dates[0] ? -0.5 : S.dates.length - 0.5;
+  };
+
+  function monthTicks(S, L, g, y) {
+    let last = "";
+    S.dates.forEach((d, i) => {
+      const m = dfmt(d, { month: "short" });
+      if (m !== last) {
+        el("line", { x1: xOf(L, i), x2: xOf(L, i), y1: y - 4, y2: y, stroke: css("--rule-strong") }, g);
+        const t = el("text", { x: xOf(L, i) + 3, y: y + 12 }, g); t.textContent = m;
+        last = m;
+      }
+    });
+  }
+
+  function drawObserved(S, ref, loc, L) {
+    const box = $("obsChart"); box.innerHTML = "";
+    const obs = S.obs[state.loc] || [];
+    const truth = S.truth[state.loc];
+    const H = 150, top = 10, bottom = 26, h = H - top - bottom;
+    const svg = el("svg", { width: L.W, height: H, viewBox: `0 0 ${L.W} ${H}`, role: "img",
+      "aria-label": `Weekly flu hospital admissions in ${loc.name}, ${state.season}` }, box);
+    const max = Math.max(1, ...obs.filter((v) => v != null));
+    const niceMax = niceCeil(max);
+    const y = (v) => top + h - (v / niceMax) * h;
+    [0, 0.5, 1].forEach((f) => {
+      el("line", { x1: L.left, x2: L.W - L.right, y1: y(niceMax * f), y2: y(niceMax * f), stroke: css("--rule") }, svg);
+      const t = el("text", { x: L.left - 8, y: y(niceMax * f) + 4, "text-anchor": "end", class: "num" }, svg);
+      t.textContent = fmt.format(Math.round(niceMax * f));
+    });
+    monthTicks(S, L, svg, top + h + 4);
+    const ri = refIndex(S, ref);
+    const pts = obs.map((v, i) => v == null ? null : [xOf(L, i) + L.cw / 2, y(v)]);
+    const path = (arr) => arr.filter(Boolean).map((p, i) => (i ? "L" : "M") + p[0].toFixed(1) + " " + p[1].toFixed(1)).join("");
+    const seen = pts.map((p, i) => (i < ri ? p : null));
+    const later = pts.map((p, i) => (i >= Math.floor(ri) - 1 ? p : null));
+    el("path", { d: path(later), fill: "none", stroke: css("--future"), "stroke-width": 2, "stroke-dasharray": "3 3" }, svg);
+    el("path", { d: path(seen), fill: "none", stroke: css("--ink"), "stroke-width": 2 }, svg);
+    if (truth) {
+      const [px, py] = pts[truth.week] || [];
+      if (px != null) {
+        el("path", { d: `M${px - 5} ${py - 12} L${px + 5} ${py - 12} L${px} ${py - 4} Z`, fill: css("--truth") }, svg);
+      }
+    }
+    drawNow(svg, L, ri, top, top + h);
+    const t0 = el("text", { x: L.left - 8, y: top + h + 16, "text-anchor": "end" }, svg); t0.textContent = loc.abbr;
+    $("obsNote").textContent = truth
+      ? `Solid: data available before the forecast date. Dashed: data reported later. Observed peak ${fmt.format(truth.count)} admissions in the week ending ${dfmt(S.dates[truth.week])}.`
+      : "Solid: data available before the forecast date. Dashed: data reported later.";
+  }
+
+  function drawNow(svg, L, ri, y0, y1) {
+    const x = xOf(L, ri) + L.cw / 2 - L.cw; // data run through the week before the forecast date
+    el("line", { x1: x + L.cw / 2, x2: x + L.cw / 2, y1: y0 - 4, y2: y1, stroke: css("--now"), "stroke-width": 1.5 }, svg);
+  }
+
+  function colorFor(p) {
+    let k = 0;
+    BINS.forEach((b, i) => { if (p >= b.lo) k = i; });
+    return css(`--seq-${k}`);
+  }
+  function drawWeeks(S, ref, L) {
+    const box = $("weekChart"); box.innerHTML = "";
+    const fc = S.forecasts[ref] || {};
+    const models = shown();
+    if (!models.length) { box.innerHTML = '<div class="empty">Select at least one model.</div>'; return; }
+    const rowH = 84, gap = 14, top = 10, bottom = 28;
+    const H = top + models.length * (rowH + gap) - gap + bottom;
+    const svg = el("svg", { width: L.W, height: H, viewBox: `0 0 ${L.W} ${H}`, role: "img", "aria-label": "Peak week probabilities by model" }, box);
+    // fixed vertical scale: 0 to 100% in every row, date and location
+    const yP = (p, y0) => y0 + rowH - p * rowH;
+    const truth = S.truth[state.loc];
+    const ri = refIndex(S, ref);
+    models.forEach((m, r) => {
+      const y0 = top + r * (rowH + gap);
+      const f = fc[m.id]?.[state.loc];
+      const lab = el("text", { x: 0, y: y0 + 18, class: "strong" }, svg); lab.textContent = short(m.label);
+      el("title", {}, lab).textContent = m.label;
+      if (!f || !f.p) {
+        el("rect", { x: L.left, y: y0, width: L.W - L.left - L.right, height: rowH, fill: css("--seq-0"), rx: 4 }, svg);
+        const t = el("text", { x: L.left + 10, y: y0 + rowH / 2 + 4 }, svg); t.textContent = f ? "This model has no peak-week forecast" : "No forecast from this model on this date";
+        return;
+      }
+      const iMax = f.p.indexOf(Math.max(...f.p));
+      const sub = el("text", { x: 0, y: y0 + 34, class: "num" }, svg);
+      sub.textContent = `${dfmt(S.dates[iMax])} · ${(f.p[iMax] * 100).toFixed(0)}%`;
+      [0.5, 1].forEach((g) => {
+        el("line", { x1: L.left, x2: L.W - L.right, y1: yP(g, y0), y2: yP(g, y0), stroke: css("--rule"), "stroke-dasharray": g === 1 ? "none" : "2 3" }, svg);
+        const t = el("text", { x: L.left - 6, y: yP(g, y0) + 4, "text-anchor": "end", class: "num" }, svg);
+        t.textContent = `${g * 100}%`;
+      });
+      el("line", { x1: L.left, x2: L.W - L.right, y1: y0 + rowH, y2: y0 + rowH, stroke: css("--rule-strong") }, svg);
+      f.p.forEach((p, i) => {
+        const bh = Math.max(1.5, p * rowH);
+        const x = xOf(L, i) + 1, w = Math.max(1, L.cw - 2);
+        el("rect", { x, y: y0 + rowH - bh, width: w, height: bh, rx: Math.min(3, w / 2), fill: colorFor(p) }, svg);
+        const hit = el("rect", { x: xOf(L, i), y: y0, width: L.cw, height: rowH, fill: "transparent" }, svg);
+        hit.addEventListener("mousemove", (e) => showTip(e, `${m.label} · week ending ${dfmt(S.dates[i])}: ${(p * 100).toFixed(1)}%`));
+        hit.addEventListener("mouseleave", hideTip);
+      });
+      if (truth && !truth.tied) {
+        const x = xOf(L, truth.week) + L.cw / 2;
+        el("path", { d: `M${x - 5} ${y0 - 1} L${x + 5} ${y0 - 1} L${x} ${y0 + 7} Z`, fill: css("--truth") }, svg);
+        const pt = f.p[truth.week];
+        const t = el("text", { x: L.W - L.right, y: y0 + 12, "text-anchor": "end", class: "num" }, svg);
+        t.textContent = `${(pt * 100).toFixed(1)}% on observed peak`;
+      }
+      drawNow(svg, L, ri, y0 + 4, y0 + rowH);
+    });
+    monthTicks(S, L, svg, H - bottom + 6);
+  }
+
+  function drawSize(S, ref, loc) {
+    const box = $("sizeChart"); box.innerHTML = "";
+    const fc = S.forecasts[ref] || {};
+    const truth = S.truth[state.loc];
+    const models = shown().filter((m) => fc[m.id]?.[state.loc]?.q);
+    if (!models.length) { box.innerHTML = '<div class="empty">No peak size forecasts for this date.</div>'; $("table").innerHTML = ""; return; }
+    const W = Math.max(560, box.clientWidth), left = 172, right = 24, rowH = 30, top = 6, bottom = 30;
+    const H = top + models.length * rowH + bottom;
+    const svg = el("svg", { width: W, height: H, viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": "Peak size forecasts by model" }, box);
+    const qi = (q) => D.q_levels.indexOf(q);
+    // fixed domain for this location and season: all models' 95% intervals over every forecast date, plus the
+    // observed peak, so the axis does not move when stepping dates or toggling models
+    const [lo, hi] = sizeDomain(S, qi(0.025), qi(0.975));
+    // log scale: peak sizes span orders of magnitude across models and dates
+    const x = (v) => left + (Math.log(Math.min(Math.max(v, lo), hi)) - Math.log(lo)) / (Math.log(hi) - Math.log(lo)) * (W - left - right);
+    logTicks(lo, hi).forEach((v) => {
+      el("line", { x1: x(v), x2: x(v), y1: top, y2: H - bottom, stroke: css("--rule") }, svg);
+      const t = el("text", { x: x(v), y: H - bottom + 16, "text-anchor": "middle", class: "num" }, svg); t.textContent = compact(v);
+    });
+    models.forEach((m, r) => {
+      const q = fc[m.id][state.loc].q, yc = top + r * rowH + rowH / 2;
+      const lab = el("text", { x: 0, y: yc + 4, class: "strong" }, svg); lab.textContent = short(m.label);
+      el("title", {}, lab).textContent = m.label;
+      el("line", { x1: x(q[qi(0.025)]), x2: x(q[qi(0.975)]), y1: yc, y2: yc, stroke: css("--interval-95"), "stroke-width": 8, "stroke-linecap": "round" }, svg);
+      [[q[qi(0.025)] < lo, x(lo), -1], [q[qi(0.975)] > hi, x(hi), 1]].forEach(([clipped, xe, dir]) => {
+        if (clipped) el("path", { d: `M${xe + dir * 9} ${yc} L${xe} ${yc - 6} L${xe} ${yc + 6} Z`, fill: css("--interval-50") }, svg);
+      });
+      el("line", { x1: x(q[qi(0.25)]), x2: x(q[qi(0.75)]), y1: yc, y2: yc, stroke: css("--interval-50"), "stroke-width": 8, "stroke-linecap": "round" }, svg);
+      el("circle", { cx: x(q[qi(0.5)]), cy: yc, r: 5, fill: css("--median"), stroke: css("--panel"), "stroke-width": 2 }, svg);
+      const hit = el("rect", { x: left, y: yc - rowH / 2, width: W - left - right, height: rowH, fill: "transparent" }, svg);
+      hit.addEventListener("mousemove", (e) => showTip(e, `${m.label}: median ${fmt.format(q[qi(0.5)])} · 50% ${fmt.format(q[qi(0.25)])}–${fmt.format(q[qi(0.75)])} · 95% ${fmt.format(q[qi(0.025)])}–${fmt.format(q[qi(0.975)])}`));
+      hit.addEventListener("mouseleave", hideTip);
+    });
+    if (truth) {
+      el("line", { x1: x(truth.count), x2: x(truth.count), y1: top - 2, y2: H - bottom, stroke: css("--truth"), "stroke-width": 2 }, svg);
+    }
+    const t = el("text", { x: left, y: H - 2 }, svg); t.textContent = `Peak weekly admissions, ${loc.name} (log scale)`;
+
+    // table view
+    const rows = models.map((m) => {
+      const q = fc[m.id][state.loc].q, p = fc[m.id][state.loc].p;
+      const iMax = p ? p.indexOf(Math.max(...p)) : -1;
+      return `<tr><td>${m.label}</td><td>${p ? `${dfmt(S.dates[iMax])} (${(p[iMax] * 100).toFixed(0)}%)` : "–"}</td><td>${p && truth && !truth.tied ? (p[truth.week] * 100).toFixed(1) + "%" : "–"}</td><td>${fmt.format(q[qi(0.5)])}</td><td>${fmt.format(q[qi(0.25)])}–${fmt.format(q[qi(0.75)])}</td><td>${fmt.format(q[qi(0.025)])}–${fmt.format(q[qi(0.975)])}</td></tr>`;
+    }).join("");
+    $("table").innerHTML = `<div style="overflow-x:auto"><table><thead><tr><th>Model</th><th>Most likely peak week</th><th>P(observed peak week)</th><th>Median peak</th><th>50% interval</th><th>95% interval</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  }
+
+  function niceCeil(v) { const p = Math.pow(10, Math.floor(Math.log10(v))); for (const m of [1, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10]) if (m * p >= v) return m * p; return 10 * p; }
+  const domainCache = new Map();
+  function sizeDomain(S, iLo, iHi) {
+    // one axis per location: shared by every season, forecast date and model, so it never moves while stepping.
+    // Uses the 2nd-98th percentiles of all 95% interval endpoints (plus observed peaks) so a few extreme early-season
+    // intervals do not squash the rest; intervals beyond the axis are drawn with an arrow cap.
+    const key = state.loc;
+    if (domainCache.has(key)) return domainCache.get(key);
+    const los = [], his = [], peaks = [];
+    Object.values(D.seasons).forEach((SS) => {
+      if (SS.truth[state.loc]) peaks.push(SS.truth[state.loc].count);
+      Object.values(SS.forecasts).forEach((byModel) => Object.values(byModel).forEach((byLoc) => {
+        const f = byLoc[state.loc]; if (f && f.q) { los.push(f.q[iLo]); his.push(f.q[iHi]); }
+      }));
+    });
+    const pct = (arr, p) => { const a = arr.filter((v) => v > 0).sort((u, v) => u - v); return a.length ? a[Math.min(a.length - 1, Math.floor(p * a.length))] : null; };
+    const lo = Math.max(1, Math.min(pct(los, 0.02) ?? 1, ...peaks) / 1.25);
+    const hi = Math.max(lo * 4, Math.max(pct(his, 0.98) ?? 10, ...peaks) * 1.25);
+    const d = [lo, hi];
+    domainCache.set(key, d);
+    return d;
+  }
+  function logTicks(lo, hi) {
+    const sets = [[1, 1.5, 2, 3, 4, 5, 6, 8], [1, 2, 3, 5], [1, 2, 5], [1]];
+    const make = (ms) => {
+      const out = [];
+      for (let e = Math.floor(Math.log10(lo)); e <= Math.ceil(Math.log10(hi)); e++)
+        for (const m of ms) { const v = m * Math.pow(10, e); if (v >= lo && v <= hi && v >= 1) out.push(Math.round(v)); }
+      return [...new Set(out)];
+    };
+    for (const ms of sets) { const t = make(ms); if (t.length <= 8) return t.length >= 2 ? t : make(sets[0]); }
+    return make([1]);
+  }
+  function compact(v) {
+    const trim = (x) => (Math.round(x * 10) / 10).toString();
+    return v >= 1e6 ? trim(v / 1e6) + "M" : v >= 1e3 ? trim(v / 1e3) + "k" : String(v);
+  }
+  function showTip(e, text) { const t = $("tip"); t.textContent = text; t.hidden = false; t.style.left = e.clientX + "px"; t.style.top = e.clientY + "px"; }
+  function hideTip() { $("tip").hidden = true; }
+})();
+</script>

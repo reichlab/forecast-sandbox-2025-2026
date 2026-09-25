@@ -5,3 +5,9 @@
 .Rhistory
 *.Rproj
 docs/
+# peak model analysis outputs (regenerate with the scripts in analysis/peak-models/)
+analysis/peak-models/*.csv
+analysis/peak-models/*.html
+analysis/peak-models/*_files/
+analysis/peak-models/viz/*.json
+**/__pycache__/

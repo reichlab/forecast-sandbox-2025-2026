@@ -1,0 +1,22 @@
+team_name: "UMass-Amherst"
+team_abbr: "UMass"
+model_name: "Peak kernel conditional density (analog) model"
+model_abbr: "peak_kcde"
+model_version: "0.1"
+model_contributors: [
+  {
+    "name": "Nick Reich",
+    "affiliation": "UMass Amherst",
+    "email": "nick@umass.edu"
+  }
+]
+license: "CC-BY-4.0"
+designated_model: true
+methods: "Kernel conditional density estimation: weighted historical analog seasons at similar states give the joint distribution of weeks-to-peak and remaining peak growth."
+methods_long: "
+  Analog / kernel conditional density estimation model for peak week inc flu hosp and peak inc flu hosp (FluSight designated_targets: both peak targets), following Ray et al. (2017). Every historical season-week (NHSN, ILINet x WHO-NREVSS percent positive, FluSurv-NET) is an analog with outcomes (weeks until peak, remaining log growth of the running maximum); analogs within 4 season weeks are weighted by a Gaussian product kernel on standardized state features (season week, level relative to running maximum, weeks since maximum, 1- and 3-week growth, 3-week mean level, national level relative to its maximum), with non-NHSN analogs down-weighted by a tuned factor. Bandwidths are chosen by leave-one-season-out log score. Forecasts mix the weighted analog distribution with the conditional climatology baseline (weight 0.05).
+  Backfill adjustment: revisions to the most recent 10 weeks of NHSN counts are simulated by resampling historical revision vectors (log ratio of final to first-reported counts) estimated from NHSN data vintages; features and predictions are recomputed for each of 200 simulated revised series and averaged, which puts probability on past weeks that could be revised to become the peak. Every peak-week probability is floored at 1e-4.
+"
+data_inputs: "NHSN weekly laboratory-confirmed influenza hospital admissions (with data vintages); ILINet weighted ILI x WHO-NREVSS percent positive; FluSurv-NET hospitalization rates."
+ensemble_of_models: false
+ensemble_of_hub_models: false
