@@ -17,7 +17,7 @@ format:
 ---
 
 ::: {.callout-important title="Status of this document"}
-This methods document describes the direct peak models as they are implemented in `idmodels` (module `idmodels.peak`: `series.py`, `revision.py`, `base.py`, `baseline.py`, `gbqr.py`, `kcde.py`; configuration classes `PeakModelConfig`, `PeakBaselineModelConfig`, `PeakGBQRModelConfig` and `PeakKCDEModelConfig` in `idmodels/config.py`) and in the sandbox scripts `src/peak_*` and `analysis/peak-models/*.py`. Every specific setting is stated in a callout titled *Implementation*, with the name of the configuration field that controls it where one exists. Three models are implemented: the conditional-climatology baseline (`peak_baseline`), gradient-boosted direct models (`peak_gbqr`), and kernel conditional density estimation (`peak_kcde`). The hierarchical Bayesian model and the ensembles are **planned but not yet implemented**; their sections are labelled as such. Design choices that were considered but not implemented appear in remarks titled *Alternatives considered*. The document contains **no results**.
+This methods document describes the direct peak models as they are implemented in `idmodels` (module `idmodels.peak`: `series.py`, `revision.py`, `base.py`, `baseline.py`, `gbqr.py`, `kcde.py`, `hier.py`; configuration classes `PeakModelConfig`, `PeakBaselineModelConfig`, `PeakGBQRModelConfig`, `PeakKCDEModelConfig` and `PeakHierModelConfig` in `idmodels/config.py`) and in the sandbox scripts `src/peak_*` and `analysis/peak-models/*.py`. Every specific setting is stated in a callout titled *Implementation*, with the name of the configuration field that controls it where one exists. Four models are implemented: the conditional-climatology baseline (`peak_baseline`), gradient-boosted direct models (`peak_gbqr`), kernel conditional density estimation (`peak_kcde`), and a Bayesian hierarchical model (`peak_hier`, not yet evaluated). The ensembles are **planned but not yet implemented**; their section is labelled as such. Design choices that were considered but not implemented appear in remarks titled *Alternatives considered*. The document contains **no results**.
 :::
 
 # The problem in plain terms {#sec-problem}
@@ -65,7 +65,21 @@ There are two broad ways to produce these forecasts.
 1. **Trajectory-based.** Build a model that simulates the whole remaining season week by week, draw many simulated seasons, and compute the peak week and peak size of each draw. This is conceptually clean, but it requires a model whose joint distribution over many weeks ahead (sometimes 30 or more) is well calibrated. Weekly forecasting models are usually built and checked only for a few weeks ahead, and their long-range joint behavior is rarely trustworthy.
 2. **Direct.** Treat the peak week and peak size themselves as the response variables, and learn their conditional distribution given a summary of the season observed so far. This targets exactly the quantities that are scored, and it can use long historical records in which the outcome of each season is known.
 
-This document describes direct models. Their main cost is that timing and size are modeled as two separate marginal distributions, so the two forecasts need not come from one joint distribution. FluSight scores the two targets separately, so this is acceptable. (In the KCDE model of @sec-kcde both marginals come from the same set of weighted analogs, so a joint distribution is available in principle, but the implementation uses only the two marginals. The planned hierarchical model of @sec-hier would be fully joint.)
+This document describes direct models. Their main cost is that timing and size are modeled as two separate marginal distributions, so the two forecasts need not come from one joint distribution. FluSight scores the two targets separately, so this is acceptable. (In the KCDE model of @sec-kcde both marginals come from the same set of weighted analogs, so a joint distribution is available in principle, but the implementation uses only the two marginals. The hierarchical model of @sec-hier is fully joint.)
+
+## Related work {#sec-related}
+
+Each part of these models has precedents; the combination does not seem to. (The search behind this section was careful but not exhaustive.)
+
+**Seasonal peak targets.** Peak week and peak intensity were central targets in CDC's influenza forecasting challenges from 2013/14 on (Biggerstaff et al. 2016, 2018; McGowan et al. 2019; Reich et al. 2019). The current FluSight peak targets for NHSN hospital admissions are defined in the FluSight hub's documentation. Forecasts of these targets have come from mechanistic models fitted by data assimilation (Shaman and Karspeck 2012; Shaman et al. 2013; Hickmann et al. 2015; Osthus et al. 2017; Ben-Nun et al. 2019), from agent-based simulation (Nsoesie, Marathe and Brownstein 2013), from statistical and ensemble methods (Yamana, Kandula and Shaman 2017; Kandula et al. 2018; Ray and Reich 2018; Lu and Meyer 2020), and from human judgment (Farrow et al. 2017). Lutz et al. (2019) discuss how public health agencies use such forecasts.
+
+**Conditioning on the season so far, and analogs.** The idea of forecasting from historical seasons that looked similar at the same point goes back to the method of analogues (Viboud et al. 2003). Kernel conditional density estimation (Ray et al. 2017), and its use for peak timing and peak incidence in weighted density ensembles (Ray and Reich 2018), is the direct ancestor of Model 3. Brooks et al. (2015) build empirical-Bayes priors on peak week and peak height from past seasons and condition them on the current season's data. Brooks et al. (2018) forecast the same targets with chained one-week-ahead densities. Both work with whole curves rather than with the peak targets directly.
+
+**Direct targets and multiple sources.** Modeling the quantity of interest directly, instead of iterating one-step-ahead forecasts, is the "direct" strategy of multi-step forecasting (Ben Taieb et al. 2012). Pooling ILINet, FluSurv-NET and NHSN in one gradient-boosted quantile regression is the approach of Flusion (Ray et al. 2025), from which Model 2 is adapted. Meyer et al. (2025) likewise extend short state-level hospitalization records with ILINet history. We found no earlier work that combines direct peak-week and peak-size targets, season-replay training rows and scale-free relative targets for pooling sources.
+
+**Hierarchical Bayesian influenza forecasting.** Osthus et al. (2019) let a partially observed season borrow strength from past seasons through a hierarchical discrepancy, and Osthus and Moran (2021) share information across states, regions and the nation. Wadsworth and Niemi (2025) fit a hierarchical nonlinear model to NHSN admissions that borrows from ILI. None of these uses a discrete-time hazard for peak timing, right-censored current-season observations, or a tempered likelihood. Those components are standard in other contexts: discrete-time hazards (Allison 1982; Singer and Willett 1993; Tutz and Schmid 2016); power, tempered and composite-likelihood posteriors (Pauli, Racugno and Ventura 2011; Ribatet, Cooley and Davison 2012; Bissiri, Holmes and Walker 2016; Holmes and Walker 2017; Grünwald and van Ommen 2017; Miller and Dunson 2019); and Laplace approximations (Tierney and Kadane 1986).
+
+**Data and revisions.** FluSurv-NET is described by Chaves et al. (2015) and its burden adjustment by Reed et al. (2015) and Rolfes et al. (2018). NSSP grew out of BioSense (Gould, Walker and Yoon 2017). ILINet, WHO/NREVSS and NHSN are documented on CDC's web pages. Revisions in influenza surveillance data and their effect on forecasts are studied by Chakraborty et al. (2018), Brooks et al. (2018), McGough et al. (2020) and Tang et al. (2025).
 
 # Notation and target definitions {#sec-notation}
 
@@ -196,6 +210,8 @@ NHSN is the only one of our sources for which past vintages are available, so it
 
 ILI is not specific to influenza, because other respiratory viruses cause the same symptoms. To make the signal more specific, `iddata` multiplies percent ILI by the **percent positive**: the percentage of respiratory specimens tested by clinical laboratories (reported to the WHO and NREVSS laboratory systems) that were positive for influenza in that week. The product (divided by 100) approximates the percentage of outpatient visits that were due to influenza. We refer to this product as **ILINet** from here on.
 
+ILINet for Puerto Rico and the US Virgin Islands is excluded from training and from the development targets (`PeakModelConfig.exclude_training_series`): several of their seasons are zero throughout, or have implausible pre-season values, reflecting sparse laboratory testing. More generally, any series that is zero in every window week is dropped from training, since it has no peak.
+
 ILINet data go back to the 1997/98 season for the 10 **HHS regions** (groupings of states used by the US Department of Health and Human Services) and the nation, and to about 2010 for individual states. For the earliest seasons (1997/98 to 2001/02) `iddata` keeps only season weeks 10 to 42. `iddata` does not provide vintages for ILINet, so only final values are available.
 
 ## FluSurv-NET
@@ -203,6 +219,10 @@ ILINet data go back to the 1997/98 season for the 10 **HHS regions** (groupings 
 **FluSurv-NET** is a population-based surveillance system for laboratory-confirmed influenza hospitalizations in defined catchment areas (selected counties) in about 14 sites across the country. It reports weekly hospitalization rates per 100,000 catchment residents. `iddata` loads seasons 2010/11 to 2022/23, maps the sites to states (two New York sites are averaged into one New York series) and the "Entire Network" to the US.
 
 Because not all hospitalized flu patients are tested, FluSurv-NET rates undercount true hospitalizations, and the degree of undercounting varies by season. With `burden_adj=True` (the default used here), `iddata` multiplies every weekly rate in season $s$ by a season-specific factor, the ratio of CDC's estimated total national influenza hospitalization burden for season $s$ to the cumulative hospitalizations implied by the network's cumulative rate. This makes the level of different seasons more comparable. Like ILINet, FluSurv-NET is not versioned in `iddata`.
+
+## NSSP emergency department visits
+
+The **National Syndromic Surveillance Program (NSSP)** reports, for each state and the nation, the weekly percentage of emergency department (ED) visits with a diagnosis of influenza. `iddata` provides state and national series from the 2022/23 season on, and only from snapshots published on or after 2025-09-17 (no earlier vintages). NSSP is therefore used only as an optional source of additional *training seasons* for the NHSN forecasts (`supplementary_sources` including `SourceType.NSSP`), never as a current-season input. For a reference date in season $s$, only NSSP seasons strictly before $s$ are kept (`PeakModel._load_nssp`), which is the same forward-chaining rule as for every other source. NSSP adds nothing to the ILINet development seasons 2018/19 and 2019/20, which predate it.
 
 ## Why the sources are on different scales, and what is comparable
 
@@ -213,6 +233,7 @@ The three sources measure different things: NHSN measures admissions per 100,000
 | NHSN | lab-confirmed flu admissions | rate per 100k | 2022/23 to 2025/26 | 53 locations | yes |
 | ILINet × percent positive | flu-attributable share of outpatient visits | percent | 1997/98+ (regions, US); about 2010+ (states) | US, HHS regions, states | no |
 | FluSurv-NET (burden adjusted) | lab-confirmed flu hospitalizations | rate per 100k (adjusted) | 2010/11 to 2022/23 | about 14 sites mapped to states, plus US | no |
+| NSSP (optional, training only) | share of ED visits with an influenza diagnosis | percent | 2022/23+ | states, US | no (snapshots from 2025-09-17) |
 
 ## Scales, offsets, and data preparation {#sec-transforms}
 
@@ -264,6 +285,13 @@ where $\varepsilon = \varepsilon_g$ is a small offset for the series' source (@s
 2. *Remaining growth depends mainly on the stage of the epidemic, which the data reveal; the absolute peak depends mainly on population size and season severity, which they largely do not.* A location whose admissions are still doubling every week, one whose growth is slowing, and one that has been falling for a month call for very different forecasts of $z$, whatever their size. The features of @sec-features describe that stage (weeks since the maximum, recent growth, level relative to the maximum). The conditional distribution of $z$ given those features is therefore much more similar across locations, seasons and sources than the distribution of $Y^*$, so one model can be shared by all of them.
 3. *The scale builds in what we know for certain.* Once the data are final the season's peak can never be lower than the largest week already seen, so $z \ge 0$, and $z = 0$ exactly when the peak has already passed (@sec-relative, "What these targets look like when the data are final"). Forecasts made on this scale cannot fall below the observed maximum. They also shrink onto the observed maximum after the peak, as FluSight requires, because the training data contain many post-peak rows with $z = 0$. No hand-written rule is needed for either behavior.
 
+**Is this target new?** As far as we can tell, no published epidemic-forecasting work uses the log ratio of the eventual seasonal maximum to the running maximum to date as its peak-size target. Earlier peak forecasts either model the peak on its absolute scale or read it off simulated trajectories. Trajectories respect $Y^* \ge M_t$ automatically, because the observed weeks are part of each one, but not through the choice of target. The closest precedent in influenza forecasting is Flusion (Ray et al. 2025), which predicts the change from the most recent observation on a standardized scale, pooled across surveillance systems. $z$ carries the same "relative, scale-free, pooled" idea over to the running maximum. The mathematical object itself is not new:
+
+- In optimal-prediction problems, the ratio of a process's ultimate maximum to its current value or running maximum is studied directly (Shiryaev, Xu and Zhou 2008; du Toit and Peskir 2009). Its conditional law has the same structure as $z$: a point mass at 0 plus a continuous positive part.
+- In actuarial reserving, "age-to-ultimate" development factors predict the ratio of a nondecreasing quantity's eventual value to its value to date, estimated from historical cohorts (Mack 1993). This is the analogue of season replay.
+
+The point mass at $z = 0$ also makes this a two-part ("hurdle") outcome in the sense of Cragg (1971) and Duan et al. (1983). The models handle it by separating "has the peak passed?" from "how much growth remains?".
+
 **Converting back to the peak.** FluSight asks for quantiles of the peak itself, in admissions, so every $z$ forecast has to be converted back. Given $\mathcal{F}_t$, the map
 $$
 \psi_t(z) = (M_t + \varepsilon)e^{z} - \varepsilon
@@ -272,7 +300,7 @@ recovers $Y^* = \psi_t(z)$. It has known coefficients and is continuous and stri
 $$
 Q_{Y^*}(\tau \mid \mathcal{F}_t) = (M_t + \varepsilon)\exp\{Q_z(\tau \mid \mathcal{F}_t)\} - \varepsilon,
 $$ {#eq-z-invert}
-and modeling the quantiles of $z$ is exactly equivalent to modeling the quantiles of $Y^*$. The equivalence holds for quantiles but not for means, since $E[e^{Z}] \ne e^{E[Z]}$. This is one reason the whole approach is built on quantiles. The final step multiplies the rate by the location's population divided by $10^5$ to give counts (@sec-submission).
+and modeling the quantiles of $z$ is exactly equivalent to modeling the quantiles of $Y^*$ (Koenker 2005, on equivariance of quantiles to monotone transformations). The equivalence holds for quantiles but not for means, since $E[e^{Z}] \ne e^{E[Z]}$. This is one reason the whole approach is built on quantiles. The final step multiplies the rate by the location's population divided by $10^5$ to give counts (@sec-submission).
 
 Two details complete the picture. First, the offset $\varepsilon$ exists so that the logarithm is defined when a week has zero admissions. It is set to about one thousandth of a typical national peak in each source's units, which keeps $z$ comparable across sources, and the same value is used in @eq-z and @eq-z-invert. Second, with real NHSN data $M_t$ is not quite known, because recent weeks are revised after they are first reported. In practice @eq-z-invert is therefore applied separately to each simulated final version of the season, each with its own running maximum $\tilde M_t$. The reported quantiles are those of the pooled draws, which is the quantile of a mixture and not an average of quantiles (@sec-mc).
 
@@ -352,13 +380,28 @@ Features describe the series as observed through week $t$ and are scale-free (lo
 | `cum_rel` | $\log\bigl(\sum_{u=5}^{t} x_u + \varepsilon\bigr) - \ell^M_t$, cumulative incidence since season week 5 relative to the running maximum (missing $x_u$ count as 0) |
 | `hist_rel` | $\ell^M_t - \bar P_{g,l,s}$, where $\bar P_{g,l,s}$ is the mean of $\log(Y^*_{s'} + \varepsilon)$ over the strictly earlier complete seasons $s' < s$ of the same source and location (missing if there are none) |
 | `nat_rel_max`, `nat_wks_since_max`, `nat_g3` | `rel_max`, `wks_since_max` and `g3` of the national series of the same source and season (for a national series, its own values; missing if no national series exists) |
-| `src_code` | source: 0 = NHSN, 1 = ILINet, 2 = FluSurv-NET |
+| `src_code` | source: 0 = NHSN, 1 = ILINet, 2 = FluSurv-NET, 3 = NSSP |
+| `sync_med_rel_max`, `sync_med_g3` | *(optional, `sync_burden_features`)* the median `rel_max` and `g3` over the non-national series of the same source and season (for the current season: of the same revision draw) observed at $t$ |
+| `sync_frac_past2`, `sync_frac_half` | *(optional)* the fraction of those series at least 2 weeks past their running maximum (0 before the window opens), and the fraction at or above half their running maximum |
+| `cum_vs_hist_total` | *(optional)* $\log(\sum_{u=5}^{t} x_u + \varepsilon) - \log(\bar H + \varepsilon)$, where $\bar H$ is the mean season total (weeks 5 to $\overline\omega$) over earlier complete seasons of the same source and location: how much of a typical season's burden has already occurred |
+| `cum_vs_hist_same_week` | *(optional)* the same with $\bar H$ replaced by the mean cumulative incidence through week $t$ in those seasons |
 
 GBQR uses all 13 features; KCDE uses a subset (@sec-kcde); the baseline uses only `season_week` and `wks_since_max`. For the current season, `hist_rel` uses the mean NHSN log peak over all training seasons of that location, which are exactly the strictly earlier ones, and the national features come from the US series of the same revision draw (@sec-backfill).
 :::
 
 ::: {.callout-tip title="Alternatives considered"}
 The original plan reused the `idmodels` weekly-model feature machinery (Taylor-polynomial features on fourth-root, centered and scaled series; rolling means and lags; a Christmas indicator; one-hot aggregation level; $\log N_l$; the fraction of states past their maximum; the previous season's peak week). The implemented features are a smaller set of log ratios, chosen so that no scale factors are needed.
+
+The exploratory analysis of $z$ (`relative-size-eda.qmd`) tested more candidates in leave-one-season-out LightGBM fits on ILINet and FluSurv-NET. Two groups gave small but consistent improvements, together reducing the pinball loss for $z$ by 2.5% overall and 7% in season weeks 22–26: synchrony across locations and burden to date. They are now available as optional features.
+
+These did not help:
+
+- local-polynomial ("Taylor") trend features, rolling means and lags;
+- time relative to the location's historical peak week, which made the pinball loss 3.6% worse;
+- onset-based features;
+- holiday-week features.
+
+On holidays: around Christmas and New Year all sources, FluSurv-NET included, rise by about 0.4 on the log scale relative to the surrounding weeks, so most of the holiday bump is real epidemic activity. What is specific to ILINet is that it runs ahead within the holiday block, and that ILINet maxima set in holiday weeks are more often exceeded later. Neither holiday indicators nor adjusting the ILINet holiday weeks before training improved cross-validated forecasts.
 :::
 
 ## Avoiding leakage
@@ -438,16 +481,47 @@ The class probabilities are mapped to window weeks in @sec-mc: class $j \ge 1$ t
 
 The baseline answers: "what would we predict using only the calendar and the crudest summary of the season so far?" Its metadata describe it as the FluSight baseline for these targets, and it is not designated (`designated_model: false`). Every other model must beat it to be worth using.
 
+### In plain terms
+
+The baseline is a lookup table built from history. To forecast a location today, it asks only two questions about the current season:
+
+1. **What week of the season is it?** ($t$)
+2. **How many weeks ago was the biggest week so far?** ($d_t$, grouped as 0, 1, 2, 3, or 4 or more)
+
+It then finds every historical series (any source, location and training season) that was in the same situation: the same season week, and the same number of weeks since its running maximum. From what those series went on to do, it answers three things.
+
+- **Has the peak already happened?** It uses the fraction of those historical series whose running maximum at that point turned out to be the season's peak.
+- **If not, when will it come?** The remaining probability goes to the weeks still ahead, in proportion to how often historical seasons peaked in each of those calendar weeks (the climatology $p_{	ext{clim}}$ of @sec-classes-to-pmf). The current season's shape plays no part in this step.
+- **How much bigger will the peak be than the biggest week so far?** It uses the spread of that ratio ($z$, on the log scale) among the same historical series, taking series within two weeks of the same season week so that there are enough of them.
+
+Nothing about the level of the current season, its recent growth, other locations, or the location's own history enters. That is deliberate: the baseline measures how much can be learned from the calendar and from "how long since the max" alone.
+
+### A worked example
+
+These numbers come from the baseline trained for the 2019/20 ILINet development season. That training set holds 26,480 replay rows from 733 historical series in 20 seasons of ILINet and FluSurv-NET.
+
+Suppose it is season week 25 (the week ending 18 January 2020), and a state's biggest week so far was two weeks ago ($d_t = 2$).
+
+- **Already peaked?** 78 historical rows were also at season week 25 and two weeks past their running maximum. In 47 of them that maximum was the season's peak. So $\hat\pi_0 = (47 + 0.5)/(78 + 1) pprox 0.60$: a 60% chance that the week two weeks ago was the peak.
+- **When, if not?** The other 40% is spread over the weeks still ahead by climatology. The weights for 1, 2, 3, 4 and 6 weeks ahead are 10%, 13%, 16%, 16% and 10% of the remaining 40%. Mid-January to mid-February is when US flu seasons most often peak, so the next month gets most of it.
+- **How much bigger?** Among the 456 rows within two weeks of season week 25 that were also two weeks past their maximum, 52% had $z = 0$ (they had already peaked). The median of $z$ is therefore 0: the median forecast of the peak is the current maximum. The 75% and 90% quantiles of $z$ are 1.01 and 1.95, so there is a 25% chance that the peak is at least $e^{1.01} pprox 2.7$ times, and a 10% chance at least $e^{1.95} pprox 7$ times, the largest week so far.
+
+This also shows the baseline's weakness. At the same season week, the already-peaked rate is 60% for series two weeks past their maximum and 67% for three weeks past, but it drops to 41% for four or more weeks past. By mid-January, a maximum more than a month old is often a small early-season bump before the real epidemic has started. The baseline cannot tell such a bump from a real peak, but the level and growth features of the other models can.
+
+### The formulas
+
+The formulas below restate these steps. In each, "rows" are training replay rows (@sec-replay), and row $i$ has origin week $t_i$, weeks since its running maximum $d_i$, and outcomes $k_i$ and $z_i$.
+
 **Timing.** Let $b(d) = \min(d, 4)$ bin the weeks since the maximum into $\{0, 1, 2, 3, 4{+}\}$. The baseline estimates the probability that the peak has already happened as a smoothed frequency among training rows with the same origin week and the same bin:
 $$
 \hat\pi_0(t, b) = \frac{\#\{i : t_i = t,\, b(d_i) = b,\, k_i \le 0\} + 0.5}{\#\{i : t_i = t,\, b(d_i) = b\} + 1},
 $$
-where $t_i$ and $d_i$ are the origin and weeks since the maximum of row $i$. The constants $0.5$ and $1$ make this the posterior mean under a Jeffreys Beta$(1/2, 1/2)$ prior, which keeps the estimate away from exactly 0 and 1. The forecast uses $\pi_0 = \hat\pi_0(t, b(d_t))$, with three exceptions: $\pi_0 = 0$ before the window opens ($t < \underline\omega$); $\pi_0 = 1$ if $t \ge \underline\omega$ and no future window week remains ($t \ge \overline\omega$); and $\pi_0 = 0.5$ if no training row has that $(t, b)$. The remaining probability is spread over the future window weeks by climatology:
+where $t_i$ and $d_i$ are the origin and weeks since the maximum of row $i$. In words, this is "the fraction of matching historical rows that had already peaked". The numerator counts matching rows with $k_i \le 0$ (the peak was at or before the origin), and the denominator counts all matching rows. The constants $0.5$ and $1$ make this the posterior mean under a Jeffreys Beta$(1/2, 1/2)$ prior, which keeps the estimate away from exactly 0 and 1. The forecast uses $\pi_0 = \hat\pi_0(t, b(d_t))$, with three exceptions: $\pi_0 = 0$ before the window opens ($t < \underline\omega$); $\pi_0 = 1$ if $t \ge \underline\omega$ and no future window week remains ($t \ge \overline\omega$); and $\pi_0 = 0.5$ if no training row has that $(t, b)$. The remaining probability is spread over the future window weeks by climatology. The probability that the peak is $j$ weeks ahead is the probability that it has not happened yet, times the climatological probability of a peak in week $t + j$, rescaled so that the future weeks share $1 - \pi_0$:
 $$
 \pi_j = (1 - \pi_0)\, \frac{p_{\text{clim}}(t + j)}{\sum_{u \in \mathcal{W},\, u > t} p_{\text{clim}}(u)}, \qquad j \ge 1,\; t + j \in \mathcal{W}.
 $$
 
-**Size.** The quantiles of $z$ are the empirical quantiles of $z_i$ among training rows with $|t_i - t| \le 2$ and the same bin $b(d_i) = b(d_t)$. If fewer than 20 rows qualify, the bin is ignored and all rows with $|t_i - t| \le 2$ are used.
+**Size.** The quantiles of $z$ are the empirical quantiles of $z_i$ among training rows with $|t_i - t| \le 2$ and the same bin $b(d_i) = b(d_t)$. In words: collect the matching historical rows and read the 23 quantiles of "how much higher the peak turned out to be" directly from them. These are converted to peak sizes with @eq-z-invert. If fewer than 20 rows qualify, the bin is ignored and all rows with $|t_i - t| \le 2$ are used.
 
 **Why.** It is cheap, transparent, and uses exactly the same conditioning as the other models. Improvements over it can be attributed to the information in the features rather than to the conditioning trick itself.
 
@@ -586,63 +660,208 @@ Here $\bar\pi^{\text{A}, -s(i)}$ is the analog timing distribution for row $i$ c
 A state vector containing the recent trajectory shape $\bigl(\log\{(x_{t-n} + \varepsilon)/(M_t + \varepsilon)\}\bigr)_{n = 0, \dots, 3}$ and $\log(1 + d_t)$; kernel smoothing of the size distribution in $z$ with an outcome bandwidth; a joint timing-and-size LOSO objective; L-BFGS optimization from a rule-of-thumb start; joint $(k, z)$ draws for the backfill simulation; and a warning when the **effective number of analogs**, $n_{\text{eff}} = 1 / \sum_i \varpi_i^2$, is small. None of these is implemented, although $n_{\text{eff}}$ remains a useful diagnostic.
 :::
 
-## Model 4 (planned): Bayesian hierarchical model of timing and size (`peak_hier`) {#sec-hier}
+## Model 4: Bayesian hierarchical model of timing and size (`peak_hier`) {#sec-hier}
 
-::: {.callout-warning title="Planned, not implemented"}
-This model is a design only. No code exists yet, and none of its settings below have been tested.
+::: {.callout-warning title="Implemented, not yet evaluated"}
+The model below is implemented in `idmodels/peak/hier.py` and has passed a short smoke test on a subsample. It has **not** yet been fit with full MCMC settings or scored. The settings in the *Implementation* callout are starting values to be checked on the development seasons (@sec-dev-design). The design choices that are open for review are listed at the end of this section.
 :::
 
-This optional model makes the strongest structural assumption: that locations in the same season share a common season-level tendency in timing and size, and that the same location tends to behave similarly across seasons. It would be implemented in NumPyro (Phan, Pradhan and Jankowiak 2019), which the lab already uses for SARIX models.
+### What this model adds
 
-### Likelihood
+The models so far learn one mapping from "what the season looks like now" to "when and how high the peak will be", shared by every location and season. They treat two kinds of structure only indirectly.
 
-Index training rows by $i = (g, l, s, t)$. **Timing** would use the continuation-ratio (hazard) form described under *Alternatives considered* in @sec-gbqr:
-$$
-\begin{aligned}
-\operatorname{logit} \pi_{0, i} &= \beta_0^\top \phi_i + u^{0}_l + v^{0}_s, \\
-\operatorname{logit} \chi_{i,m} &= f_\omega(t_i+m) + f_m(m) + \beta^\top \phi_i + u_l + v_s + \gamma_g ,
-\end{aligned}
-$$
-where $\operatorname{logit}(p) = \log\{p/(1-p)\}$, $\chi_{i,m}$ is the discrete hazard of row $i$ at offset $m$, the feature vector $\phi_i$ includes a constant (intercept) term, $\beta_0$ and $\beta$ are coefficient vectors, $f_\omega$ is a smooth function of the season week $t_i + m$ of the candidate peak week, $f_m$ is a smooth function of the offset $m$, $\gamma_g$ is a source effect, $u_l$ is a **location effect**, and $v_s$ is a **season effect** shared by all locations in season $s$; $u^0_l$ and $v^0_s$ are the corresponding effects for the already-peaked probability, with their own normal distributions and variances.
+1. **Seasons differ as a whole.** In some seasons almost every state peaks around Christmas; in others the peak comes in February or March, or a second virus produces a late wave. All locations in a season are exposed to the same viruses, so their peaks are correlated. When half the states have already peaked, that is informative about the other half. GBQR and KCDE see this only through the three national features.
+2. **Locations differ persistently.** Some states tend to peak earlier than others, for example because of when school terms start, which strains arrive first, or the mix of urban and rural populations. The NHSN record for any one state is only two or three usable seasons long, far too short to estimate a state-specific tendency from NHSN alone, but the same state has eight or more seasons of ILINet data.
 
-**Size** would be modeled only for rows whose peak is still to come ($k_i \ge 1$), since for $k_i \le 0$ the size is determined by the atom at $z = 0$:
+A **hierarchical** (multilevel) model represents both with random effects: a **season effect** shared by all locations and sources in a season, and a **location effect** shared by all seasons and sources for a location. The key feature for real-time use is that the *current* season's effect is estimated from the current season's data in every location at once (@sec-hier-current). This is the "pooling across locations" that the other models lack.
+
+A further benefit is that timing and size come from one joint model, and every source of parameter uncertainty is carried into the forecast through posterior draws.
+
+### Data and notation
+
+The model is fit to the same season-replay rows as the other models (@sec-replay). Row $i$ comes from source $g_i$, location $l_i$ and season $s_i$, has current week $t_i$, standardized feature vector $\phi_i$ (below), and outcomes $k_i = W^* - t_i$ and $z_i$ (@sec-relative). For each row we also need the set of candidate peak offsets
 $$
-z_i \mid k_i \ge 1 \;\sim\; \operatorname{St}_{\nu}\bigl(\mu_i,\, \sigma_g(t_i)\bigr) \text{ truncated to } (0, \infty),
+\mathcal{M}_i = \{m \ge 1 : t_i + m \in \mathcal{W}\},
+$$
+the offsets $m$ for which $t_i + m$ is a window week. Its largest element is $m^{\max}_i = \overline\omega - t_i$. When the window has not yet opened ($t_i < \underline\omega$), the smallest element is $\underline\omega - t_i$, not 1.
+
+### Timing: "already peaked" plus a discrete-time hazard
+
+Timing is modeled in two stages, which mirror how a person reads a season. First: has the peak already happened? Then, if not: when will it happen?
+
+**Stage 1, already peaked.** Once the window has opened ($t_i \ge \underline\omega$), the probability that the running maximum is the season's peak ($k_i \le 0$) is
+$$
+\pi_{0,i} = \operatorname{logit}^{-1}\bigl(a_0(t_i) + \phi_i^\top \beta_0 + \gamma_{g_i,0} + r_{i,0}\bigr),
+$$
+where $\operatorname{logit}^{-1}(x) = 1/(1 + e^{-x})$ maps any real number to a probability. Here $a_0(t)$ is a smooth function of the current week, $\beta_0$ is a coefficient vector, $\gamma_{g,0}$ is a source effect and $r_{i,0}$ is the random effect defined below. Before the window opens, $\pi_{0,i} = 0$.
+
+**Stage 2, when.** If the peak is still to come, it occurs at week $t_i + m$ for some $m \in \mathcal{M}_i$. We model this with a **discrete-time hazard**, the standard tool of survival analysis for event times measured in whole weeks. The hazard $\chi_{i,m}$ is the probability that the peak is at offset $m$, *given that it is not at any earlier offset in* $\mathcal{M}_i$:
+$$
+\operatorname{logit} \chi_{i,m} = f_\omega(t_i + m) + f_m(m) + \phi_i^\top \beta + (\log m - \log 4)\,\phi_i^\top \beta_m + \gamma_{g_i,1} + r_{i,1},
+\qquad m \in \mathcal{M}_i,\ m < m^{\max}_i,
+$$
+and $\chi_{i,m^{\max}_i} = 1$, because the peak must fall in the window. Then
+$$
+\Pr(k_i = m \mid k_i \ge 1) = \chi_{i,m} \prod_{m' \in \mathcal{M}_i,\, m' < m} (1 - \chi_{i,m'}),
 \qquad
-\mu_i = \beta_z^\top \phi_i + u^z_l + v^z_s ,
+\Pr(k^+_i = m) = (1 - \pi_{0,i}) \Pr(k_i = m \mid k_i \ge 1).
 $$
-where $\operatorname{St}_{\nu}(\mu, \sigma)$ is a Student-$t$ distribution with $\nu$ degrees of freedom, location $\mu$ and scale $\sigma$; $\beta_z$ is a coefficient vector; $u^z_l$ and $v^z_s$ are location and season effects for size; and the scale $\sigma_g(t)$ depends on the source and varies smoothly with the origin week. The heavy tails of the $t$ distribution let occasional very large seasons occur without distorting the fit for typical seasons. The location and season effects of the two parts are allowed to be correlated:
+The probabilities over $m \in \mathcal{M}_i$ sum to one automatically because the last hazard is 1.
+
+The terms have these roles:
+
+- $f_\omega(w)$, a smooth function of the calendar week $w$ of the candidate peak, captures seasonality: peaks are common in late December through February and rare in October or May.
+- $f_m(m)$, a smooth function of $\log m$, captures how the chance of peaking depends on how far ahead we look.
+- $\phi_i^\top\beta$ shifts the hazard according to the current state of the season. For example, fast recent growth makes a peak next week less likely.
+- $(\log m - \log 4)\,\phi_i^\top \beta_m$ lets the effect of the state depend on the offset. For example, a falling series makes a peak in 1–2 weeks unlikely but says less about a second peak 10 weeks away. The centering at $\log 4$ makes $\beta$ the effect at an offset of about a month.
+
+**Why a hazard instead of a softmax over offsets?** A softmax needs a separate parameter per offset, and offsets far ahead are rare in the data. A hazard with smooth terms in $w$ and $m$ shares strength across offsets and handles the window boundary exactly. It is also the form that makes the censored observations of @sec-hier-current easy to write down.
+
+### Size given timing
+
+For rows whose peak is still ahead ($k_i \ge 1$), the remaining log growth $z_i > 0$ is modeled on the **square-root scale**, *conditional on the timing*:
 $$
-(u_l, u^z_l)^\top \sim \mathcal{N}_2(\mathbf{0}, \Sigma_{\text{loc}}), \qquad (v_s, v^z_s)^\top \sim \mathcal{N}_2(\mathbf{0}, \Sigma_{\text{sea}}),
+\sqrt{z_i} \sim \mathcal{N}^{+}(\mu_i, \sigma_i),
 $$
-where $\mathcal{N}_2(\mathbf{0}, \Sigma)$ is a bivariate normal distribution with mean zero and covariance matrix $\Sigma$. So, for example, seasons that peak early could also tend to be large, if the data support it.
-
-### Partial pooling
-
-The random effects implement **partial pooling**. Consider the simplest case: $n_l$ independent observations for location $l$ with mean $\bar z_l$, observation variance $\sigma^2$, and a location effect $u^z_l \sim \mathcal{N}(0, \sigma_a^2)$ around a common mean $\mu$, with $\mu$, $\sigma^2$ and $\sigma_a^2$ treated as known. The posterior mean of the effect is
 $$
-\mathbb{E}[u^z_l \mid \text{data}] = B_l\, (\bar z_l - \mu), \qquad B_l = \frac{n_l / \sigma^2}{n_l/\sigma^2 + 1/\sigma_a^2} \in (0, 1).
+\mu_i = b(t_i) + b_1 (\log k_i - \bar c_k) + b_2 (\log k_i - \bar c_k)^2 + \phi_i^\top\beta_z + (\log k_i - \bar c_k)\,\phi_i^\top \beta_{zm} + \gamma_{g_i,2} + r_{i,2},
 $$
-With much data about location $l$ ($n_l$ large), $B_l \to 1$ and the estimate follows that location's own data (no pooling). With little data, $B_l \to 0$ and the estimate is shrunk toward the common mean (complete pooling). The variance $\sigma_a^2$ is estimated from the data, so how much to shrink is itself learned. This matters here because the NHSN history per location is only a few seasons long.
-
-Two cautions apply. First, replay rows from the same season are not independent observations, so $n_l$ in this formula should be thought of as roughly the number of seasons, not the number of rows. The season effects $v_s$ and $v^z_s$ help here: they absorb deviations shared by all rows of a season, so that the 39 replay rows of one season are not treated as 39 independent pieces of evidence. A (location, season) effect can be added for the same reason. Second, source-specific scales $\sigma_g$ and source effects $\gamma_g$ keep the many ILINet rows from overwhelming the few NHSN rows.
-
-### Using the current season: censored observations
-
-The season effect $v_s$ captures the strongest signal available to a peak forecaster: states in the same season peak at similar times, so states that have already peaked carry information about states that have not. But in a model that conditions on features, a *new* season's effect $v_{s_0}$ is learned only if some likelihood term involves the current season. Such terms can be obtained from **censoring**, as in survival analysis. Ignoring revisions, at time $t$ in the current season $s_0$ we know for each location $l$ that $W^*_l \ge A_{l,t}$ (the subscript $l$ is restored here because several locations are involved), since no past non-maximal week can be the peak. For each earlier origin $t' < A_{l,t}$ in the current season this means $k_{t'} \ge A_{l,t} - t'$: a right-censored observation of the timing offset, contributing
 $$
-\Pr(k_{t'} \ge A_{l,t} - t' \mid \phi_{t'}) = \bigl(1 - \pi_{0}(\phi_{t'})\bigr) \prod_{m=1}^{A_{l,t} - t' - 1} \bigl(1 - \chi_m(\phi_{t'})\bigr)
+\log \sigma_i = c_0 + c_1 (\log k_i - \bar c_k) + c_2 (t_i - 24)/10 + c_{g_i}.
 $$
-to the likelihood. Similarly $Y^*_l \ge M_{l,t}$ gives a lower bound on $z_{t'}$. These terms involve $v_{s_0}$ and $v^z_{s_0}$, so the posterior of the current season's effects is updated by what every location has shown so far, without using any unavailable information.
+Here $\mathcal{N}^{+}(\mu, \sigma)$ is a normal distribution with mean $\mu$ and standard deviation $\sigma$ truncated to $(0, \infty)$, $b(t)$ is a smooth function of the current week, and $\bar c_k$ is the mean of $\log k$ over the training rows with $k \ge 1$. If the peak has already occurred, $z = 0$ exactly (@sec-relative).
 
-### Priors and inference
+In words: given that the peak is $k$ weeks away, the square root of the remaining log growth is roughly normal, with a center and spread that depend on $k$, the current week, the state of the season and the random effects.
 
-Features would be standardized, and the priors weakly informative: normal priors with unit scale on regression coefficients, half-normal priors on standard deviations of random effects (Gelman 2006), an LKJ prior on the correlation matrices in $\Sigma_{\text{loc}}$ and $\Sigma_{\text{sea}}$ (Lewandowski, Kurowicka and Joe 2009), second-order random-walk priors on $f_\omega$ and $f_m$, and a Gamma(2, 0.1) prior on $\nu$. The posterior would be sampled with the No-U-Turn Sampler (Hoffman and Gelman 2014), with the standard convergence diagnostics ($\hat R$, effective sample size, divergent transitions). Posterior predictive draws of $(k, z)$ are obtained by drawing parameters from the posterior, then $k$ from its class probabilities, then $z$ given $k$.
+Some explanation of these choices:
 
-**Why it matters, and its cost.** It would be the only model in which the within-season shared effect is explicit and in which uncertainty about all parameters propagates into full joint draws. The tree and analog models capture season synchrony only indirectly, through the national features. It is also the most work to build and to tune, and it will be built only if the backtest shows that models 2 and 3 are missing this structure.
+- **Conditioning on $k$.** A peak that is eight weeks away will be much higher, relative to today, than one that is next week. With $\log k$ in the mean and in the scale, the model captures this directly. Timing and size then come from one joint distribution: a draw of the timing implies a distribution for the size, and anything that shifts the timing (such as the current season's effect) also shifts the size.
+- **Why the square root?** Grouping the training rows (ILINet and FluSurv-NET before 2018/19) by $k$, we compared transformations of $z$:
+    - $z$ itself is right-skewed (skewness 0.6–2.1 across $k$ groups).
+    - $\log z$ over-corrects and is strongly *left*-skewed (skewness −0.8 to −2.3), because peaks only slightly above the current maximum give very negative $\log z$.
+    - $\sqrt{z}$ is close to symmetric (skewness −0.2 to 0.5) with near-normal tails (excess kurtosis −0.4 to 0.6) in every $k$ group.
+
+  A first version of the model used a Student-$t$ distribution for $\log z$. Its fitted degrees of freedom went to about 1 (Cauchy-like tails), because it was trying to fit that long left tail, and the resulting posterior was hard to sample. The $\log$-$t$ version remains available as an option (`size_scale = "log"`).
+- **Truncation at zero** keeps $z > 0$ for rows before the peak. Rows before the window opens can in principle have $z \le 0$ (@sec-relative), and those have $\sqrt{\max(z, 0)} = 0$. This is a slight approximation that affects very few rows.
+- **Draws are capped** at the largest $z$ seen in training plus 1 (a growth factor of about 2.7 beyond the most extreme training row), as a guard against implausible upper quantiles.
+
+### Random effects and partial pooling
+
+The random effect of row $i$ has three components, one each for the already-peaked probability, the hazard and the size:
+$$
+r_i = u_{l_i} + v_{s_i} \in \mathbb{R}^3, \qquad
+u_l \sim \mathcal{N}_3(\mathbf{0}, \Sigma_{\text{loc}}), \qquad
+v_s \sim \mathcal{N}_3(\mathbf{0}, \Sigma_{\text{sea}}),
+$$
+independently across locations and seasons.
+
+- **Location effect** $u_l$. Shared by all sources with the same location code. NHSN, ILINet and FluSurv-NET all use two-digit FIPS codes for states and "US" for the nation, so Massachusetts' eight ILINet seasons inform its NHSN forecasts. HHS regions appear only in ILINet and get their own effects.
+- **Season effect** $v_s$. Shared by all locations *and all sources* in a calendar season, since they observe the same epidemic.
+- **Components and correlation.** By default the three components are **independent** ($\Sigma$ diagonal, with SDs $\tau \in \mathbb{R}^3_+$), and the **location effect has only a hazard component** (@sec-hier-compute explains both choices). An optional version with LKJ-correlated components, $\Sigma = \operatorname{diag}(\tau)\,\Omega\,\operatorname{diag}(\tau)$, would let late seasons also tend to be large. It would also let timing information about the current season update its size forecast through the correlation. However, the correlations were too poorly identified to sample. Without them, the current season's timing still affects its size forecast through the model for size given $k$, but its size component $v_{s_0,2}$ is informed only by the censored size bounds.
+
+To see how partial pooling works, consider the simplest case: $n_l$ independent observations for location $l$ with mean $\bar z_l$, observation variance $\sigma^2$, and a location effect $u_l \sim \mathcal{N}(0, \tau^2)$. The posterior mean of the effect is $B_l(\bar z_l - \mu)$ with $B_l = (n_l/\sigma^2)/(n_l/\sigma^2 + 1/\tau^2)$. It follows the location's own data when $n_l$ is large and shrinks toward the common mean when $n_l$ is small, and $\tau$ itself is estimated from the data.
+
+**Source effects.** $\gamma_g \in \mathbb{R}^3$ and the scale offsets $c_g$ are fixed effects, with ILINet as the reference source ($\gamma_{\text{ILINet}} = 0$, $c_{\text{ILINet}} = 0$), since ILINet contributes the most rows. They let NHSN (or NSSP) differ systematically from ILINet. With only two or three NHSN seasons they are estimated imprecisely, and the posterior carries that uncertainty into the forecast.
+
+### Tempering: rows of a series are not independent {#sec-hier-temper}
+
+A likelihood that multiplies over replay rows treats every row as an independent observation. As @sec-loso explains, the roughly 39 rows of one (source, location, season) series all describe the same peak: $k$ decreases by exactly one from each row to the next, and $z$ changes little. An untempered posterior would therefore behave as if it had about 39 times more evidence than it does. Its intervals would be far too narrow, and the random-effect variances, which compare between-series with within-series variation, would be distorted.
+
+We use a **tempered** (power) likelihood: every row's log likelihood is multiplied by a weight $w_{\text{lik}} \in (0, 1]$,
+$$
+\log p(\theta \mid \text{data}) = \text{const} + \log p(\theta) + w_{\text{lik}} \sum_i \bigl[\ell^{\text{timing}}_i(\theta) + \mathbf{1}\{k_i \ge 1\}\,\ell^{\text{size}}_i(\theta)\bigr],
+$$
+where $\theta$ denotes all parameters, $\ell^{\text{timing}}_i = \log \pi_{0,i}$ if $k_i \le 0$ and $\log \Pr(k^+_i = k_i)$ otherwise, and $\ell^{\text{size}}_i$ is the log density of $\log\max(z_i, z_{\min})$. With $w_{\text{lik}} = 0.15$ each series counts as about six observations. This is a pragmatic device, not a model of the dependence (a series-level effect would be the more complete alternative). Its value mainly affects the width of the parameter posterior and the strength of the current-season update, so it is the first setting to tune on the development seasons.
+
+### Priors
+
+All features are standardized to mean 0 and standard deviation 1 in the training rows and clipped to $\pm 5$. They are then **whitened**: rotated and rescaled, using the eigendecomposition of their training covariance, into uncorrelated combinations with unit variance. The features are strongly collinear. For example, `rel_max`, `rm3` and `cum_rel` all measure the current level relative to the maximum. Without whitening the coefficients are highly correlated in the posterior, which makes sampling slow (@sec-hier-compute). Whitening changes the parameterization but not the model's fitted values, apart from the priors, which now apply to the uncorrelated combinations.
+
+- Smooth functions $a_0$, $f_\omega$, $f_m$, $b$: cubic B-splines (6, 8, 5 and 6 basis functions, equally spaced knots) with $\mathcal{N}(0, 2^2)$ priors on the coefficients. $f_m$ drops its first basis function so that it has no intercept of its own.
+- Coefficients: $\beta_0, \beta, \beta_z \sim \mathcal{N}(0, 1)$ elementwise; the offset interactions $\beta_m, \beta_{zm} \sim \mathcal{N}(0, 0.5^2)$; $b_1, b_2, c_0, c_1, c_2 \sim \mathcal{N}(0, 1)$; source effects $\gamma_g \sim \mathcal{N}(0, 1)$ and $c_g \sim \mathcal{N}(0, 0.5^2)$.
+- Random effects: scales $\tau \sim \text{Half-Normal}(0.5)$ elementwise (Gelman 2006), and the Cholesky factor of $\Omega$ has an LKJ(2) prior (Lewandowski, Kurowicka and Joe 2009), which mildly favors small correlations. The effects are parameterized non-centered ($u_l = \operatorname{diag}(\tau)L\,\tilde u_l$, $\tilde u_l \sim \mathcal{N}_3(0, I)$), which usually samples better when the data per group are weak.
+- Degrees of freedom: $\nu - 1 \sim \text{Gamma}(2, 0.1)$, so $\nu > 1$ and the mean exists.
+
+On the logit scale a standard deviation of 0.5 corresponds to shifting a hazard of 0.2 to roughly 0.13–0.29, a moderate between-season or between-location difference.
+
+### Computation {#sec-hier-compute}
+
+The posterior is sampled with NUTS. The first version sampled very slowly: every iteration used the maximum of 255 leapfrog steps, with step sizes around 0.002. Finding out why took several steps, and they are recorded here because the reasons say something about the model.
+
+1. **Collinear features and an ill-suited size scale.** At the posterior mode, the curvature (eigenvalues of the Hessian of the log posterior) spanned a factor of about $10^6$. Whitening the features, centering $\log k$ and $\log m$, and switching to the $\sqrt{z}$ size model (which removes the badly identified $\nu$) reduced this, but not enough on their own.
+2. **The random-effect covariance was the real problem.** Starting from the mode and perturbing one block of parameters at a time, every block of fixed effects behaved like a Gaussian. The random-effect parameters did not.
+    - **Non-centered season effects** (effects written as SD × standard normal) gave a long curved ridge between each season-effect SD and the standardized effects. This is the known failure of that parameterization when each group has a lot of data, and every season has hundreds of series.
+    - **Centered effects** removed the ridge, but the **LKJ correlations** among the three effect components were pushed toward $\pm 1$. They are barely identified from about 20 seasons.
+3. **What works.** The implementation now uses:
+    - **independent** effect components (no estimated correlations);
+    - **centered** effects, except that the season effect of the already-peaked component is non-centered, because its SD has posterior mass near zero, where the centered form has a funnel;
+    - **location effects on the hazard only.** In the development fit, the location SDs for the already-peaked and size components were essentially zero (about 0.05 and 0.008 on their scales), against about 0.6 for the hazard. Locations differ in *when* they peak, not in the other two respects.
+    - **thinned origins:** every third origin week (`origin_stride = 3`), with each row's likelihood weight multiplied by 3, so every series keeps the same total weight. Neighboring origins are near-duplicates, so little information is lost.
+
+With these choices, on the 2018/19 development fit, no iteration reached the step limit (mean 64 leapfrog steps). All parameters had effective sample sizes of 15–160 from 200 draws of a single chain, and 500 iterations took about 4.5 minutes.
+
+Things that did *not* help in a benchmark: a dense mass matrix adapted during warm-up; starting at the mode; and using the inverse Hessian at the mode as a fixed metric (a Laplace preconditioner). The last two fail because the joint mode of a hierarchical model is degenerate in the effect SDs. They remain available as options.
+
+### Learning the current season's effect from censored observations {#sec-hier-current}
+
+When forecasting season $s_0$, the training data contain no rows from $s_0$, so without further steps its season effect $v_{s_0}$ would simply be a draw from $\mathcal{N}_3(0, \Sigma_{\text{sea}})$. But the current season has already revealed something in every location. Suppose location $l$ is observed through week $t$ with running maximum $M_t$ reached at week $A_t$. Ignoring revisions, two facts are certain (@sec-relative, "What these targets look like when the data are final"):
+
+- the peak is no earlier than $A_t$: $W^* \ge A_t$; and
+- the peak is no lower than $M_t$: $Y^* \ge M_t$.
+
+Now look back at any earlier origin $t' < A_t$ of the current season. Its outcomes $(k_{t'}, z_{t'})$ are not known yet, but they are **right-censored**: we know lower bounds for them,
+$$
+k_{t'} \ge \kappa_{t'} := A_t - t' \;(\ge 1), \qquad z_{t'} \ge \zeta_{t'} := \log(M_t + \varepsilon) - \log(M_{t'} + \varepsilon).
+$$
+The features $\phi_{t'}$ at that origin are computed from data through $t'$ only, exactly as for a training row. Under the model, the probability of what we know is
+$$
+\Pr(k_{t'} \ge \kappa_{t'},\, z_{t'} \ge \zeta_{t'})
+= (1 - \pi_{0,t'}) \sum_{m \in \mathcal{M}_{t'},\, m \ge \kappa_{t'}} \Pr(k_{t'} = m \mid k_{t'} \ge 1)\; \Pr\bigl(z_{t'} \ge \zeta_{t'} \mid k_{t'} = m\bigr),
+$$
+where the size factor is omitted (set to 1) when $\zeta_{t'} \le z_{\min}$. Each such term involves $v_{s_0}$. Collecting them over all locations and all origins $t' < A_t$ gives a likelihood for the current season's effect. For example, if many locations have been rising for weeks without peaking, these terms push the hazard component of $v_{s_0}$ down (a later season). If many have already reached high levels relative to their early-season values, the size component moves up.
+
+**Computation.** Refitting the whole model by MCMC at every reference date would be slow, so the current-season effect is updated separately. For each posterior draw $\theta^{(d)}$ of the other parameters (from the fit to training seasons), we
+
+1. find the mode $\hat v^{(d)}$ of the conditional log posterior of $v_{s_0}$,
+$$
+w_{\text{lik}} \sum_{l,\, t' < A_{l,t}} \log \Pr\bigl(k_{l,t'} \ge \kappa_{l,t'},\, z_{l,t'} \ge \zeta_{l,t'} \mid \theta^{(d)}, v_{s_0}\bigr) - \tfrac12 v_{s_0}^\top \bigl(\Sigma_{\text{sea}}^{(d)}\bigr)^{-1} v_{s_0},
+$$
+by damped Newton steps (12 iterations; the step length is capped at 1);
+2. draw $v^{(d)}_{s_0} \sim \mathcal{N}_3\bigl(\hat v^{(d)}, H^{(d)-1}\bigr)$, where $H^{(d)}$ is the negative Hessian at the mode (a **Laplace approximation**).
+
+The same tempering weight is applied, so that each location's censored rows count as a few observations, not dozens. Location effects of the current locations are held at their posterior draws (or drawn from $\mathcal{N}_3(0, \Sigma_{\text{loc}}^{(d)})$ for a location not seen in training) and are not updated by the current season.
+
+Two approximations should be kept in mind. First, the conditional posterior of $v_{s_0}$ given $\theta^{(d)}$ is approximated by a normal distribution. It has only three dimensions and draws on hundreds of censored terms, so this should be accurate. Second, $\theta$ is not updated by the current season, which ignores a small amount of information. For NHSN the bounds use the currently reported values, which can still be revised. A downward revision of the current maximum could in principle make a bound slightly wrong, but the effect on a season-level parameter estimated from many locations is small.
+
+### Prediction
+
+For a current-season series with features $\phi$ at week $t$, and each of $D = 200$ posterior draws $d$ (with its own $v^{(d)}_{s_0}$ and $u^{(d)}_l$):
+
+- **Timing:** compute $\pi_0$ and the class probabilities $\Pr(k^+ = m)$ for $m \in \mathcal{M}$ from the formulas above. The model's timing output is the average over draws.
+- **Size:** draw five joint samples $(k^+, z)$: $k^+$ from the class probabilities, then $z = 0$ if $k^+ = 0$ and otherwise $\log z \sim \mathrm{St}_\nu(\mu, \sigma)$ evaluated at $k = k^+$. The model's size output is the set of quantiles of the resulting 1,000 values of $z$.
+
+These outputs then pass through the same backfill simulation, floor and formatting as the other models (@sec-backfill, @sec-submission).
 
 ::: {.callout-note title="Implementation"}
-**Not implemented.** Proposed specification: the hurdle structure above (size likelihood only for $k \ge 1$, truncated at zero), the censored current-season terms, and the priors listed above; NUTS with 4 chains, with warm-up and sample sizes to be set after pilot runs. Because training rows use final data, $k_i \ge 1$ implies $z_i > 0$ whenever $t_i \ge \underline\omega$; rows before the window opens can have $k_i \ge 1$ and $z_i \le 0$, and would need a size likelihood that is not truncated at zero.
+**`PeakHierModel`** (`idmodels/peak/hier.py`; configuration `PeakHierModelConfig`).
+
+- **Features** (`design_features`): `rel_max`, `log1p(min(wks_since_max, 15))`, `g1`, `g3`, `rm3`, `cum_rel`, `hist_rel` (0 if missing) and an indicator that it is missing, `nat_rel_max`, `log1p(min(nat_wks_since_max, 15))`, `nat_g3` (each replaced by the series' own value if there is no national series) and an indicator of that. `season_week` enters only through the splines; `g2` is not used. Features are standardized with the training mean and SD (not the two indicators) and clipped to $\pm 5$.
+- **Splines**: `df_t = 6` (for $a_0$ and $b$, knots over season weeks `replay_start_week`..`window_end_week`), `df_week = 8` ($f_\omega$, over the window), `df_offset = 5` ($f_m$, over $\log m \in [0, \log 42]$).
+- **Likelihood**: `likelihood_weight` $= w_{\text{lik}} = 0.15$ per replay row (multiplied by `origin_stride` when origins are thinned); `size_scale = "sqrt"` (the alternative `"log"` uses a Student-$t$ for $\log\max(z, z_{\min})$ if `student_t = True`, with `z_floor` $= z_{\min} = 0.01$); `origin_stride = 3` (every third origin week).
+- **Effects**: `location_effects = True` with `location_components = [1]` (hazard only), `season_effects = True` with `season_components = [0, 1, 2]`, `correlated_effects = False`, `centered_effects = True` except `season_noncentered_components = [0]`, `effect_scale = 0.5` (Half-Normal scale of $\tau$), `current_season_update = True`.
+- **MCMC**: NUTS (NumPyro; Phan, Pradhan and Jankowiak 2019) with `num_chains = 2` chains run sequentially, `num_warmup = 500`, `num_samples = 500`, `target_accept_prob = 0.85`, `max_tree_depth = 8`; `whiten_features = True`; diagonal mass matrix adapted during warm-up. (Options not used by default: `dense_mass`, `init_map_steps`, `laplace_mass`.) The condition number of $H$ is stored as `laplace_condition_`, and timings and step statistics as `mcmc_stats_`. Diagnostics stored after fitting: `max_rhat_`, `min_ess_` (over all parameters except the individual effects $u_l$, $v_s$) and `num_divergences_`. The fit is repeated once per forecast season, as for the other models.
+- **Prediction**: `num_posterior_draws = 200` (evenly spaced over the retained draws), `size_samples_per_draw = 5`, `laplace_iters = 12`. The current-season update and prediction are deterministic given the reference date (seeded random numbers).
+- **Hook**: the current-season update runs in `PeakHierModel._observe_current_season`, which the base class calls with the current season as reported (`CurrentSeason`) just before `_predict`.
+:::
+
+::: {.callout-important title="Open for review before full runs"}
+1. **Tempering weight.** $w_{\text{lik}} = 0.15$ ("about six observations per series") is a judgment call. Plan: compare 0.05, 0.15 and 0.4 on the development seasons.
+2. **Effect structure.** Independent components (no correlation), and location effects on the hazard only (@sec-hier-compute). Also: **location effects shared across sources.** Assumes a state's tendency to peak early or late, and its relative size, carries over from ILINet to NHSN. Alternative: source-specific location effects, or a location effect for timing only.
+3. **Season effects shared across sources.** Natural if the sources track the same epidemic, but a source's relative size ($z$) could differ by season, for example if test positivity or care-seeking changed.
+4. **Size model.** $\sqrt{z}$ given $k$ as a truncated normal, chosen from the skewness and kurtosis of the training data (the first version used $\log z$ with a Student-$t$). Calibration will be checked via the coverage and the PIT of the peak size.
+5. **Current-season update via censoring plus Laplace**, instead of refitting the whole model at each reference date (which would be the exact Bayesian answer but costs roughly an MCMC run per date).
+6. **Compute.** See @sec-hier-compute. The random-effect SDs at the posterior mode (about 0.9–1.8 on the logit scale for timing) are well above the Half-Normal(0.5) prior scale, so `effect_scale` may need to be larger.
+7. **What the model does not have.** No series-level effect, no effects of virus type or subtype, and no dependence between the current-season effect and features beyond the national ones.
 :::
 
 ## Model 5 (planned): ensembles (`peak_ensemble`) {#sec-ensemble}
@@ -842,7 +1061,17 @@ Scores require the true values, which `build_peak_oracle.py` derives for each ev
 **Scoring details** (`score_peak_forecasts.py`). A submitted pmf is aligned to the 34 window dates (missing dates count as 0) and renormalized before scoring; the log score guards against $\log 0$ with a floor of $10^{-300}$. Each forecast row is also labelled with its distance to the true peak, $(r - W^*)$ in weeks (`weeks_from_peak`).
 :::
 
-## Backtest design and comparisons
+## Development and test design {#sec-dev-design}
+
+NHSN has only a few usable seasons, and all of them have already been looked at (the hindcasts of 2023/24–2025/26). Choosing among model variants by their NHSN scores would therefore overfit the choice to those seasons. Model development is instead done on a source that the NHSN forecasts never have to predict:
+
+- **Development seasons: state-level ILINet in 2018/19 and 2019/20**, the last two full seasons before COVID-19 (`validate_ilinet.py`). No NHSN data are used at all. For development season $s$, a model is trained on every season before $s$ of ILINet (nation, HHS regions, states) and FluSurv-NET. It then forecasts the peak week and peak size of every state's ILINet series (about 46 states) at 29 weekly reference dates (season weeks 14–42, late October to mid-May). At reference date $r$ it uses only weeks through $r - 7$, since ILINet for a week is published the following Friday. Forward chaining means that the 2019/20 fit also uses 2018/19.
+- **Real-time data.** ILINet has no vintages in `iddata`, but the Delphi Epidata API keeps every weekly release (unweighted ILI from the 2017/18 season on, clinical-lab positivity from October 2018). `epidata_ilinet.py` reconstructs the ILINet × positivity series of each state and the nation as published by each reference date (`validate_ilinet.py --realtime`). Weeks at least 10 weeks old are taken as final. Revisions are large: at first release the product differs from its final value by a median of 6–9%, with a 90th percentile of 45–65%, mostly because positivity is revised as more specimens are reported. Revisions go in both directions, unlike NHSN's mostly upward ones. Scores always use the final data.
+- **Revision simulation.** With `--revisions`, the same block-bootstrap revision model as for NHSN (@sec-revision) is fit, at each reference date, to the ILINet revision vectors known by then. Revisions are measured against the latest value available at that date, with an offset of 0.01 in ILINet units and no strata. The model is then applied to 200 simulated final versions of the current season. Before about mid-December 2018 fewer than 200 revision vectors exist, and a symmetric perturbation with lag-0 SD 0.25 is used instead. That value was chosen with knowledge of the revision sizes above, a mild use of hindsight that affects only the first reference dates of 2018/19.
+- **Other differences from the NHSN setting.** State ILINet also has about eight earlier seasons per state, whereas NHSN has two or three, so features that use a location's history (`hist_rel`) and location effects are better informed here than they will be for NHSN. Peak size is in ILINet units and is scored with WIS on the $\log(y + 0.01)$ scale; the log score and RPS for the peak week are as defined above.
+- **Test seasons: NHSN 2023/24 and 2024/25.** The few variants that do well on the development seasons are then run as real-time NHSN hindcasts (@sec-dev-design-test) and compared with the existing models. 2025/26 is left for a final check, keeping in mind that the earlier models were already examined on it.
+
+## Backtest design and comparisons {#sec-dev-design-test}
 
 - **Seasons and origins.** Hindcasts (`run_hindcasts.py`) at every reference date listed for the peak-week task of each season in `hub-config/tasks.json`: 2023/24 (29 dates, 2023-10-21 to 2024-05-04), 2024/25 (23 dates, 2024-11-30 to 2025-05-17), and 2025/26 (28 dates, 2025-11-22 to 2026-05-30). Training is forward chaining (@sec-loso): only seasons strictly before the forecast season. NHSN inputs, including all revision vintages, are those available on each reference date, so the current-season inputs are exactly what was available in real time.
 - **Scores.** Peak week: log score (with the floor applied), RPS, and the probability within $\pm 1$ week. Peak size: WIS on the count and log scales, 50% and 95% coverage, and the relative error of the median. Planned additions: the WIS decomposition, coverage at all 11 levels, and the calibration of past-week revision probabilities (@sec-backfill).
@@ -999,27 +1228,72 @@ scores = pd.read_csv("analysis/peak-models/peak-scores.csv")  # written by score
 ## References
 
 - Aitchison, J. and Aitken, C. G. G. (1976). Multivariate binary discrimination by the kernel method. *Biometrika*, 63(3), 413–420.
+- Allison, P. D. (1982). Discrete-time methods for the analysis of event histories. *Sociological Methodology*, 13, 61–98. doi:10.2307/270718
+- Ben Taieb, S., Bontempi, G., Atiya, A. F. and Sorjamaa, A. (2012). A review and comparison of strategies for multi-step ahead time series forecasting based on the NN5 forecasting competition. *Expert Systems with Applications*, 39(8), 7067–7083. doi:10.1016/j.eswa.2012.01.039
+- Ben-Nun, M., Riley, P., Turtle, J., Bacon, D. P. and Riley, S. (2019). Forecasting national and regional influenza-like illness for the USA. *PLOS Computational Biology*, 15(5), e1007013. doi:10.1371/journal.pcbi.1007013
+- Biggerstaff, M., Alper, D., Dredze, M., et al. (2016). Results from the Centers for Disease Control and Prevention's Predict the 2013–2014 Influenza Season Challenge. *BMC Infectious Diseases*, 16, 357. doi:10.1186/s12879-016-1669-x
+- Biggerstaff, M., Johansson, M., Alper, D., et al. (2018). Results from the second year of a collaborative effort to forecast influenza seasons in the United States. *Epidemics*, 24, 26–33. doi:10.1016/j.epidem.2018.02.003
+- Bissiri, P. G., Holmes, C. C. and Walker, S. G. (2016). A general framework for updating belief distributions. *Journal of the Royal Statistical Society: Series B*, 78(5), 1103–1130. doi:10.1111/rssb.12158
 - Bracher, J. (2019). On the multibin logarithmic score used in the FluSight competitions. *Proceedings of the National Academy of Sciences*, 116(42), 20809–20810.
 - Bracher, J., Ray, E. L., Gneiting, T. and Reich, N. G. (2021). Evaluating epidemic forecasts in an interval format. *PLoS Computational Biology*, 17(2), e1008618.
 - Breiman, L. (1996). Bagging predictors. *Machine Learning*, 24(2), 123–140.
+- Brooks, L. C., Farrow, D. C., Hyun, S., Tibshirani, R. J. and Rosenfeld, R. (2015). Flexible modeling of epidemics with an empirical Bayes framework. *PLOS Computational Biology*, 11(8), e1004382. doi:10.1371/journal.pcbi.1004382
+- Brooks, L. C., Farrow, D. C., Hyun, S., Tibshirani, R. J. and Rosenfeld, R. (2018). Nonmechanistic forecasts of seasonal influenza with iterative one-week-ahead distributions. *PLOS Computational Biology*, 14(6), e1006134. doi:10.1371/journal.pcbi.1006134
+- Chakraborty, P., Lewis, B., Eubank, S., Brownstein, J. S., Marathe, M. and Ramakrishnan, N. (2018). What to know before forecasting the flu. *PLOS Computational Biology*, 14(10), e1005964. doi:10.1371/journal.pcbi.1005964
+- Chaves, S. S., Lynfield, R., Lindegren, M. L., Bresee, J. and Finelli, L. (2015). The US Influenza Hospitalization Surveillance Network. *Emerging Infectious Diseases*, 21(9), 1543–1550. doi:10.3201/eid2109.141912
 - Chernozhukov, V., Fernández-Val, I. and Galichon, A. (2010). Quantile and probability curves without crossing. *Econometrica*, 78(3), 1093–1125.
+- Cragg, J. G. (1971). Some statistical models for limited dependent variables with application to the demand for durable goods. *Econometrica*, 39(5), 829–844. doi:10.2307/1909582
+- du Toit, J. and Peskir, G. (2009). Selling a stock at the ultimate maximum. *Annals of Applied Probability*, 19(3), 983–1014. doi:10.1214/08-AAP566
+- Duan, N., Manning, W. G., Morris, C. N. and Newhouse, J. P. (1983). A comparison of alternative models for the demand for medical care. *Journal of Business and Economic Statistics*, 1(2), 115–126. doi:10.1080/07350015.1983.10509330
 - Epstein, E. S. (1969). A scoring system for probability forecasts of ranked categories. *Journal of Applied Meteorology*, 8(6), 985–987.
+- Farrow, D. C., Brooks, L. C., Hyun, S., Tibshirani, R. J., Burke, D. S. and Rosenfeld, R. (2017). A human judgment approach to epidemiological forecasting. *PLOS Computational Biology*, 13(3), e1005248. doi:10.1371/journal.pcbi.1005248
 - Friedman, J. H. (2001). Greedy function approximation: a gradient boosting machine. *Annals of Statistics*, 29(5), 1189–1232.
 - Gelman, A. (2006). Prior distributions for variance parameters in hierarchical models. *Bayesian Analysis*, 1(3), 515–534.
-- Gneiting, T., Balabdaoui, F. and Raftery, A. E. (2007). Probabilistic forecasts, calibration and sharpness. *Journal of the Royal Statistical Society: Series B*, 69(2), 243–268.
 - Gneiting, T. and Raftery, A. E. (2007). Strictly proper scoring rules, prediction, and estimation. *Journal of the American Statistical Association*, 102(477), 359–378.
+- Gneiting, T., Balabdaoui, F. and Raftery, A. E. (2007). Probabilistic forecasts, calibration and sharpness. *Journal of the Royal Statistical Society: Series B*, 69(2), 243–268.
 - Good, I. J. (1952). Rational decisions. *Journal of the Royal Statistical Society: Series B*, 14(1), 107–114.
+- Gould, D. W., Walker, D. and Yoon, P. W. (2017). The evolution of BioSense: lessons learned and future directions. *Public Health Reports*, 132(1_suppl), 7S–11S. doi:10.1177/0033354917706954
+- Grünwald, P. and van Ommen, T. (2017). Inconsistency of Bayesian inference for misspecified linear models, and a proposal for repairing it. *Bayesian Analysis*, 12(4), 1069–1103. doi:10.1214/17-BA1085
+- Hickmann, K. S., Fairchild, G., Priedhorsky, R., et al. (2015). Forecasting the 2013–2014 influenza season using Wikipedia. *PLOS Computational Biology*, 11(5), e1004239. doi:10.1371/journal.pcbi.1004239
 - Hoffman, M. D. and Gelman, A. (2014). The No-U-Turn Sampler: adaptively setting path lengths in Hamiltonian Monte Carlo. *Journal of Machine Learning Research*, 15, 1593–1623.
+- Holmes, C. C. and Walker, S. G. (2017). Assigning a value to a power likelihood in a general Bayesian model. *Biometrika*, 104(2), 497–503. doi:10.1093/biomet/asx010
 - Hyndman, R. J., Bashtannyk, D. M. and Grunwald, G. K. (1996). Estimating and visualizing conditional densities. *Journal of Computational and Graphical Statistics*, 5(4), 315–336.
+- Kandula, S., Yamana, T., Pei, S., Yang, W., Morita, H. and Shaman, J. (2018). Evaluation of mechanistic and statistical methods in forecasting influenza-like illness. *Journal of the Royal Society Interface*, 15(144), 20180174. doi:10.1098/rsif.2018.0174
 - Ke, G., Meng, Q., Finley, T., Wang, T., Chen, W., Ma, W., Ye, Q. and Liu, T.-Y. (2017). LightGBM: a highly efficient gradient boosting decision tree. *Advances in Neural Information Processing Systems*, 30.
+- Koenker, R. (2005). *Quantile Regression*. Econometric Society Monographs 38. Cambridge University Press. doi:10.1017/CBO9780511754098
 - Koenker, R. and Bassett, G. (1978). Regression quantiles. *Econometrica*, 46(1), 33–50.
 - Lerch, S., Thorarinsdottir, T. L., Ravazzolo, F. and Gneiting, T. (2017). Forecaster's dilemma: extreme events and forecast evaluation. *Statistical Science*, 32(1), 106–127.
 - Lewandowski, D., Kurowicka, D. and Joe, H. (2009). Generating random correlation matrices based on vines and extended onion method. *Journal of Multivariate Analysis*, 100(9), 1989–2001.
 - Lichtendahl, K. C., Grushka-Cockayne, Y. and Winkler, R. L. (2013). Is it better to average probabilities or quantiles? *Management Science*, 59(7), 1594–1611.
+- Lu, J. and Meyer, S. (2020). Forecasting flu activity in the United States: benchmarking an endemic-epidemic beta model. *International Journal of Environmental Research and Public Health*, 17(4), 1381. doi:10.3390/ijerph17041381
+- Lutz, C. S., Huynh, M. P., Schroeder, M., et al. (2019). Applying infectious disease forecasting to public health: a path forward using influenza forecasting examples. *BMC Public Health*, 19, 1659. doi:10.1186/s12889-019-7966-8
+- Mack, T. (1993). Distribution-free calculation of the standard error of chain ladder reserve estimates. *ASTIN Bulletin*, 23(2), 213–225. doi:10.2143/AST.23.2.2005092
 - Mathis, S. M., Webber, A. E., León, T. M., et al. (2024). Evaluation of FluSight influenza forecasting in the 2021–22 and 2022–23 seasons with a new target laboratory-confirmed influenza hospitalizations. *Nature Communications*, 15, 6289.
+- McGough, S. F., Johansson, M. A., Lipsitch, M. and Menzies, N. A. (2020). Nowcasting by Bayesian smoothing: a flexible, generalizable model for real-time epidemic tracking. *PLOS Computational Biology*, 16(4), e1007735. doi:10.1371/journal.pcbi.1007735
 - McGowan, C. J., Biggerstaff, M., Johansson, M., et al. (2019). Collaborative efforts to forecast seasonal influenza in the United States, 2015–2016. *Scientific Reports*, 9, 683.
+- Meyer, A. G., Lu, F., Clemente, L. and Santillana, M. (2025). A prospective real-time transfer learning approach to estimate influenza hospitalizations with limited data. *Epidemics*, 50, 100816. doi:10.1016/j.epidem.2025.100816
+- Miller, J. W. and Dunson, D. B. (2019). Robust Bayesian inference via coarsening. *Journal of the American Statistical Association*, 114(527), 1113–1125. doi:10.1080/01621459.2018.1469995
+- Nsoesie, E., Marathe, M. and Brownstein, J. (2013). Forecasting peaks of seasonal influenza epidemics. *PLOS Currents Outbreaks*, 5. doi:10.1371/currents.outbreaks.bb1e879a23137022ea79a8c508b030bc
+- Osthus, D. and Moran, K. R. (2021). Multiscale influenza forecasting. *Nature Communications*, 12, 2991. doi:10.1038/s41467-021-23234-5
+- Osthus, D., Gattiker, J., Priedhorsky, R. and Del Valle, S. Y. (2019). Dynamic Bayesian influenza forecasting in the United States with hierarchical discrepancy (with discussion). *Bayesian Analysis*, 14(1), 261–312. doi:10.1214/18-BA1117
+- Osthus, D., Hickmann, K. S., Caragea, P. C., Higdon, D. and Del Valle, S. Y. (2017). Forecasting seasonal influenza with a state-space SIR model. *Annals of Applied Statistics*, 11(1), 202–224. doi:10.1214/16-AOAS1000
+- Pauli, F., Racugno, W. and Ventura, L. (2011). Bayesian composite marginal likelihoods. *Statistica Sinica*, 21(1), 149–164.
 - Phan, D., Pradhan, N. and Jankowiak, M. (2019). Composable effects for flexible and accelerated probabilistic programming in NumPyro. arXiv:1912.11554.
 - Ranjan, R. and Gneiting, T. (2010). Combining probability forecasts. *Journal of the Royal Statistical Society: Series B*, 72(1), 71–91.
+- Ray, E. L. and Reich, N. G. (2018). Prediction of infectious disease epidemics via weighted density ensembles. *PLOS Computational Biology*, 14(2), e1005910. doi:10.1371/journal.pcbi.1005910
 - Ray, E. L., Sakrejda, K., Lauer, S. A., Johansson, M. A. and Reich, N. G. (2017). Infectious disease prediction with kernel conditional density estimation. *Statistics in Medicine*, 36(30), 4908–4929.
+- Ray, E. L., Wang, Y., Wolfinger, R. D. and Reich, N. G. (2025). Flusion: integrating multiple data sources for accurate influenza predictions. *Epidemics*, 50, 100810. doi:10.1016/j.epidem.2024.100810
+- Reed, C., Chaves, S. S., Daily Kirley, P., et al. (2015). Estimating influenza disease burden from population-based surveillance data in the United States. *PLoS ONE*, 10(3), e0118369. doi:10.1371/journal.pone.0118369
 - Reich, N. G., Brooks, L. C., Fox, S. J., et al. (2019). A collaborative multiyear, multimodel assessment of seasonal influenza forecasting in the United States. *Proceedings of the National Academy of Sciences*, 116(8), 3146–3154.
+- Ribatet, M., Cooley, D. and Davison, A. C. (2012). Bayesian inference from composite likelihoods, with an application to spatial extremes. *Statistica Sinica*, 22(2), 813–845. doi:10.5705/ss.2009.248
+- Rolfes, M. A., Foppa, I. M., Garg, S., et al. (2018). Annual estimates of the burden of seasonal influenza in the United States: a tool for strengthening influenza surveillance and preparedness. *Influenza and Other Respiratory Viruses*, 12(1), 132–137. doi:10.1111/irv.12486
+- Shaman, J. and Karspeck, A. (2012). Forecasting seasonal outbreaks of influenza. *Proceedings of the National Academy of Sciences*, 109(50), 20425–20430. doi:10.1073/pnas.1208772109
+- Shaman, J., Karspeck, A., Yang, W., Tamerius, J. and Lipsitch, M. (2013). Real-time influenza forecasts during the 2012–2013 season. *Nature Communications*, 4, 2837. doi:10.1038/ncomms3837
+- Shiryaev, A., Xu, Z. and Zhou, X. Y. (2008). Thou shalt buy and hold. *Quantitative Finance*, 8(8), 765–776. doi:10.1080/14697680802563732
+- Singer, J. D. and Willett, J. B. (1993). It's about time: using discrete-time survival analysis to study duration and the timing of events. *Journal of Educational Statistics*, 18(2), 155–195. doi:10.3102/10769986018002155
+- Tang, J., Rumack, A., Wilder, B. and Rosenfeld, R. (2025). Real-time forecasting of data revisions in epidemic surveillance streams. *PLOS Computational Biology*, 21(11), e1013709. doi:10.1371/journal.pcbi.1013709
+- Tierney, L. and Kadane, J. B. (1986). Accurate approximations for posterior moments and marginal densities. *Journal of the American Statistical Association*, 81(393), 82–86. doi:10.1080/01621459.1986.10478240
 - Tutz, G. and Schmid, M. (2016). *Modeling Discrete Time-to-Event Data*. Springer.
+- Viboud, C., Boëlle, P.-Y., Carrat, F., Valleron, A.-J. and Flahault, A. (2003). Prediction of the spread of influenza epidemics by the method of analogues. *American Journal of Epidemiology*, 158(10), 996–1006. doi:10.1093/aje/kwg239
+- Wadsworth, S. and Niemi, J. (2025). Forecasting influenza hospitalizations using a Bayesian hierarchical nonlinear model with discrepancy. *Bayesian Analysis*, advance publication. doi:10.1214/25-BA1578
+- Yamana, T. K., Kandula, S. and Shaman, J. (2017). Individual versus superensemble forecasts of seasonal influenza outbreaks in the United States. *PLOS Computational Biology*, 13(11), e1005801. doi:10.1371/journal.pcbi.1005801

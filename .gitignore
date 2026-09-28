@@ -10,4 +10,6 @@ analysis/peak-models/*.csv
 analysis/peak-models/*.html
 analysis/peak-models/*_files/
 analysis/peak-models/viz/*.json
+analysis/peak-models/ilinet-validation/
 **/__pycache__/
+analysis/peak-models/eda/
