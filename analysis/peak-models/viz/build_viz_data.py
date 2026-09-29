@@ -131,7 +131,20 @@ def main():
         "locations": [{"id": r.location, "abbr": r.abbreviation, "name": r.location_name} for r in locs.itertuples()],
         "seasons": seasons,
     }
-    (HERE / "data.json").write_text(json.dumps(out, separators=(",", ":"), allow_nan=False))
+    text = json.dumps(out, separators=(",", ":"), allow_nan=False)
+    (HERE / "data.json").write_text(text)
+    # the published page loads data-<content hash>.json, so browsers and caches never serve an older data file;
+    # write that copy and point index.html at it (publish index.html with the hashed file)
+    import hashlib
+    import re
+
+    name = f"data-{hashlib.sha256(text.encode()).hexdigest()[:10]}.json"
+    for old in HERE.glob("data-*.json"):
+        old.unlink()
+    (HERE / name).write_text(text)
+    page = HERE / "index.html"
+    page.write_text(re.sub(r'fetch\("data[^"]*\.json"', f'fetch("{name}"', page.read_text()))
+    print("page now loads", name)
     print({k: (len(v["refs"]), len(v["models"])) for k, v in seasons.items()},
           (HERE / "data.json").stat().st_size // 1024, "KB")
     print([m["id"] for m in models])

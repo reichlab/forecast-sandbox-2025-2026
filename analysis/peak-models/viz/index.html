@@ -198,7 +198,8 @@ th { font-family: var(--font-ui); font-weight: 600; color: var(--ink-2); }
   let D, state = { loc: "US", season: null, refIdx: 0, models: new Set(), playing: null };
 
   // revalidate so an updated data file is never replaced by a stale cached copy
-  fetch("data.json", { cache: "no-cache" }).then((r) => r.json()).then((data) => { D = normalize(data); init(); })
+  // the data file name carries a content hash, so a cached copy of an older file can never be used
+  fetch("data-48903ce150.json", { cache: "no-cache" }).then((r) => r.json()).then((data) => { D = normalize(data); init(); })
     .catch(() => { $("status").textContent = "Could not load forecast data."; });
 
   function normalize(data) {
