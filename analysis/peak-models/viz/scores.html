@@ -74,6 +74,10 @@ svg .num { font-family: var(--font-num); font-size: 10.5px; }
 table.sum { border-collapse: collapse; font-size: 12.5px; min-width: 640px; }
 table.sum th, table.sum td { padding: 5px 10px; border-bottom: 1px solid var(--rule); text-align: right; font-variant-numeric: tabular-nums; font-family: var(--font-num); }
 table.sum th { font-family: var(--font-ui); font-weight: 600; color: var(--ink-2); font-size: 12px; }
+table.sum th button { font: inherit; color: inherit; background: none; border: 0; padding: 2px 0; cursor: pointer; display: inline-flex; gap: 4px; align-items: center; }
+table.sum th button:hover { color: var(--ink); }
+table.sum th button .arr { font-size: 10px; color: var(--ink-3); min-width: 8px; }
+table.sum th[aria-sort] button, table.sum th[aria-sort] button .arr { color: var(--ink); }
 table.sum th:first-child, table.sum td:first-child { text-align: left; font-family: var(--font-ui); }
 table.sum td.best { background: var(--good); color: var(--good-ink); font-weight: 600; }
 table.sum td .n { color: var(--ink-3); font-size: 10.5px; margin-left: 4px; }
@@ -149,7 +153,9 @@ table.sum td .n { color: var(--ink-3); font-size: 10.5px; margin-left: 4px; }
   };
   const styleOf = (id) => STYLE[id] || { c: "--other", thin: true };
 
-  let D, state = { metric: store.get("metric") || "wis_log", loc: store.get("loc") || "all", win: store.get("win") || "near", models: new Set() };
+  let D, state = { metric: store.get("metric") || "wis_log", loc: store.get("loc") || "all", win: store.get("win") || "near", models: new Set(),
+    // table sort: column index (-1 = model order, 0 = model name, 1.. = season columns) and direction (1 or -1)
+    sort: (() => { try { return JSON.parse(store.get("sort")) || { col: -1, dir: 1 }; } catch (e) { return { col: -1, dir: 1 }; } })() };
 
   // the data file name carries a content hash, so a cached copy of an older file can never be used
   fetch("scores-0f70f60fde.json", { cache: "no-cache" }).then((r) => r.json()).then((d) => { D = d; init(); })
@@ -305,7 +311,7 @@ table.sum td .n { color: var(--ink-3); font-size: 10.5px; margin-left: 4px; }
     const inWin = rows.filter((r) => r.wfp >= W.lo && r.wfp <= W.hi);
     const cols = [...SEASONS, "All seasons"];
     const cell = (m, s) => { const rr = inWin.filter((r) => r.model === m.id && (s === "All seasons" || r.season === s)); if (!rr.length) return null; return { mean: rr.reduce((a, r) => a + r.v, 0) / rr.length, n: rr.length }; };
-    const grid = models.map((m) => ({ m, cells: cols.map((s) => cell(m, s)) }));
+    const grid = models.map((m, i) => ({ m, i, cells: cols.map((s) => cell(m, s)) }));
     const best = cols.map((_, j) => {
       const vs = grid.map((g) => g.cells[j]?.mean).filter((v) => v != null);
       if (!vs.length) return null;
@@ -313,11 +319,36 @@ table.sum td .n { color: var(--ink-3); font-size: 10.5px; margin-left: 4px; }
       if (M.better === "higher") return Math.max(...vs);
       return vs.reduce((a, v) => (Math.abs(v - M.target) < Math.abs(a - M.target) ? v : a));
     });
-    $("tableNote").textContent = `Mean ${M.label} for forecasts made ${W.label} weeks from the observed peak. Highlighted: best in each column (${M.better === "target" ? "closest to " + (M.target * 100) + "%" : M.better + " is better"}). Models are compared on whatever forecasts they submitted, so hub columns can cover fewer dates or locations; n is the number of forecasts.`;
-    $("table").innerHTML = `<table class="sum"><thead><tr><th>Model</th>${cols.map((c) => `<th>${c}</th>`).join("")}</tr></thead><tbody>` +
-      grid.map((g) => `<tr><td><span class="legend" style="display:inline"><span class="k${styleOf(g.m.id).dash ? " dash" : ""}" style="border-top-color:var(${styleOf(g.m.id).c})"></span></span>${g.m.label}</td>` +
+    // sorting: "goodness" of a value for this metric, so that dir = 1 means best first
+    const good = (v) => (M.better === "higher" ? v : M.better === "lower" ? -v : -Math.abs(v - M.target));
+    const { col, dir } = state.sort;
+    const rowsSorted = [...grid].sort((a, b) => {
+      if (col < 0) return a.i - b.i;
+      if (col === 0) return dir * a.m.label.localeCompare(b.m.label);
+      const va = a.cells[col - 1]?.mean, vb = b.cells[col - 1]?.mean;
+      if (va == null && vb == null) return a.i - b.i;
+      if (va == null) return 1; // models without a score in this column go last
+      if (vb == null) return -1;
+      return dir * (good(vb) - good(va)) || a.i - b.i;
+    });
+    const headers = ["Model", ...cols];
+    const arrow = (j) => (col !== j ? "" : j === 0 ? (dir > 0 ? "▲" : "▼") : dir > 0 ? "best ▼" : "best ▲");
+    const ariaSort = (j) => {
+      if (col !== j) return "";
+      const ascending = j === 0 ? dir > 0 : (dir > 0) === (M.better === "lower");
+      return ` aria-sort="${ascending ? "ascending" : "descending"}"`;
+    };
+    $("tableNote").textContent = `Mean ${M.label} for forecasts made ${W.label} weeks from the observed peak. Highlighted: best in each column (${M.better === "target" ? "closest to " + (M.target * 100) + "%" : M.better + " is better"}). Click a column heading to sort by it (click again to reverse). Models are compared on whatever forecasts they submitted, so hub columns can cover fewer dates or locations; n is the number of forecasts.`;
+    $("table").innerHTML = `<table class="sum"><thead><tr>${headers.map((h, j) => `<th${ariaSort(j)}><button type="button" data-col="${j}" title="Sort by ${h}">${h}<span class="arr">${arrow(j)}</span></button></th>`).join("")}</tr></thead><tbody>` +
+      rowsSorted.map((g) => `<tr><td><span class="legend" style="display:inline"><span class="k${styleOf(g.m.id).dash ? " dash" : ""}" style="border-top-color:var(${styleOf(g.m.id).c})"></span></span>${g.m.label}</td>` +
         g.cells.map((c, j) => c ? `<td class="${c.mean === best[j] ? "best" : ""}">${M.fmt(c.mean)}<span class="n">${c.n}</span></td>` : `<td style="color:var(--ink-3)">–</td>`).join("") + "</tr>").join("") +
       "</tbody></table>";
+    $("table").querySelectorAll("th button").forEach((b) => b.addEventListener("click", () => {
+      const j = +b.dataset.col;
+      state.sort = state.sort.col === j ? { col: j, dir: -state.sort.dir } : { col: j, dir: 1 };
+      store.set("sort", JSON.stringify(state.sort));
+      drawTable(rows, W, M, models);
+    }));
   }
 
   function niceTicks(lo, hi, n) {
