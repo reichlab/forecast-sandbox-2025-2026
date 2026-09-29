@@ -21,11 +21,10 @@ This methods document describes the direct peak models as implemented in `idmode
 
 Model and feature-set names follow the table in @sec-versions. In brief:
 
-- **Committed** in idmodels 8c56bf0: the baseline `peak_baseline`, GBQR `peak_gbqr` (optionally with feature set SB), KCDE `peak_kcde`, and the hierarchical model `peak_hier`.
-- **Uncommitted:** GBQR's separate size and timing feature groups with the candidate feature groups (`extra_features.py`) and the reported-at-t synchrony option; the GBQR-offset hybrid `peak_hybrid` and `current_update_weight`.
+- **Committed** in idmodels 8c56bf0: the baseline `peak_baseline`, GBQR `peak_gbqr` (optionally with feature set SB), KCDE `peak_kcde`, and the hierarchical model `peak_hier`. Added in idmodels 1dd468d: GBQR's separate size and timing feature groups, the candidate feature groups (`extra_features.py`), the reported-at-t synchrony option, and the GBQR-offset hybrid `peak_hybrid` with `current_update_weight` (development paused).
 - **Not yet a model directory:** the equal-weight ensembles, which have been evaluated.
 
-**Current focus: locking in a GBQR model.** Development of the hierarchical and hybrid models is paused until then. The only results so far are **development results** on two ILINet seasons (@sec-dev-results); nothing developed since the 2023/24–2025/26 NHSN hindcasts has been run on NHSN. Everything not yet done is listed in @sec-future.
+**Current focus: locking in a GBQR model.** Development of the hierarchical and hybrid models is paused until then. The only results so far are **development results** on two ILINet seasons (@sec-dev-results); the chosen GBQR configurations are being run on NHSN 2023/24 and 2024/25 (@sec-dev-gbqr-runs). Everything not yet done is listed in @sec-future.
 :::
 
 # Versions and names used in this document {#sec-versions}
@@ -38,7 +37,7 @@ Several versions of each model and several feature sets were compared during dev
 |---|---|---|
 | **base** | The 13 original state features: `season_week`, `rel_max`, `wks_since_max`, `g1`, `g2`, `g3`, `rm3`, `cum_rel`, `hist_rel`, `nat_rel_max`, `nat_wks_since_max`, `nat_g3`, `src_code` | Default |
 | **SB** | base plus 4 synchrony features (`sync_med_rel_max`, `sync_med_g3`, `sync_frac_past2`, `sync_frac_half`) and 2 burden features (`cum_vs_hist_total`, `cum_vs_hist_same_week`) | `sync_burden_features = True` |
-| base / SB + *group* | A feature set plus candidate groups. **Available in GBQR** (`idmodels/peak/extra_features.py`, identical to the exploratory harness on all 31,108 training rows): **trend** (local-polynomial level, slope and curvature, rolling means, lags), **recession** (recession and records: `rec_rate`, `rec_consist`, `n_rec4`, `rec_frac`), **holiday**, **latlon**, **bshare** (influenza B share: `b_share_3wk`, `b_share_cum`, `b_share_trend`, `a_rising`, `b_rising`, `b_minus_a_growth`, `b_frac_of_peak`), **h3** (H3N2 share). **Exploratory harness only** (`relative_size_predictors.py`): onset, timing-vs-history, reflection, severity-in-peaked, chain-ladder, deceleration, Bass, cross-source, and the neighbor groups `nbr5`, `hhs`, `wave` | `PeakGBQRModelConfig.size_feature_groups` and `timing_feature_groups`, e.g. `["base", "sb", "bshare"]` (uncommitted) |
+| base / SB + *group* | A feature set plus candidate groups. **Available in GBQR** (`idmodels/peak/extra_features.py`, identical to the exploratory harness on all 31,108 training rows): **trend** (local-polynomial level, slope and curvature, rolling means, lags), **recession** (recession and records: `rec_rate`, `rec_consist`, `n_rec4`, `rec_frac`), **holiday**, **latlon**, **bshare** (influenza B share: `b_share_3wk`, `b_share_cum`, `b_share_trend`, `a_rising`, `b_rising`, `b_minus_a_growth`, `b_frac_of_peak`), **h3** (H3N2 share). **Exploratory harness only** (`relative_size_predictors.py`): onset, timing-vs-history, reflection, severity-in-peaked, chain-ladder, deceleration, Bass, cross-source, and the neighbor groups `nbr5`, `hhs`, `wave` | `PeakGBQRModelConfig.size_feature_groups` and `timing_feature_groups`, e.g. `["base", "sb", "bshare"]` (1dd468d) |
 
 Two definitions of the synchrony features exist. **Carried-forward** (the default): a location counts at week $t$ if it has any value through $t$, its latest value carried forward. **Reported-at-t** (`sync_reported_only = True`, used by the exploratory harness and the `gbqr__R` runs): it counts only if week $t$ itself was reported. In as-published ILINet at least one state lacks the latest week at 98% of reference dates (median 3 of about 45), and the synchrony features then differ by a median of 0.008–0.02 and a 90th percentile of 0.03–0.12 (up to 0.45). `peak_gbqr__sb` and `hier__w05c12sb` used carried-forward.
 
@@ -49,15 +48,15 @@ Two definitions of the synchrony features exist. **Carried-forward** (the defaul
 | `peak_baseline` | Conditional climatology (@sec-baseline) | 8c56bf0 |
 | `peak_gbqr` | GBQR with base (@sec-gbqr) | 8c56bf0 |
 | `peak_gbqr__sb` | GBQR with SB | 8c56bf0 |
-| `gbqr__R1` … `gbqr__R10` | GBQR with separate size and timing feature sets and reported-at-t synchrony (@sec-dev-gbqr-runs) | uncommitted |
+| `gbqr__R1` … `gbqr__R10` | GBQR with separate size and timing feature sets and reported-at-t synchrony (@sec-dev-gbqr-runs) | 1dd468d (config) |
 | `peak_kcde` | Kernel conditional density estimation (@sec-kcde) | 8c56bf0 |
 | `peak_hier` | Hierarchical model with the committed defaults: tempering $w_{\text{lik}} = 0.15$, current-season update on all three components (@sec-hier) | 8c56bf0 |
 | `hier__w05`, `hier__w02c12` | `peak_hier` with $w_{\text{lik}} = 0.05$; with $w_{\text{lik}} = 0.02$ and the current-season update on the hazard and size components only | 8c56bf0 (config) |
 | `hier__nocur`, `hier__tv` | `peak_hier` without the current-season update; with time-varying coefficients | 8c56bf0 (config) |
 | `hier__w05d`, `hier__w05dtv`, `hier__w05c12`, `hier__w05c12sb` | `hier__w05` plus weeks-since-max indicators; plus those and time-varying coefficients; with the update on hazard and size only; the latter with SB-derived features | 8c56bf0 (config) |
-| `peak_hybrid` (`hybrid`) | Hierarchical model with GBQR offsets, $w_{\text{lik}} = 0.05$ (@sec-hier-hybrid) | uncommitted |
-| `hybrid__w02`, `hybrid__feat` | `hybrid` with $w_{\text{lik}} = 0.02$; `hybrid` also keeping the hierarchical model's own feature terms | uncommitted |
-| `hybrid__cu01`, `hybrid__cu003` | `hybrid` with a separate censored-update weight `current_update_weight` of 0.01 and 0.003 | uncommitted |
+| `peak_hybrid` (`hybrid`) | Hierarchical model with GBQR offsets, $w_{\text{lik}} = 0.05$ (@sec-hier-hybrid) | 1dd468d |
+| `hybrid__w02`, `hybrid__feat` | `hybrid` with $w_{\text{lik}} = 0.02$; `hybrid` also keeping the hierarchical model's own feature terms | 1dd468d (config) |
+| `hybrid__cu01`, `hybrid__cu003` | `hybrid` with a separate censored-update weight `current_update_weight` of 0.01 and 0.003 | 1dd468d (config) |
 | `ens_gbqr_hierw05`, `ens_gbqr_hierw02`, `ens_gbqr_hierw05_base` | Equal-weight ensembles of `peak_gbqr` and `hier__w05`; of `peak_gbqr` and `hier__w02c12`; of `peak_gbqr`, `hier__w05` and `peak_baseline` (@sec-ensemble) | `ensemble_validation.py` |
 
 **Evaluation settings** for the ILINet development seasons (@sec-dev-design):
@@ -66,7 +65,7 @@ Two definitions of the synchrony features exist. **Carried-forward** (the defaul
 - **@rt**: the series is as published by the reference date.
 - **@rtrev**: as published, plus revision simulation.
 
-The validation harness and first exploratory analyses are in sandbox commit c88a6ca; later changes are uncommitted.
+The validation harness, the GBQR feature-set runs and the R exploratory analyses are in sandbox commit 7198510.
 
 # The problem in plain terms {#sec-problem}
 
@@ -596,7 +595,7 @@ applied to a residual $e = z - q$ (here $\mathbf{1}\{\cdot\}$ is the indicator f
 
 An option, `PeakGBQRModelConfig.size_offset = True` (sandbox model `peak_gbqr_offset`), starts each row from a sensible value instead. Each quantile regression is then boosted from an **offset** (LightGBM's `init_score`) equal to the conditional-climatology baseline's $\tau$-quantile of $z$ for that row (@sec-baseline), which already depends on the season week and on the weeks since the maximum. The trees learn only a correction to the baseline, and the prediction is the offset plus the boosted correction. On the training rows this brings the late-season 97.5% prediction to 0, while the early-season 97.5% quantile still covers about 99% of outcomes.
 
-The offset is not the default. In the 2023/24–2025/26 NHSN hindcasts it improved the calibration of early-season intervals but worsened the log-scale WIS of peak size overall (0.169 against 0.157), mostly one to four weeks after the peak, where the default's extra width mainly covered small late revisions to the reported peak. Adding trees (400 instead of 100) was worse in held-out seasons, with or without the offset. Peak-week forecasts do not depend on it; it is being retested on ILINet with richer features (@sec-dev-gbqr-runs).
+The offset is not the default. In the 2023/24–2025/26 NHSN hindcasts it improved the calibration of early-season intervals but worsened the log-scale WIS of peak size overall (0.169 against 0.157), mostly one to four weeks after the peak, where the default's extra width mainly covered small late revisions to the reported peak. Adding trees (400 instead of 100) was worse in held-out seasons, with or without the offset. Peak-week forecasts do not depend on it. On the ILINet development seasons it also worsened size forecasts with SB (@sec-dev-gbqr-runs).
 
 ### The timing classifier
 
@@ -940,14 +939,11 @@ Still open:
 
 ### Hybrid: GBQR offsets (`peak_hybrid`) {#sec-hier-hybrid}
 
-::: {.callout-warning title="Status: uncommitted, partly evaluated"}
-Implemented in `idmodels/peak/hybrid.py` (`PeakHybridModel`, `PeakHybridModelConfig`) and `src/peak_hybrid`, not yet committed. It has been scored on the 2018/19 development season only; the remaining runs are on hold (@sec-future).
+::: {.callout-warning title="Status: paused, partly evaluated"}
+Implemented in `idmodels/peak/hybrid.py` (`PeakHybridModel`, `PeakHybridModelConfig`; idmodels 1dd468d) and `src/peak_hybrid`. It has been scored on the 2018/19 development season only; the remaining runs are on hold (@sec-future).
 :::
 
-**In plain terms.** The hierarchical model and GBQR are strong in different phases of the season (@sec-dev-results).
-
-- The hierarchical model is better well before the peak, because it learns the current season's timing from all locations.
-- GBQR is better around and after the peak, because its trees capture sharp combinations of the level, growth and weeks since the maximum.
+**In plain terms.** The hierarchical model is better well before the peak, because it learns the current season's timing from all locations; GBQR is better around and after the peak, because its trees capture sharp combinations of the level, growth and weeks since the maximum (@sec-dev-results).
 
 The hybrid is a single model that uses GBQR's forecasts as a starting point, or **offset**, for each part of the hierarchical model:
 
@@ -967,24 +963,7 @@ Here $o_m$ is the hazard implied by GBQR's class probabilities over the valid fu
 
 **Honest offsets for training.** If the training rows' offsets were GBQR's in-sample predictions, GBQR would look far more accurate than it is, and the hybrid would learn to trust it too much. Each of GBQR's bags leaves out about 30% of the training seasons, so every training row is given the **out-of-bag** prediction: the average over the bags that never saw the row's season (`PeakGBQRModel.oob_predict`). At forecast time all bags are used.
 
-**Results so far** (2018/19 only, `@rtrev`, states):
-
-| Model | Log score | Rel. RPS | Rel. log-WIS | 95% cov. | Log score, 1 week either side of the peak |
-|---|---|---|---|---|---|
-| `hybrid__w02` | **−1.836** | 0.885 | 0.642 | 0.94 | −2.15 |
-| `ens_gbqr_hierw05` | −1.849 | 0.894 | **0.640** | 0.94 | −2.15 |
-| `hybrid__feat` | −1.855 | 0.889 | 0.670 | 0.94 | −2.43 |
-| `peak_gbqr` | −1.867 | **0.880** | 0.695 | 0.92 | **−1.97** |
-| `peak_baseline` | −1.871 | 1.000 | 1.000 | 0.94 | −2.01 |
-| `hybrid` | −1.878 | 0.913 | 0.664 | 0.94 | −2.54 |
-| `hier__w02c12` | −1.901 | 0.964 | 0.662 | 0.94 | −2.10 |
-| `hier__w05` | −1.927 | 0.974 | 0.661 | 0.94 | −2.46 |
-
-What these results show:
-
-- **Every hybrid beats the hierarchical variants.** In 2018/19, `hybrid__w02` was the best single model on log score.
-- **Sampling.** The GBQR offsets make the posterior better behaved. `hybrid` mixed very well: largest $\hat R$ 1.01, smallest effective sample size 218. `hybrid__w02` mixed poorly ($\hat R$ 1.29, effective sample size 12), so its scores need a longer run before they can be trusted.
-- **The weakness around the peak remains.** It persists in `hybrid` (−2.54) and shrinks with weaker tempering. This is the evidence, discussed under item 6 above, that the censored update is too strong. It motivated `current_update_weight` (@sec-hier-current).
+**Results so far** (2018/19 only, `@rtrev`, states). Log score: `hybrid__w02` −1.836 (the best single model that season, ahead of `ens_gbqr_hierw05` −1.849), `hybrid__feat` −1.855, `hybrid` −1.878, against `peak_gbqr` −1.867, `peak_baseline` −1.871 and `hier__w05` −1.927; relative log-WIS 0.64–0.67 for the hybrids against 0.695 for `peak_gbqr`. The GBQR offsets make the posterior better behaved (`hybrid`: largest $\hat R$ 1.01, smallest effective sample size 218), but `hybrid__w02` mixed poorly ($\hat R$ 1.29, effective sample size 12) and needs a longer run. The weakness around the peak remains (log score one week either side of the peak: `hybrid` −2.54, `hybrid__w02` −2.15, `peak_gbqr` −1.97), which is the evidence that the censored update is too strong and the reason for `current_update_weight` (@sec-hier-current).
 
 ::: {.callout-note title="Implementation"}
 **`PeakHybridModel`** (`idmodels/peak/hybrid.py`, subclass of `PeakHierModel`; configuration `PeakHybridModelConfig`).
@@ -1309,26 +1288,48 @@ Besides the model runs above, many candidate feature groups were tested in the e
 | SB + chain-ladder | 1.050 | — | Hurts |
 | base + trend / onset / timing-vs-history / holiday | 0.996 / 0.999 / 1.036 / 1.005 | about 0 (holiday −0.0024, not reliable) | No gain |
 
-In plain terms: almost nothing improves the forecast of *how big* the peak will be beyond SB; the strongest size predictor is where the season stands relative to the location's typical peak (`hist_rel`). For *has the peak passed?* three groups help a little: the influenza B share, latitude/longitude, and recession/records. The B-share gain is the largest; it mostly works in reverse of the "second B wave" story, because a high or rising B share usually means the A wave is already falling.
+In plain terms: almost nothing improves the forecast of *how big* the peak will be beyond SB (the strongest size predictor is `hist_rel`). For *has the peak passed?* the B share, latitude/longitude and recession/records helped a little in this harness (a high or rising B share usually means the A wave is already falling), but not in GBQR itself (@sec-dev-gbqr-runs).
 
 ### GBQR feature-set runs {#sec-dev-gbqr-runs}
 
 The candidate groups that looked useful above are being tested in `peak_gbqr` itself (`validate_ilinet.py --revisions`, `@rtrev`, both development seasons). Because GBQR's size and timing models are separate (@sec-gbqr), each run tests one size set and one timing set, and the best of each can be combined afterwards without another run. All runs use reported-at-t synchrony. For the type and subtype groups, training uses final WHO/NREVSS counts; the forecast season uses as-published clinical-lab A/B counts from the Delphi releases (for example, Massachusetts A positives were first published as 227 and later revised to 336), but final H1/H3 counts, since no subtype vintages exist. "Offset" is `size_offset = True`; "recession" includes the records features.
 
-| Run | Size features | Timing features | Result |
-|---|---|---|---|
-| `peak_gbqr` (control) | base | base | above |
-| `peak_gbqr__sb` (control, carried-forward) | SB | SB | above |
-| `gbqr__R1` | SB | SB | *pending* |
-| `gbqr__R2` | SB + offset | base + bshare | *pending* |
-| `gbqr__R3` | SB + bshare | base + latlon | *pending* |
-| `gbqr__R4` | SB + trend | base + recession | *pending* |
-| `gbqr__R5` | SB + h3 | base + holiday | *pending* |
-| `gbqr__R6` | SB + recession | base + bshare + latlon + recession + holiday | *pending* |
-| `gbqr__R7` | SB + latlon | SB + bshare | *pending* |
-| `gbqr__R8` | SB + bshare + offset | SB + latlon + recession | *pending* |
-| `gbqr__R9` | SB + trend + bshare | SB + bshare + latlon + recession | *pending* |
-| `gbqr__R10` | base + offset | SB + bshare + latlon + recession + holiday | *pending* |
+Timing columns score the peak-week pmf (log score, higher is better; RPS relative to `peak_baseline`), which depends only on the timing features; size columns score the peak-size quantiles (log-scale WIS, lower is better; relative to `peak_baseline`), which depend only on the size features. `peak_baseline`: log score −1.663, log-WIS 0.292.
+
+| Run | Size features | Timing features | Log score (18/19, 19/20) | Rel. RPS | Log-WIS (18/19, 19/20) | Rel. WIS |
+|---|---|---|---|---|---|---|
+| `peak_gbqr` | base | base | −1.631 (−1.867, −1.394) | 0.899 | 0.184 (0.205, 0.163) | 0.631 |
+| `peak_gbqr__sb` | SB (carried-forward) | SB (carried-forward) | −1.670 (−1.886, −1.453) | 0.911 | **0.179** (0.192, 0.167) | **0.615** |
+| `gbqr__R1` | SB | SB | −1.677 (−1.892, −1.461) | 0.918 | 0.183 (0.191, 0.175) | 0.628 |
+| `gbqr__R2` | SB + offset | base + bshare | −1.651 (−1.920, −1.382) | 0.918 | 0.207 (0.211, 0.203) | 0.711 |
+| `gbqr__R3` | SB + bshare | base + latlon | −1.633 (−1.871, −1.395) | 0.908 | 0.183 (0.193, 0.173) | 0.628 |
+| `gbqr__R4` | SB + trend | base + recession | −1.634 (−1.871, −1.396) | 0.908 | 0.188 (0.200, 0.175) | 0.644 |
+| `gbqr__R5` | SB + h3 | base + holiday | **−1.627** (−1.847, −1.406) | **0.892** | 0.185 (0.195, 0.175) | 0.633 |
+| `gbqr__R6` | SB + recession | base + bshare + latlon + recession + holiday | −1.635 (−1.903, −1.368) | 0.910 | 0.183 (0.192, 0.175) | 0.629 |
+| `gbqr__R7` | SB + latlon | SB + bshare | −1.692 (−1.930, −1.453) | 0.938 | **0.179** (0.193, 0.166) | **0.615** |
+| `gbqr__R8` | SB + bshare + offset | SB + latlon + recession | −1.690 (−1.913, −1.467) | 0.944 | 0.209 (0.213, 0.204) | 0.716 |
+| `gbqr__R9` | SB + trend + bshare | SB + bshare + latlon + recession | −1.700 (−1.950, −1.450) | 0.954 | 0.188 (0.202, 0.173) | 0.643 |
+| `gbqr__R10` | base + offset | SB + bshare + latlon + recession + holiday | −1.690 (−1.933, −1.448) | 0.943 | 0.211 (0.225, 0.196) | 0.722 |
+
+What the runs show:
+
+- **SB hurts timing**: all six timing sets containing SB score 0.04–0.07 worse than base, in both seasons.
+- **The baseline offset hurts size**: all three runs with it are about 0.03 worse.
+- **Everything else is within noise**: timing extras on base (holiday, lat/lon, recession/records, B share) are within 0.02 of base, and size extras on SB within 0.005 (0.009 for trend), with rankings that flip between seasons.
+- **Synchrony definition**: carried-forward is slightly better than reported-at-t for both size (0.179 vs 0.183) and timing, so carried-forward stays the default.
+
+**Chosen GBQR configuration: size SB (carried-forward), timing base.** Pairing the size forecasts of `peak_gbqr__sb` with the timing forecasts of `peak_gbqr` (`combine_size_timing.py`) gives log score −1.631, relative RPS 0.899 and relative WIS 0.615, matching or beating both controls on both tasks; with holiday in the timing set, −1.627 and 0.892.
+
+**NHSN test runs** (2023/24 and 2024/25, real time with NHSN vintages; 2025/26 held out; outputs kept outside `model-output/`). Each run pairs one size set with one timing set:
+
+| Run | Size features | Timing features |
+|---|---|---|
+| N1 | SB (carried-forward) | base |
+| N2 | SB + latlon | base + holiday |
+| N3 | SB + bshare | base + bshare + latlon + recession + holiday |
+| controls | `peak_gbqr` (base / base, re-run with the current code), `peak_baseline` | |
+
+For N3, the forecast-season B share uses as-published clinical-lab A/B counts from Delphi; training uses final counts.
 
 ### Geography and influenza types {#sec-dev-geography}
 
@@ -1349,11 +1350,11 @@ From `peak-timing-size-eda.html` (ILINet states, final data; descriptive):
 ### Conclusions from development {#sec-dev-conclusions}
 
 1. **Evaluate in real time.** `@rtrev` (as-published data plus revision simulation) is the evaluation setting. Treating provisional data as final costs about a third of a unit of log score.
-2. **Best single model over both seasons: `peak_gbqr`** with feature set base. `peak_gbqr__sb` trades slightly better size forecasts for slightly worse timing.
+2. **Best GBQR: size SB, timing base.** Separate feature lists combine SB's better size forecasts with base's better timing (@sec-dev-gbqr-runs).
 3. **Best overall: `ens_gbqr_hierw05`.** It beats both members and `peak_baseline` on log score and peak-size WIS in each season.
 4. **Hierarchical model and hybrid.** Much weaker tempering than the committed default is better (0.02 best). The current-season update helps 5–8 weeks before the peak but appears too strong around it. `hybrid__w02` was the best single model in 2018/19 (one season, poor mixing).
-5. **Features.** For peak size nothing tested beats SB. For the already-peaked probability the B share is the most promising addition, then latitude/longitude and recession/records; these are now being tested in GBQR (@sec-dev-gbqr-runs).
-6. **NHSN.** None of this has been tested on NHSN (@sec-future).
+5. **Features.** In GBQR, no candidate group reliably improves on SB for size or on base for timing; the exploratory harness's gains for B share, latitude/longitude and recession/records did not carry over (@sec-dev-gbqr-runs). SB in the timing classifier and the baseline offset hurt.
+6. **NHSN.** Three GBQR configurations and two controls are being run on NHSN 2023/24 and 2024/25 (@sec-dev-gbqr-runs).
 
 ## Backtest design and comparisons {#sec-dev-design-test}
 
@@ -1423,22 +1424,19 @@ Everything below is not yet done. Other sections point here instead of describin
 
 **Evaluation**
 
-- Score `gbqr__R1`–`gbqr__R10` (@sec-dev-gbqr-runs) and combine the best size set with the best timing set.
-- Run 2–3 of those GBQR configurations, including one without the recession features (NHSN's mostly upward revisions make provisional latest weeks look like declines), with `peak_gbqr` and `peak_baseline`, as real-time hindcasts on NHSN 2023/24 and 2024/25, keeping 2025/26 for a final check.
+- Score the NHSN runs N1–N3 and controls (@sec-dev-gbqr-runs), choose the GBQR configuration, and use 2025/26 for a final check. N1 and N2 have no recession features, which matters if NHSN's mostly upward revisions make provisional latest weeks look like declines.
 - On hold while GBQR is locked in: `hybrid` and `hybrid__w02` for 2019/20, `hybrid__cu01` and `hybrid__cu003`, and a longer `hybrid__w02` run.
 - For the backtests: season-blocked uncertainty for paired score differences, the WIS decomposition, coverage at all 11 levels, and the calibration of past-week revision probabilities.
 
 **Models**
 
 - Decide the default tempering for `peak_hier` (development favors 0.02 over the committed 0.15) and, once the `cu` runs finish, the current-update weight.
-- Commit the hybrid (`idmodels/peak/hybrid.py`, `current_update_weight`) and `src/peak_hybrid`.
 - Build a `peak_ensemble` model directory producing hub files. Learning the ensemble weights, for example by phase of the season, needs more than two development seasons.
 - Season-specific spatial gradients in the hierarchical hazard (@sec-dev-geography), and location effects shrunk toward a latitude trend (useful for Florida, which has no ILINet).
 - Modeling influenza A and B separately and combining them, to represent a B-driven second hump directly.
 
 **Features**
 
-- Adopt one synchrony definition as the default (reported-at-t is used by the `gbqr__R` runs).
 - Revision simulation for the clinical-lab A/B counts behind the B-share features, and as-published subtype counts.
 
 **Revisions**

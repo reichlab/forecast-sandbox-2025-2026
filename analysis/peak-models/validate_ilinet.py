@@ -112,6 +112,11 @@ VARIANTS: dict[str, dict] = {
                      timing_feature_groups=["base", "sb", "bshare", "latlon", "recession"]),
     "gbqr__R10": dict(sync_reported_only=True, size_offset=True, size_feature_groups=["base"],
                       timing_feature_groups=["base", "sb", "bshare", "latlon", "recession", "holiday"]),
+    # GBQR configurations carried to the NHSN test seasons (nhsn_validation.py); carried-forward synchrony
+    "gbqr__N1": dict(size_feature_groups=["base", "sb"], timing_feature_groups=["base"]),
+    "gbqr__N2": dict(size_feature_groups=["base", "sb", "latlon"], timing_feature_groups=["base", "holiday"]),
+    "gbqr__N3": dict(size_feature_groups=["base", "sb", "bshare"],
+                     timing_feature_groups=["base", "bshare", "latlon", "recession", "holiday"]),
     "hybrid__w02": dict(likelihood_weight=0.02),
     "hybrid__feat": dict(hybrid_keep_features=True),  # also keep the hierarchical model's own feature terms
     "hybrid__cu01": dict(current_update_weight=0.01),  # weaker censored current-season update

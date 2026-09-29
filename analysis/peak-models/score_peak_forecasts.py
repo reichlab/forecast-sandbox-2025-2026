@@ -90,6 +90,9 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--models", nargs="*", default=None,
                         help="model directory names under model-output/ (default: all UMass-peak_*)")
+    parser.add_argument("--forecast_root", default=None,
+                        help="directory holding UMass-peak_* forecast folders (default: model-output/); scores are "
+                             "then written to peak-scores-<folder name>.csv")
     parser.add_argument("--hub_root", default=None,
                         help="optional path to a FluSight-forecast-hub clone whose peak forecasts to also score")
     args = parser.parse_args()
@@ -102,13 +105,15 @@ def main():
             dates = mt["output_type"]["pmf"]["output_type_id"]["required"]
             windows[season_of_ref(dates[0])] = dates
 
-    names = args.models or sorted(p.name for p in (ROOT / "model-output").glob("UMass-peak_*"))
-    dirs = [ROOT / "model-output" / n for n in names]
+    froot = Path(args.forecast_root) if args.forecast_root else ROOT / "model-output"
+    names = args.models or sorted(p.name for p in froot.glob("UMass-peak_*"))
+    dirs = [froot / n for n in names]
     if args.hub_root:
         dirs += [d for d in sorted((Path(args.hub_root) / "model-output").iterdir()) if d.is_dir()]
     forecasts = load_forecasts(dirs)
     scores = score(forecasts, oracle, windows)
-    scores.to_csv(HERE / "peak-scores.csv", index=False)
+    out_name = f"peak-scores-{froot.name}.csv" if args.forecast_root else "peak-scores.csv"
+    scores.to_csv(HERE / out_name, index=False)
 
     ours = scores.loc[scores["model"].str.startswith("UMass-peak_")]
     cols = ["log_score", "rps", "prob_pm1", "wis", "wis_log", "cov50", "cov95"]

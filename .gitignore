@@ -13,5 +13,6 @@ analysis/peak-models/*_files/
 analysis/peak-models/*_cache/
 analysis/peak-models/viz/*.json
 analysis/peak-models/ilinet-validation/
+analysis/peak-models/nhsn-hindcasts/
 **/__pycache__/
 analysis/peak-models/eda/

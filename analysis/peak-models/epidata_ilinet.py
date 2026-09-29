@@ -54,11 +54,14 @@ STATE_FIPS = {
 }
 
 
-def _get(endpoint: str, lag: int) -> list[dict]:
-    path = CACHE / f"{endpoint}_lag{lag}.json"
+def _get(endpoint: str, lag: int | None, epiweeks: str = EPIWEEKS, tag: str = "") -> list[dict]:
+    """One Epidata call for all regions at one lag (lag None: the latest values), cached as JSON."""
+    path = CACHE / f"{endpoint}{tag}_lag{lag if lag is not None else 'latest'}.json"
     if path.exists():
         return json.loads(path.read_text())
-    params = {"regions": ",".join(STATE_FIPS), "epiweeks": EPIWEEKS, "lag": lag}
+    params = {"regions": ",".join(STATE_FIPS), "epiweeks": epiweeks}
+    if lag is not None:
+        params["lag"] = lag
     url = BASE + endpoint + "/?" + urllib.parse.urlencode(params)
     for attempt in range(5):
         try:
@@ -136,6 +139,26 @@ def as_of_values(table: pd.DataFrame, ref_date: datetime.date, final: pd.DataFra
     rt = rt[["location", "wk_end_date", "inc"]]
     old = final.loc[(final["wk_end_date"] <= last - pd.Timedelta(weeks=MAX_LAG)), ["location", "wk_end_date", "inc"]]
     return pd.concat([old, rt], ignore_index=True).sort_values(["location", "wk_end_date"]).reset_index(drop=True)
+
+
+NHSN_EPIWEEKS = "202235-202535"
+
+
+def nhsn_clinical_tables() -> tuple[pd.DataFrame, pd.DataFrame]:
+    """
+    Clinical-lab A and B positives for the NHSN test seasons (epiweeks NHSN_EPIWEEKS): a lag table (lags 0..MAX_LAG-1,
+    as lag_table) and the latest values. One API call per lag plus one for the latest values.
+    """
+    frames = []
+    for lag in list(range(MAX_LAG)) + [None]:
+        c = pd.DataFrame(_get("fluview_clinical", lag, epiweeks=NHSN_EPIWEEKS, tag="_nhsn"))
+        c = c[["region", "epiweek", "total_a", "total_b"]].assign(lag=lag if lag is not None else -1)
+        frames.append(c)
+    out = pd.concat(frames, ignore_index=True)
+    out["location"] = out["region"].map(STATE_FIPS)
+    out["wk_end_date"] = pd.to_datetime([epiweek_to_saturday(e) for e in out["epiweek"]])
+    out = out.drop(columns="region")
+    return out.loc[out["lag"] >= 0].reset_index(drop=True), out.loc[out["lag"] < 0].drop(columns="lag")
 
 
 def strain_as_of(table: pd.DataFrame, ref_date: datetime.date, season: str, week_map: pd.DataFrame,
