@@ -16,10 +16,11 @@ import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[3]
 HERE = Path(__file__).parent
-SANDBOX_MODELS = [("UMass-peak_gbqr", "GBQR"), ("UMass-peak_gbqr_offset", "GBQR (offset)"), ("UMass-peak_kcde", "KCDE"),
+# final candidate models; labels are "<size features> / <timing features>" for the GBQR models
+SANDBOX_MODELS = [("UMass-peak_gbqr_sb", "GBQR SB / core"), ("UMass-peak_gbqr_core_hol", "GBQR core / core+hol"),
                   ("UMass-peak_baseline", "Baseline")]
 HUB_FIRST = ["FluSight-ensemble", "FluSight-base_seasonal"]  # listed first among hub models
-DEFAULT_ON = {"UMass-peak_gbqr", "UMass-peak_kcde", "UMass-peak_baseline", "FluSight-ensemble"}
+DEFAULT_ON = {"UMass-peak_gbqr_sb", "UMass-peak_gbqr_core_hol", "UMass-peak_baseline", "FluSight-ensemble"}
 MIN_HUB_REFS = 8  # hub models need at least this many reference dates in a season to be shown
 WEEK_TARGET, SIZE_TARGET = "peak week inc flu hosp", "peak inc flu hosp"
 

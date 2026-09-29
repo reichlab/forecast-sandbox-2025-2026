@@ -123,7 +123,7 @@ th { font-family: var(--font-ui); font-weight: 600; color: var(--ink-2); }
   <header class="top">
     <div>
       <h1>Flu season peak forecasts</h1>
-      <p class="sub">Probability that weekly flu hospital admissions (NHSN) peak in each week of the season, and forecasts of the peak weekly count, from the sandbox peak models and the real-time FluSight hub submissions.</p>
+      <p class="sub">Probability that weekly flu hospital admissions (NHSN) peak in each week of the season, and forecasts of the peak weekly count, from three sandbox candidate models and the real-time FluSight hub submissions. Sandbox GBQR labels give the feature sets of the peak-size and the peak-timing parts: <b>GBQR SB / core</b> uses core + synchrony/burden features for size and core features for timing; <b>GBQR core / core+hol</b> uses core features for size and core + holiday features for timing. Sandbox forecasts for 2023/24–2025/26 are real-time hindcasts.</p>
     </div>
     <span class="status" id="status"></span>
   </header>
