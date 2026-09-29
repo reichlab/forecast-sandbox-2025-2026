@@ -13,11 +13,12 @@ import pandas as pd
 
 HERE = Path(__file__).parent
 ROOT = HERE.parents[2]
-LABELS = {"UMass-peak_gbqr": "GBQR", "UMass-peak_gbqr_offset": "GBQR (offset)", "UMass-peak_kcde": "KCDE",
+# final candidate models; GBQR labels are "<size features> / <timing features>"
+LABELS = {"UMass-peak_gbqr_sb": "GBQR SB / core", "UMass-peak_gbqr_core_hol": "GBQR core / core+hol",
           "UMass-peak_baseline": "Baseline"}
-ORDER = ["UMass-peak_gbqr", "UMass-peak_gbqr_offset", "UMass-peak_kcde", "UMass-peak_baseline", "FluSight-ensemble",
+ORDER = ["UMass-peak_gbqr_sb", "UMass-peak_gbqr_core_hol", "UMass-peak_baseline", "FluSight-ensemble",
          "NAU-vulPES", "UGA_flucast-Copycat", "PSI-PROF", "CU-ensemble", "FluSight-base_seasonal"]
-DEFAULT_ON = {"UMass-peak_gbqr", "UMass-peak_gbqr_offset", "UMass-peak_baseline", "FluSight-ensemble"}
+DEFAULT_ON = {"UMass-peak_gbqr_sb", "UMass-peak_gbqr_core_hol", "UMass-peak_baseline", "FluSight-ensemble"}
 MIN_ROWS = 500  # drop models with only a handful of forecasts
 METRICS = ["log_score", "rps", "prob_pm1", "wis_log", "wis", "cov50", "cov95"]
 LOG_FLOOR = np.log(1e-4)
@@ -44,8 +45,19 @@ def main():
         "locations": [{"id": r.location, "name": r.location_name} for r in locs.itertuples()],
         "log_floor": LOG_FLOOR,
     }
-    (HERE / "scores.json").write_text(json.dumps(out, separators=(",", ":"), allow_nan=False))
-    print(len(rows), "rows,", (HERE / "scores.json").stat().st_size // 1024, "KB;", models)
+    text = json.dumps(out, separators=(",", ":"), allow_nan=False)
+    (HERE / "scores.json").write_text(text)
+    # the published page loads scores-<content hash>.json, so browsers and caches never serve an older file
+    import hashlib
+    import re
+
+    name = f"scores-{hashlib.sha256(text.encode()).hexdigest()[:10]}.json"
+    for old in HERE.glob("scores-*.json"):
+        old.unlink()
+    (HERE / name).write_text(text)
+    page = HERE / "scores.html"
+    page.write_text(re.sub(r'fetch\("scores[^"]*\.json"', f'fetch("{name}"', page.read_text()))
+    print(len(rows), "rows,", len(text) // 1024, "KB;", models, "; page loads", name)
 
 
 if __name__ == "__main__":

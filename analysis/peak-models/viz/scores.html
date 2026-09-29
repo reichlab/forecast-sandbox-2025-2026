@@ -84,7 +84,7 @@ table.sum td .n { color: var(--ink-3); font-size: 10.5px; margin-left: 4px; }
 <div class="wrap">
   <header>
     <h1>Peak score explorer</h1>
-    <p class="sub">Hindcast and real-time scores for the seasonal peak targets, by weeks from each location's observed peak. The sandbox models are retrospective hindcasts; the FluSight models are the forecasts teams actually submitted during 2024/25 and 2025/26.</p>
+    <p class="sub">Hindcast and real-time scores for the seasonal peak targets, by weeks from each location's observed peak. The sandbox models are retrospective hindcasts; the FluSight models are the forecasts teams actually submitted during 2024/25 and 2025/26. Sandbox GBQR labels give the feature sets of the peak-size and peak-timing parts: <b>GBQR SB / core</b> (size: core + synchrony/burden; timing: core) and <b>GBQR core / core+hol</b> (size: core; timing: core + holiday).</p>
   </header>
 
   <section class="controls" aria-label="Score controls">
@@ -141,9 +141,9 @@ table.sum td .n { color: var(--ink-3); font-size: 10.5px; margin-left: 4px; }
   };
   const WINDOWS = [{ id: "near", label: "−8 to +6", lo: -8, hi: 6 }, { id: "core", label: "−4 to +4", lo: -4, hi: 4 }, { id: "wide", label: "−14 to +12", lo: -14, hi: 12 }];
   const SEASONS = ["2023/24", "2024/25", "2025/26"];
-  // fixed color per model (identity never depends on what is selected); GBQR versions share a hue, the offset variant dashed
+  // fixed color per model (identity never depends on what is selected)
   const STYLE = {
-    "UMass-peak_gbqr": { c: "--s1" }, "UMass-peak_gbqr_offset": { c: "--s1", dash: true }, "UMass-peak_kcde": { c: "--s2" },
+    "UMass-peak_gbqr_sb": { c: "--s1" }, "UMass-peak_gbqr_core_hol": { c: "--s2" },
     "UMass-peak_baseline": { c: "--neutral" }, "FluSight-ensemble": { c: "--s3" }, "NAU-vulPES": { c: "--s4" },
     "UGA_flucast-Copycat": { c: "--s5" }, "PSI-PROF": { c: "--s6" }, "CU-ensemble": { c: "--s7" }, "FluSight-base_seasonal": { c: "--s8" },
   };
@@ -151,7 +151,8 @@ table.sum td .n { color: var(--ink-3); font-size: 10.5px; margin-left: 4px; }
 
   let D, state = { metric: store.get("metric") || "wis_log", loc: store.get("loc") || "all", win: store.get("win") || "near", models: new Set() };
 
-  fetch("scores.json").then((r) => r.json()).then((d) => { D = d; init(); })
+  // the data file name carries a content hash, so a cached copy of an older file can never be used
+  fetch("scores-0f70f60fde.json", { cache: "no-cache" }).then((r) => r.json()).then((d) => { D = d; init(); })
     .catch(() => { $("facets").innerHTML = '<div class="empty">Could not load the scores.</div>'; });
 
   function init() {
