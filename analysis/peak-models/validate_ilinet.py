@@ -115,6 +115,7 @@ VARIANTS: dict[str, dict] = {
     # GBQR configurations carried to the NHSN test seasons (nhsn_validation.py); carried-forward synchrony
     "gbqr__N1": dict(size_feature_groups=["core", "sb"], timing_feature_groups=["core"]),
     "gbqr__N2": dict(size_feature_groups=["core", "sb", "latlon"], timing_feature_groups=["core", "holiday"]),
+    "gbqr__N4": dict(size_feature_groups=["core"], timing_feature_groups=["core", "holiday"]),
     "gbqr__N3": dict(size_feature_groups=["core", "sb", "bshare"],
                      timing_feature_groups=["core", "bshare", "latlon", "recession", "holiday"]),
     "hybrid__w02": dict(likelihood_weight=0.02),

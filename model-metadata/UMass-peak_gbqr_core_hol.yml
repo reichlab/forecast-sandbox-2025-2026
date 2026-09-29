@@ -1,0 +1,21 @@
+team_name: "UMass-Amherst"
+team_abbr: "UMass"
+model_name: "Peak GBQR, size core features, timing core + holiday features"
+model_abbr: "peak_gbqr_core_hol"
+model_version: "0.1"
+model_contributors: [
+  {
+    "name": "Nick Reich",
+    "affiliation": "UMass Amherst",
+    "email": "nick@umass.edu"
+  }
+]
+license: "CC-BY-4.0"
+designated_model: false
+methods: "peak_gbqr with separate feature sets: peak size uses core features, peak timing uses core + holiday features."
+methods_long: "
+  As peak_gbqr (LightGBM pinball-loss regressions for quantiles of the remaining log growth of the running maximum, and a LightGBM multiclass classifier for weeks until the peak, bagged over seasons; NHSN revision simulation; probability floor 1e-4), except that the peak-size models use the core feature set and the timing classifier the core + holiday feature set. Synchrony features (in SB) summarize other locations in the same season and revision draw; burden features compare cumulative incidence to date with the location's earlier seasons; holiday features mark Christmas / New Year weeks. Training uses NHSN, ILINet x WHO-NREVSS percent positive and FluSurv-NET seasons before the forecast season.
+"
+data_inputs: "NHSN weekly laboratory-confirmed influenza hospital admissions (with data vintages); ILINet weighted ILI x WHO-NREVSS percent positive; FluSurv-NET hospitalization rates."
+ensemble_of_models: false
+ensemble_of_hub_models: false
