@@ -24,7 +24,7 @@ Model and feature-set names follow the table in @sec-versions. In brief:
 - **Committed** in idmodels 8c56bf0: the baseline `peak_baseline`, GBQR `peak_gbqr` (optionally with feature set SB), KCDE `peak_kcde`, and the hierarchical model `peak_hier`. Added in idmodels 1dd468d: GBQR's separate size and timing feature groups, the candidate feature groups (`extra_features.py`), the reported-at-t synchrony option, and the GBQR-offset hybrid `peak_hybrid` with `current_update_weight` (development paused).
 - **Not yet a model directory:** the equal-weight ensembles, which have been evaluated.
 
-**Current focus: locking in a GBQR model.** Development of the hierarchical and hybrid models is paused until then. The only results so far are **development results** on two ILINet seasons (@sec-dev-results); the chosen GBQR configurations are being run on NHSN 2023/24 and 2024/25 (@sec-dev-gbqr-runs). Everything not yet done is listed in @sec-future.
+**Current focus: locking in a GBQR model.** Development of the hierarchical and hybrid models is paused until then. The only results so far are **development results** on two ILINet seasons (@sec-dev-results); the chosen GBQR configurations were then tested on NHSN 2023/24 and 2024/25 (@sec-dev-gbqr-runs). Everything not yet done is listed in @sec-future.
 :::
 
 # Versions and names used in this document {#sec-versions}
@@ -35,9 +35,9 @@ Several versions of each model and several feature sets were compared during dev
 
 | Name | Contents | How to get it |
 |---|---|---|
-| **base** | The 13 original state features: `season_week`, `rel_max`, `wks_since_max`, `g1`, `g2`, `g3`, `rm3`, `cum_rel`, `hist_rel`, `nat_rel_max`, `nat_wks_since_max`, `nat_g3`, `src_code` | Default |
-| **SB** | base plus 4 synchrony features (`sync_med_rel_max`, `sync_med_g3`, `sync_frac_past2`, `sync_frac_half`) and 2 burden features (`cum_vs_hist_total`, `cum_vs_hist_same_week`) | `sync_burden_features = True` |
-| base / SB + *group* | A feature set plus candidate groups. **Available in GBQR** (`idmodels/peak/extra_features.py`, identical to the exploratory harness on all 31,108 training rows): **trend** (local-polynomial level, slope and curvature, rolling means, lags), **recession** (recession and records: `rec_rate`, `rec_consist`, `n_rec4`, `rec_frac`), **holiday**, **latlon**, **bshare** (influenza B share: `b_share_3wk`, `b_share_cum`, `b_share_trend`, `a_rising`, `b_rising`, `b_minus_a_growth`, `b_frac_of_peak`), **h3** (H3N2 share). **Exploratory harness only** (`relative_size_predictors.py`): onset, timing-vs-history, reflection, severity-in-peaked, chain-ladder, deceleration, Bass, cross-source, and the neighbor groups `nbr5`, `hhs`, `wave` | `PeakGBQRModelConfig.size_feature_groups` and `timing_feature_groups`, e.g. `["base", "sb", "bshare"]` (1dd468d) |
+| **core** | The 13 original state features: `season_week`, `rel_max`, `wks_since_max`, `g1`, `g2`, `g3`, `rm3`, `cum_rel`, `hist_rel`, `nat_rel_max`, `nat_wks_since_max`, `nat_g3`, `src_code` (called "base" in earlier drafts) | Default; config group `"core"` (idmodels also accepts `"base"`) |
+| **SB** | core plus 4 synchrony features (`sync_med_rel_max`, `sync_med_g3`, `sync_frac_past2`, `sync_frac_half`) and 2 burden features (`cum_vs_hist_total`, `cum_vs_hist_same_week`) | `sync_burden_features = True` |
+| core / SB + *group* | A feature set plus candidate groups. **Available in GBQR** (`idmodels/peak/extra_features.py`, identical to the exploratory harness on all 31,108 training rows): **trend** (local-polynomial level, slope and curvature, rolling means, lags), **recession** (recession and records: `rec_rate`, `rec_consist`, `n_rec4`, `rec_frac`), **holiday**, **latlon**, **bshare** (influenza B share: `b_share_3wk`, `b_share_cum`, `b_share_trend`, `a_rising`, `b_rising`, `b_minus_a_growth`, `b_frac_of_peak`), **h3** (H3N2 share). **Exploratory harness only** (`relative_size_predictors.py`): onset, timing-vs-history, reflection, severity-in-peaked, chain-ladder, deceleration, Bass, cross-source, and the neighbor groups `nbr5`, `hhs`, `wave` | `PeakGBQRModelConfig.size_feature_groups` and `timing_feature_groups`, e.g. `["core", "sb", "bshare"]` (1dd468d) |
 
 Two definitions of the synchrony features exist. **Carried-forward** (the default): a location counts at week $t$ if it has any value through $t$, its latest value carried forward. **Reported-at-t** (`sync_reported_only = True`, used by the exploratory harness and the `gbqr__R` runs): it counts only if week $t$ itself was reported. In as-published ILINet at least one state lacks the latest week at 98% of reference dates (median 3 of about 45), and the synchrony features then differ by a median of 0.008–0.02 and a 90th percentile of 0.03–0.12 (up to 0.45). `peak_gbqr__sb` and `hier__w05c12sb` used carried-forward.
 
@@ -46,7 +46,7 @@ Two definitions of the synchrony features exist. **Carried-forward** (the defaul
 | Name | What it is | Code |
 |---|---|---|
 | `peak_baseline` | Conditional climatology (@sec-baseline) | 8c56bf0 |
-| `peak_gbqr` | GBQR with base (@sec-gbqr) | 8c56bf0 |
+| `peak_gbqr` | GBQR with core (@sec-gbqr) | 8c56bf0 |
 | `peak_gbqr__sb` | GBQR with SB | 8c56bf0 |
 | `gbqr__R1` … `gbqr__R10` | GBQR with separate size and timing feature sets and reported-at-t synchrony (@sec-dev-gbqr-runs) | 1dd468d (config) |
 | `peak_kcde` | Kernel conditional density estimation (@sec-kcde) | 8c56bf0 |
@@ -433,7 +433,7 @@ Features describe the series as observed through week $t$ and are scale-free (lo
 | `cum_vs_hist_total` | *(optional)* $\log(\sum_{u=5}^{t} x_u + \varepsilon) - \log(\bar H + \varepsilon)$, where $\bar H$ is the mean season total (weeks 5 to $\overline\omega$) over earlier complete seasons of the same source and location: how much of a typical season's burden has already occurred |
 | `cum_vs_hist_same_week` | *(optional)* the same with $\bar H$ replaced by the mean cumulative incidence through week $t$ in those seasons |
 
-GBQR uses base by default, SB with `sync_burden_features = True`, or any combination of feature groups, separately for size and timing (@sec-versions). KCDE uses a subset (@sec-kcde); the hierarchical model uses 12 features derived from ten of them (@sec-hier); the baseline uses only `season_week` and `wks_since_max`. For the current season, `hist_rel` uses the mean log peak of the forecast source over all training seasons of that location, which are exactly the strictly earlier ones, and the national features come from the US series of the same revision draw (@sec-backfill).
+GBQR uses core by default, SB with `sync_burden_features = True`, or any combination of feature groups, separately for size and timing (@sec-versions). KCDE uses a subset (@sec-kcde); the hierarchical model uses 12 features derived from ten of them (@sec-hier); the baseline uses only `season_week` and `wks_since_max`. For the current season, `hist_rel` uses the mean log peak of the forecast source over all training seasons of that location, which are exactly the strictly earlier ones, and the national features come from the US series of the same revision draw (@sec-backfill).
 :::
 
 ::: {.callout-tip title="Alternatives considered"}
@@ -621,7 +621,7 @@ The fit is repeated over $n_{\text{bag}}$ **bags**. For bag $\beta = 1, \dots, n
 - $n_{\text{bag}}$ = `num_bags` = 25 (3 with `--short_run`); $f_{\text{bag}}$ = `bag_frac_samples` = 0.7 (at least one season per bag).
 - $K$ = `max_k` = 12, so the classifier has $K + 2 = 14$ classes.
 - LightGBM: `n_estimators = 100`, `learning_rate = 0.05`, `min_child_samples = 50`; all other hyperparameters at LightGBM defaults; `src_code` treated as categorical.
-- Features: `size_feature_groups` for the quantile regressions and `timing_feature_groups` for the classifier (default: base, or SB with `sync_burden_features`). Size and timing are separate models sharing only the bag seasons, so peak-size forecasts depend only on the size features and peak-week pmfs only on the timing features (checked by a unit test).
+- Features: `size_feature_groups` for the quantile regressions and `timing_feature_groups` for the classifier (default: core, or SB with `sync_burden_features`). Size and timing are separate models sharing only the bag seasons, so peak-size forecasts depend only on the size features and peak-week pmfs only on the timing features (checked by a unit test).
 - Per bag, 23 `LGBMRegressor(objective="quantile", alpha=τ)` models and one `LGBMClassifier(objective="multiclass")`.
 - Aggregation: median across bags then sort (quantiles); mean across bags (class probabilities).
 - Seeds: the random number generator is seeded with a CRC-32 hash of the sorted list of training seasons, so the fit is deterministic for a given set of training seasons (it does not depend on the reference date).
@@ -1236,7 +1236,7 @@ In plain terms: forecasting from provisional data as if it were final costs a lo
 | **`ens_gbqr_hierw05`** | −1.609 | **0.879** | **0.595** | 0.60 | 0.94 |
 | `ens_gbqr_hierw02` | −1.610 | 0.890 | 0.602 | 0.58 | 0.94 |
 | `ens_gbqr_hierw05_base` | **−1.596** | 0.886 | 0.687 | 0.62 | 0.93 |
-| `peak_gbqr` (base) | −1.631 | 0.899 | 0.631 | 0.53 | 0.92 |
+| `peak_gbqr` (core) | −1.631 | 0.899 | 0.631 | 0.53 | 0.92 |
 | `peak_gbqr__sb` (SB) | −1.670 | 0.911 | 0.615 | 0.54 | 0.92 |
 | `peak_baseline` | −1.663 | 1.000 | 1.000 | 0.58 | 0.92 |
 | `hier__w02c12` | −1.659 | 0.927 | 0.602 | 0.58 | 0.93 |
@@ -1276,8 +1276,8 @@ Besides the model runs above, many candidate feature groups were tested in the e
 
 | Comparison | Peak size (pinball) | Has it peaked? (log loss) | Verdict |
 |---|---|---|---|
-| SB vs base | 0.975 (−2.5%; −7% in weeks 22–26) | +0.003 | Small size gain; adopted as the optional set SB |
-| base without `hist_rel` | 1.63 | +0.058 | `hist_rel` is by far the most important feature |
+| SB vs core | 0.975 (−2.5%; −7% in weeks 22–26) | +0.003 | Small size gain; adopted as the optional set SB |
+| core without `hist_rel` | 1.63 | +0.058 | `hist_rel` is by far the most important feature |
 | SB + types (B share) | 0.995 | **−0.0074 (6%)**, win 99%, better in 16 of 22 seasons; −0.0087 on ILINet state rows, −0.0072 on FluSurv-NET | **Largest gain for timing**, mostly in weeks 17–26; no size gain |
 | SB + regional (all) | 1.012 | −0.0030 (all rows, win 88%); −0.0047 on ILINet state rows (win 99%) | Small timing gain, mostly from latitude/longitude; slight size loss |
 | SB + latlon | 1.012 | −0.0029 on ILINet state rows (win 70%) | Most of the regional gain |
@@ -1286,7 +1286,7 @@ Besides the model runs above, many candidate feature groups were tested in the e
 | SB + subtype (H3) | 1.033 | +0.0026 | Hurts; season-level values let trees memorize seasons |
 | SB + reflection, severity-in-peaked, deceleration, Bass, cross-source | 1.001–1.016 | no reliable gain | No gain |
 | SB + chain-ladder | 1.050 | — | Hurts |
-| base + trend / onset / timing-vs-history / holiday | 0.996 / 0.999 / 1.036 / 1.005 | about 0 (holiday −0.0024, not reliable) | No gain |
+| core + trend / onset / timing-vs-history / holiday | 0.996 / 0.999 / 1.036 / 1.005 | about 0 (holiday −0.0024, not reliable) | No gain |
 
 In plain terms: almost nothing improves the forecast of *how big* the peak will be beyond SB (the strongest size predictor is `hist_rel`). For *has the peak passed?* the B share, latitude/longitude and recession/records helped a little in this harness (a high or rising B share usually means the A wave is already falling), but not in GBQR itself (@sec-dev-gbqr-runs).
 
@@ -1298,63 +1298,79 @@ Timing columns score the peak-week pmf (log score, higher is better; RPS relativ
 
 | Run | Size features | Timing features | Log score (18/19, 19/20) | Rel. RPS | Log-WIS (18/19, 19/20) | Rel. WIS |
 |---|---|---|---|---|---|---|
-| `peak_gbqr` | base | base | −1.631 (−1.867, −1.394) | 0.899 | 0.184 (0.205, 0.163) | 0.631 |
+| `peak_gbqr` | core | core | −1.631 (−1.867, −1.394) | 0.899 | 0.184 (0.205, 0.163) | 0.631 |
 | `peak_gbqr__sb` | SB (carried-forward) | SB (carried-forward) | −1.670 (−1.886, −1.453) | 0.911 | **0.179** (0.192, 0.167) | **0.615** |
 | `gbqr__R1` | SB | SB | −1.677 (−1.892, −1.461) | 0.918 | 0.183 (0.191, 0.175) | 0.628 |
-| `gbqr__R2` | SB + offset | base + bshare | −1.651 (−1.920, −1.382) | 0.918 | 0.207 (0.211, 0.203) | 0.711 |
-| `gbqr__R3` | SB + bshare | base + latlon | −1.633 (−1.871, −1.395) | 0.908 | 0.183 (0.193, 0.173) | 0.628 |
-| `gbqr__R4` | SB + trend | base + recession | −1.634 (−1.871, −1.396) | 0.908 | 0.188 (0.200, 0.175) | 0.644 |
-| `gbqr__R5` | SB + h3 | base + holiday | **−1.627** (−1.847, −1.406) | **0.892** | 0.185 (0.195, 0.175) | 0.633 |
-| `gbqr__R6` | SB + recession | base + bshare + latlon + recession + holiday | −1.635 (−1.903, −1.368) | 0.910 | 0.183 (0.192, 0.175) | 0.629 |
+| `gbqr__R2` | SB + offset | core + bshare | −1.651 (−1.920, −1.382) | 0.918 | 0.207 (0.211, 0.203) | 0.711 |
+| `gbqr__R3` | SB + bshare | core + latlon | −1.633 (−1.871, −1.395) | 0.908 | 0.183 (0.193, 0.173) | 0.628 |
+| `gbqr__R4` | SB + trend | core + recession | −1.634 (−1.871, −1.396) | 0.908 | 0.188 (0.200, 0.175) | 0.644 |
+| `gbqr__R5` | SB + h3 | core + holiday | **−1.627** (−1.847, −1.406) | **0.892** | 0.185 (0.195, 0.175) | 0.633 |
+| `gbqr__R6` | SB + recession | core + bshare + latlon + recession + holiday | −1.635 (−1.903, −1.368) | 0.910 | 0.183 (0.192, 0.175) | 0.629 |
 | `gbqr__R7` | SB + latlon | SB + bshare | −1.692 (−1.930, −1.453) | 0.938 | **0.179** (0.193, 0.166) | **0.615** |
 | `gbqr__R8` | SB + bshare + offset | SB + latlon + recession | −1.690 (−1.913, −1.467) | 0.944 | 0.209 (0.213, 0.204) | 0.716 |
 | `gbqr__R9` | SB + trend + bshare | SB + bshare + latlon + recession | −1.700 (−1.950, −1.450) | 0.954 | 0.188 (0.202, 0.173) | 0.643 |
-| `gbqr__R10` | base + offset | SB + bshare + latlon + recession + holiday | −1.690 (−1.933, −1.448) | 0.943 | 0.211 (0.225, 0.196) | 0.722 |
+| `gbqr__R10` | core + offset | SB + bshare + latlon + recession + holiday | −1.690 (−1.933, −1.448) | 0.943 | 0.211 (0.225, 0.196) | 0.722 |
 
 What the runs show:
 
-- **SB hurts timing**: all six timing sets containing SB score 0.04–0.07 worse than base, in both seasons.
+- **SB hurts timing**: all six timing sets containing SB score 0.04–0.07 worse than core, in both seasons.
 - **The baseline offset hurts size**: all three runs with it are about 0.03 worse.
-- **Everything else is within noise**: timing extras on base (holiday, lat/lon, recession/records, B share) are within 0.02 of base, and size extras on SB within 0.005 (0.009 for trend), with rankings that flip between seasons.
+- **Everything else is within noise**: timing extras on core (holiday, lat/lon, recession/records, B share) are within 0.02 of core, and size extras on SB within 0.005 (0.009 for trend), with rankings that flip between seasons.
 - **Synchrony definition**: carried-forward is slightly better than reported-at-t for both size (0.179 vs 0.183) and timing, so carried-forward stays the default.
 
-**Chosen GBQR configuration: size SB (carried-forward), timing base.** Pairing the size forecasts of `peak_gbqr__sb` with the timing forecasts of `peak_gbqr` (`combine_size_timing.py`) gives log score −1.631, relative RPS 0.899 and relative WIS 0.615, matching or beating both controls on both tasks; with holiday in the timing set, −1.627 and 0.892.
+**Chosen GBQR configuration: size SB (carried-forward), timing core.** Pairing the size forecasts of `peak_gbqr__sb` with the timing forecasts of `peak_gbqr` (`combine_size_timing.py`) gives log score −1.631, relative RPS 0.899 and relative WIS 0.615, matching or beating both controls on both tasks; with holiday in the timing set, −1.627 and 0.892.
 
 **NHSN test runs** (2023/24 and 2024/25, real time with NHSN vintages; 2025/26 held out; outputs kept outside `model-output/`). Each run pairs one size set with one timing set:
 
 | Run | Size features | Timing features |
 |---|---|---|
-| N1 | SB (carried-forward) | base |
-| N2 | SB + latlon | base + holiday |
-| N3 | SB + bshare | base + bshare + latlon + recession + holiday |
-| controls | `peak_gbqr` (base / base, re-run with the current code), `peak_baseline` | |
+| N1 | SB (carried-forward) | core |
+| N2 | SB + latlon | core + holiday |
+| N3 | SB + bshare | core + bshare + latlon + recession + holiday |
+| controls | `peak_gbqr` (core / core, re-run with the current code), `peak_baseline` | |
 
 For N3, the forecast-season B share uses as-published clinical-lab A/B counts from Delphi; training uses final counts.
+
+**NHSN results** (states; 1,508 forecasts in 2023/24 and 1,196 in 2024/25, all models on the same forecasts; `score_peak_forecasts.py --forecast_root analysis/peak-models/nhsn-hindcasts`). Timing depends only on the timing set and size only on the size set, so `peak_gbqr` and N1 share the timing forecasts. Values are 2023/24 / 2024/25 / both:
+
+| Timing set | Runs | Log score | RPS rel. to `peak_baseline` |
+|---|---|---|---|
+| core | `peak_gbqr`, N1 | −1.255 / −1.295 / −1.273 | **0.689** / 1.138 / **0.811** |
+| core + holiday | N2 | **−1.254** / −1.287 / **−1.269** | 0.695 / 1.142 / 0.816 |
+| core + bshare + latlon + recession + holiday | N3 | −1.284 / −1.341 / −1.309 | 0.716 / 1.197 / 0.846 |
+| (`peak_baseline`) | | −1.514 / **−1.275** / −1.408 | 1 |
+
+| Size set | Run | log-WIS | log-WIS rel. to `peak_baseline` | 50% / 95% coverage (both) | Median error |
+|---|---|---|---|---|---|
+| core | `peak_gbqr` | **0.137** / 0.277 / 0.199 | 0.45 / 1.43 / 0.78 | 0.44 / 0.85 | +21% / −23% |
+| SB | N1 | 0.152 / 0.244 / **0.193** | 0.50 / 1.26 / **0.75** | 0.40 / 0.87 | +28% / −21% |
+| SB + latlon | N2 | 0.159 / 0.245 / 0.197 | 0.52 / 1.27 / 0.77 | 0.39 / 0.87 | +30% / −21% |
+| SB + bshare | N3 | 0.161 / 0.240 / 0.196 | 0.52 / 1.24 / 0.76 | 0.41 / 0.87 | +29% / −21% |
+| (`peak_baseline`) | | 0.306 / **0.193** / 0.256 | 1 | 0.52 / 0.85 | +131% / −4% |
+
+- **The ILINet conclusions mostly carry over.** For timing, core or core + holiday is best and the full set of extras is worst, in both seasons. For size, SB is worse than core in 2023/24 and better in 2024/25, and slightly best over both seasons.
+- **Chosen GBQR configuration: N1** (size SB, timing core).
+- **GBQR beats `peak_baseline` clearly in 2023/24 but loses to it in 2024/25**, the largest season in over a decade. There GBQR under-predicts peak size (median about 21% too low), mainly in smaller states: its WIS is worse than the baseline's on the log scale (1.26 relative) but better on the count scale (0.79), which large states dominate. All GBQR versions are overconfident (50% intervals cover about 40%).
+- **FluSight 2024/25 submissions**, each scored on its own forecasts: on log-WIS, `peak_baseline` (0.193) and PSI-PROF_beta (0.209) lead, ahead of N1 (0.244) and FluSight-ensemble (0.278); on RPS, PSI-PROF_beta (0.688) and `peak_baseline` (0.751) beat N1 (0.854), which ties FluSight-ensemble (0.854). Hub models' log scores are much worse, mainly because many put near-zero probability on some weeks.
 
 ### Geography and influenza types {#sec-dev-geography}
 
 From `peak-timing-size-eda.html` (ILINet states, final data; descriptive):
 
 - **Timing is mostly a season effect.** Season explains 69% of the variation in peak week and location 6%. The residual SD is 2.7 weeks.
-- **There is a south-to-north delay.**
-  - A state's average peak week relative to the season median correlates 0.71 with latitude, about 0.2 weeks later per degree north. Latitude and longitude explain 60% of the variation in these averages.
-  - Timing is spatially clustered: Moran's I is 0.56 with 5 nearest neighbors, and 0.27 after removing the latitude/longitude trend.
-- **The pattern changes from season to season.** A state's relative timing barely repeats between seasons (correlation 0.11). Of the within-season variation in peak week:
-  - season-specific gradients explain 18% (adjusted);
-  - a persistent state effect, 10%;
-  - one common gradient, 10%;
-  - 69% is explained by none of these.
+- **There is a south-to-north delay** of about 0.2 weeks per degree of latitude (correlation 0.71; latitude and longitude explain 60% of states' average relative timing), and timing is spatially clustered (Moran's I 0.56 with 5 nearest neighbors).
+- **The pattern changes from season to season** (a state's relative timing repeats with correlation 0.11). Season-specific gradients explain 18% of within-season variation, a persistent state effect 10%, and 69% is explained by neither.
 - **Influenza types.** B usually peaks about 3 weeks after A (range 7 weeks before to 17 weeks after). Among ILINet states, multi-peaked series (a second hump at least 60% of the peak) are more common where the B share is high: 35% in the top third of B share, against 21% in the bottom third. About 4 in 10 double humps are an A wave followed by a B wave. The target's peak week is within 2 weeks of the local A peak in 87% of location-seasons.
 - **Subtypes.** H3N2-dominant seasons are larger in FluSurv-NET hospitalizations (Spearman 0.55 between the H3 share and relative peak size, 11 seasons), but peak at about the same time as H1N1-dominant seasons.
 
 ### Conclusions from development {#sec-dev-conclusions}
 
 1. **Evaluate in real time.** `@rtrev` (as-published data plus revision simulation) is the evaluation setting. Treating provisional data as final costs about a third of a unit of log score.
-2. **Best GBQR: size SB, timing base.** Separate feature lists combine SB's better size forecasts with base's better timing (@sec-dev-gbqr-runs).
+2. **Best GBQR: size SB, timing core.** Separate feature lists combine SB's better size forecasts with core's better timing (@sec-dev-gbqr-runs).
 3. **Best overall: `ens_gbqr_hierw05`.** It beats both members and `peak_baseline` on log score and peak-size WIS in each season.
 4. **Hierarchical model and hybrid.** Much weaker tempering than the committed default is better (0.02 best). The current-season update helps 5–8 weeks before the peak but appears too strong around it. `hybrid__w02` was the best single model in 2018/19 (one season, poor mixing).
-5. **Features.** In GBQR, no candidate group reliably improves on SB for size or on base for timing; the exploratory harness's gains for B share, latitude/longitude and recession/records did not carry over (@sec-dev-gbqr-runs). SB in the timing classifier and the baseline offset hurt.
-6. **NHSN.** Three GBQR configurations and two controls are being run on NHSN 2023/24 and 2024/25 (@sec-dev-gbqr-runs).
+5. **Features.** In GBQR, no candidate group reliably improves on SB for size or on core for timing; the exploratory harness's gains for B share, latitude/longitude and recession/records did not carry over (@sec-dev-gbqr-runs). SB in the timing classifier and the baseline offset hurt.
+6. **NHSN.** N1 (size SB, timing core) is the chosen GBQR configuration. GBQR beats `peak_baseline` in 2023/24 but loses to it in 2024/25, when it under-predicted peak size and was overconfident (@sec-dev-gbqr-runs).
 
 ## Backtest design and comparisons {#sec-dev-design-test}
 
@@ -1367,56 +1383,13 @@ From `peak-timing-size-eda.html` (ILINet states, final data; descriptive):
 
 ## Figures from backtest outputs (placeholders) {#sec-figures}
 
-The following chunks are placeholders for backtest figures. They are not evaluated. Figures of the development data (peak timing and size, the relative size target, and candidate features) are in the two exploratory documents, `peak-timing-size-eda.html` and `relative-size-eda.html`. The development results are in tables (@sec-dev-results).
+Figures of the development data (peak timing and size, the relative size target, and candidate features) are in the two exploratory documents, `peak-timing-size-eda.html` and `relative-size-eda.html`; the development results are in tables (@sec-dev-results). Planned backtest figures, not yet made:
 
-```{python}
-#| label: ph-example-season
-#| eval: false
-#| echo: true
-# Placeholder: example season with running maximum M_t, argmax A_t,
-# and the realized peak W*, for one location (final vs. real-time vintages).
-import pandas as pd
-import matplotlib.pyplot as plt
-
-obs = pd.read_parquet("cache/nhsn_vintages_example.parquet")  # to be produced by the backtest
-# ... plot final and as-of series, mark M_t, A_t, W* ...
-```
-
-```{python}
-#| label: ph-replay-diagram
-#| eval: false
-#| echo: true
-# Placeholder: diagram of season replay, showing feature windows truncated at
-# origins t and the targets (k, z) computed from the completed season.
-```
-
-```{python}
-#| label: ph-example-pmfs
-#| eval: false
-#| echo: true
-# Placeholder: example peak-week pmfs and peak-size quantiles from each model at
-# several reference dates in one season, with the oracle values overlaid.
-from pathlib import Path
-fc = pd.concat(pd.read_csv(f) for f in sorted(Path("model-output").glob("UMass-peak_*/*.csv")))
-oracle = pd.read_csv("analysis/peak-models/peak-oracle.csv")
-```
-
-```{python}
-#| label: ph-scores-by-offset
-#| eval: false
-#| echo: true
-# Placeholder: log score, RPS and relative WIS by weeks relative to the true peak
-# (r - W*, column weeks_from_peak), by model, with season-resampled uncertainty bands.
-scores = pd.read_csv("analysis/peak-models/peak-scores.csv")  # written by score_peak_forecasts.py
-```
-
-```{python}
-#| label: ph-revision-calibration
-#| eval: false
-#| echo: true
-# Placeholder: calibration of past-week revision probabilities: assigned probability
-# versus observed frequency with which a past non-maximal week became the peak.
-```
+- an example season with the running maximum $M_t$, its week $A_t$ and the realized peak $W^*$, final vs. as-published;
+- a diagram of season replay (feature windows truncated at origins $t$, targets $(k, z)$ from the completed season);
+- example peak-week pmfs and peak-size quantiles from each model at several reference dates, with the oracle values;
+- log score, RPS and relative WIS by weeks from the true peak, by model, with season-resampled uncertainty bands;
+- calibration of past-week revision probabilities (assigned probability vs. how often a past non-maximal week became the peak).
 
 # Open questions and future work {#sec-future}
 
@@ -1424,7 +1397,7 @@ Everything below is not yet done. Other sections point here instead of describin
 
 **Evaluation**
 
-- Score the NHSN runs N1–N3 and controls (@sec-dev-gbqr-runs), choose the GBQR configuration, and use 2025/26 for a final check. N1 and N2 have no recession features, which matters if NHSN's mostly upward revisions make provisional latest weeks look like declines.
+- Diagnose GBQR's 2024/25 under-prediction of peak size and its overconfidence (by weeks from the peak and state size); try a GBQR + `peak_baseline` ensemble and interval widening or recalibration. Keep 2025/26 as the final held-out check.
 - On hold while GBQR is locked in: `hybrid` and `hybrid__w02` for 2019/20, `hybrid__cu01` and `hybrid__cu003`, and a longer `hybrid__w02` run.
 - For the backtests: season-blocked uncertainty for paired score differences, the WIS decomposition, coverage at all 11 levels, and the calibration of past-week revision probabilities.
 

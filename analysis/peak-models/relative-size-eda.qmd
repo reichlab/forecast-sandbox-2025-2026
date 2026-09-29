@@ -31,8 +31,8 @@ The target $z$ compares the season's **eventual peak** with the largest value se
 ::: {.callout-note title="Names of models and feature sets"}
 Feature sets and model versions are named as in the section *Versions and names used in this document* of the methods document (`peak-models-methods.html`).
 
-- **base**: the 13 default features of `peak_gbqr`.
-- **SB**: base plus the 4 synchrony and 2 burden features, available in idmodels as `sync_burden_features = True`.
+- **core**: the 13 default features of `peak_gbqr`.
+- **SB**: core plus the 4 synchrony and 2 burden features, available in idmodels as `sync_burden_features = True`.
 - **SB + *group***: SB plus a candidate group tested only in this document's cross-validation harness.
 
 In this document the synchrony features use the **reported-at-t** definition: a location must have a report for week $t$. The model runs used the **carried-forward** definition (@sec-predictors).
@@ -249,7 +249,7 @@ This atom is the central modelling fact: from January on, a large share of the o
 
 # The eventual z by real-time stage features {#sec-stage}
 
-The base features (the default feature set of `peak_gbqr`) describe where the season stands relative to its own record, and are all computable at week $t$:
+The core features (the default feature set of `peak_gbqr`) describe where the season stands relative to its own record, and are all computable at week $t$:
 
 - `wks_since_max`: how many weeks ago $M_t$ was set (0 = this week is a new record).
 - `rel_max` $= \log(\text{current value}) - \log(M_t)$: how far below the record the current week is (0 = at the record; −0.7 ≈ half of it).
@@ -489,8 +489,8 @@ Every current-season feature at week $t$ is computed from a copy of the data wit
 
 ```{r fig-corr}
 #| fig-height: 15
-#| fig-cap: "**Within-week-bin Spearman correlation of each real-time feature with the eventual $z$ (left) and with the indicator that the peak is still ahead, $z > 0$ (right).** Rows are grouped: base features first, then each candidate group. Same colour scale in both panels; blue = higher feature value goes with smaller $z$."
-ch <- corr_heatmap(pr, G9, setdiff(CURRENT, c("season_week", "src_code")), first_label = "base")
+#| fig-cap: "**Within-week-bin Spearman correlation of each real-time feature with the eventual $z$ (left) and with the indicator that the peak is still ahead, $z > 0$ (right).** Rows are grouped: core features first, then each candidate group. Same colour scale in both panels; blue = higher feature value goes with smaller $z$."
+ch <- corr_heatmap(pr, G9, setdiff(CURRENT, c("season_week", "src_code")), first_label = "core")
 ch$plot
 rz <- ch$data |> filter(target == "Spearman with z")
 rng <- function(f, bins = c("wk 12–16", "wk 17–21", "wk 22–26"), d = rz) range(d$rho[d$feature == f & d$bin %in% bins])
@@ -505,11 +505,11 @@ x1726 <- pr |> filter(season_week >= 17, season_week <= 26)
 rho_hist_cum <- cor(x1726$hist_rel, x1726$cum_vs_hist_total, method = "spearman", use = "complete.obs")
 ```
 
-Three things stand out. First, the strongest associations by far belong to features that compare **this season's level with the same location's history**: `hist_rel` (in base) (`r f2(rng("hist_rel")[2])` to `r f2(rng("hist_rel")[1])` in weeks 12–26), and the burden feature `cum_vs_hist_total` (in SB) (`r f2(rng("cum_vs_hist_total")[2])` to `r f2(rng("cum_vs_hist_total")[1])`) and `max_vs_hist_same_week` (`r f2(rng("max_vs_hist_same_week")[2])` to `r f2(rng("max_vs_hist_same_week")[1])`). Read plainly: if the record so far is already as high as a typical peak here, little growth is left. This is partly built in, because $z = (\log \text{peak} - \text{typical log peak}) - \texttt{hist\_rel}$: the eventual $z$ splits exactly into a "size surprise" (how much bigger or smaller this season's peak is than this location's usual peak, which does not depend on $t$) and `hist_rel`, which we know. The size surprise has standard deviation `r f2(anom_sd)` (10–90% range `r f2(anom_q[1])` to `r f2(anom_q[2])`; `r f2(anom_sd_st)` for ILINet states), compared with a standard deviation of `r f2(z_sd)` for $z$ itself in weeks 17–26, so the history-relative level explains most of the variation in $z$ in the middle of the season, and what remains is the unpredictability of season size. Second, the shape-of-the-curve features (current `rel_max`, `g1`–`g3`, the new Taylor slopes and levels, lags) are weakly related to $z$ before week 22 (mostly $|\rho| < 0.4$) and become strong only in weeks 27–31, when they mainly tell us whether the peak has passed ($\rho \approx 0.5$–0.65 with $z > 0$). Third, **synchrony** features (`sync_med_rel_max`, `sync_med_g3`) track the national features closely and add a similar "is the country past its peak?" signal late in the season, while timing-vs-history features are nearly unrelated to $z$ within week bins ($|\rho| \le$ `r f2(timing_max)`, except `hist_z_same_week` at about `r f2(max(rng("hist_z_same_week", c("wk 12–16", "wk 17–21"))), 1)` before week 22), and onset features are weaker, noisier versions of the level features.
+Three things stand out. First, the strongest associations by far belong to features that compare **this season's level with the same location's history**: `hist_rel` (in core) (`r f2(rng("hist_rel")[2])` to `r f2(rng("hist_rel")[1])` in weeks 12–26), and the burden feature `cum_vs_hist_total` (in SB) (`r f2(rng("cum_vs_hist_total")[2])` to `r f2(rng("cum_vs_hist_total")[1])`) and `max_vs_hist_same_week` (`r f2(rng("max_vs_hist_same_week")[2])` to `r f2(rng("max_vs_hist_same_week")[1])`). Read plainly: if the record so far is already as high as a typical peak here, little growth is left. This is partly built in, because $z = (\log \text{peak} - \text{typical log peak}) - \texttt{hist\_rel}$: the eventual $z$ splits exactly into a "size surprise" (how much bigger or smaller this season's peak is than this location's usual peak, which does not depend on $t$) and `hist_rel`, which we know. The size surprise has standard deviation `r f2(anom_sd)` (10–90% range `r f2(anom_q[1])` to `r f2(anom_q[2])`; `r f2(anom_sd_st)` for ILINet states), compared with a standard deviation of `r f2(z_sd)` for $z$ itself in weeks 17–26, so the history-relative level explains most of the variation in $z$ in the middle of the season, and what remains is the unpredictability of season size. Second, the shape-of-the-curve features (current `rel_max`, `g1`–`g3`, the new Taylor slopes and levels, lags) are weakly related to $z$ before week 22 (mostly $|\rho| < 0.4$) and become strong only in weeks 27–31, when they mainly tell us whether the peak has passed ($\rho \approx 0.5$–0.65 with $z > 0$). Third, **synchrony** features (`sync_med_rel_max`, `sync_med_g3`) track the national features closely and add a similar "is the country past its peak?" signal late in the season, while timing-vs-history features are nearly unrelated to $z$ within week bins ($|\rho| \le$ `r f2(timing_max)`, except `hist_z_same_week` at about `r f2(max(rng("hist_z_same_week", c("wk 12–16", "wk 17–21"))), 1)` before week 22), and onset features are weaker, noisier versions of the level features.
 
 ```{r fig-binned}
 #| fig-height: 6.5
-#| fig-cap: "**Eventual $z$ by decile of the most important features, at three week bins** (median and 25–75% band). `hist_rel` (in base) is shown first for comparison; the others are the top candidate features by LightGBM gain. Same y-axis as @fig-stage."
+#| fig-cap: "**Eventual $z$ by decile of the most important features, at three week bins** (median and 25–75% band). `hist_rel` (in core) is shown first for comparison; the others are the top candidate features by LightGBM gain. Same y-axis as @fig-stage."
 imp_main <- imp |> filter(`feature set` == "current + all new", model == "median quantile model") |> arrange(desc(gain_share))
 top_new <- head(imp_main$feature[!imp_main$feature %in% CURRENT], 5)
 binned_plot(pr, c("hist_rel", top_new), current = "hist_rel")
@@ -531,30 +531,30 @@ n_seasons_cv <- n_distinct(cv$season)
 n_all_new <- length(unlist(G9))
 ```
 
-Association is not the same as predictive value, particularly when a candidate feature largely duplicates one already in base. The real test is whether adding a feature improves **out-of-sample** forecasts of the eventual $z$ for a season the model has not seen.
+Association is not the same as predictive value, particularly when a candidate feature largely duplicates one already in core. The real test is whether adding a feature improves **out-of-sample** forecasts of the eventual $z$ for a season the model has not seen.
 
-**Design.** We hold out one whole season at a time (all sources and locations of that season; `r n_seasons_cv` folds, 1997/98–2022/23), fit on all other seasons, and forecast the held-out season's rows. Holding out whole seasons matters because rows from the same season are strongly correlated (@fig-seasons). Models: LightGBM quantile regression of $z$ at levels 0.1, 0.25, 0.5, 0.75 and 0.9 (200 trees, learning rate 0.05, 15 leaves, at least 50 rows per leaf), scored by **pinball loss** averaged over the five levels (the standard proper score for quantile forecasts; lower is better), and a LightGBM classifier for $z > 0$ with the same settings, scored by **log loss** (lower is better). To keep runtime modest, CV uses the even season weeks only (`r format(n_cv_rows, big.mark = ",")` of `r format(nrow(pr), big.mark = ",")` rows). Feature sets: (i) base, the `r length(CURRENT)` default features; (ii–vii) base + one candidate group; (viii) base + all `r n_all_new` candidate features; single-group ablations from (viii); and two combinations suggested by the results. All $`r length(order9)` \times `r n_seasons_cv` \times 6 = `r format(length(order9) * n_seasons_cv * 6, big.mark = ",")`$ fits took about 5 minutes (4 single-threaded processes).
+**Design.** We hold out one whole season at a time (all sources and locations of that season; `r n_seasons_cv` folds, 1997/98–2022/23), fit on all other seasons, and forecast the held-out season's rows. Holding out whole seasons matters because rows from the same season are strongly correlated (@fig-seasons). Models: LightGBM quantile regression of $z$ at levels 0.1, 0.25, 0.5, 0.75 and 0.9 (200 trees, learning rate 0.05, 15 leaves, at least 50 rows per leaf), scored by **pinball loss** averaged over the five levels (the standard proper score for quantile forecasts; lower is better), and a LightGBM classifier for $z > 0$ with the same settings, scored by **log loss** (lower is better). To keep runtime modest, CV uses the even season weeks only (`r format(n_cv_rows, big.mark = ",")` of `r format(nrow(pr), big.mark = ",")` rows). Feature sets: (i) core, the `r length(CURRENT)` default features; (ii–vii) core + one candidate group; (viii) core + all `r n_all_new` candidate features; single-group ablations from (viii); and two combinations suggested by the results. All $`r length(order9)` \times `r n_seasons_cv` \times 6 = `r format(length(order9) * n_seasons_cv * 6, big.mark = ",")`$ fits took about 5 minutes (4 single-threaded processes).
 
 ```{r fig-cv}
 #| fig-height: 5.5
-#| fig-cap: "**Cross-validated skill of each feature set relative to base.** Left: mean pinball loss for $z$, as a ratio to base (below 1 = better). Right: change in log loss for $z > 0$ (below 0 = better). Circles: week bins; diamond: all weeks. The ablation \"base − hist_rel\" is off the scale (see table)."
-cv_dotplot(rel9, setdiff(order9, "current − hist_rel"), "base")
+#| fig-cap: "**Cross-validated skill of each feature set relative to core.** Left: mean pinball loss for $z$, as a ratio to core (below 1 = better). Right: change in log loss for $z > 0$ (below 0 = better). Circles: week bins; diamond: all weeks. The ablation \"core − hist_rel\" is off the scale (see table)."
+cv_dotplot(rel9, setdiff(order9, "current − hist_rel"), "core")
 ```
 
 ```{r tbl-cv-pinball}
-#| tbl-cap: "Mean pinball loss of the eventual $z$ relative to base, by week bin (leave-one-season-out; values below 1 are improvements)."
+#| tbl-cap: "Mean pinball loss of the eventual $z$ relative to core, by week bin (leave-one-season-out; values below 1 are improvements)."
 kable(cv_table(rel9, rel_pinball, order9))
 abs_cur <- rel9 |> filter(set == "current")
 ```
 
-Absolute pinball loss of base: `r paste(f2(abs_cur$pinball[abs_cur$bin != "all"], 3), collapse = ", ")` in the six bins, `r f2(abs_cur$pinball[abs_cur$bin == "all"], 3)` overall.
+Absolute pinball loss of core: `r paste(f2(abs_cur$pinball[abs_cur$bin != "all"], 3), collapse = ", ")` in the six bins, `r f2(abs_cur$pinball[abs_cur$bin == "all"], 3)` overall.
 
 ```{r tbl-cv-logloss}
-#| tbl-cap: "Change in log loss for $z > 0$ relative to base (negative values are improvements)."
+#| tbl-cap: "Change in log loss for $z > 0$ relative to core (negative values are improvements)."
 kable(cv_table(rel9, d_logloss, order9))
 ```
 
-Log loss of base: `r f2(abs_cur$logloss[abs_cur$bin == "17–21"], 3)` in weeks 17–21, `r f2(abs_cur$logloss[abs_cur$bin == "22–26"], 3)` in 22–26, `r f2(abs_cur$logloss[abs_cur$bin == "27–31"], 3)` in 27–31, `r f2(abs_cur$logloss[abs_cur$bin == "all"], 3)` overall.
+Log loss of core: `r f2(abs_cur$logloss[abs_cur$bin == "17–21"], 3)` in weeks 17–21, `r f2(abs_cur$logloss[abs_cur$bin == "22–26"], 3)` in 22–26, `r f2(abs_cur$logloss[abs_cur$bin == "27–31"], 3)` in 27–31, `r f2(abs_cur$logloss[abs_cur$bin == "all"], 3)` overall.
 
 ```{r cv-main-numbers}
 S <- "+ synchrony"; B <- "+ burden to date"; SBs <- "+ synchrony + burden"; SBL <- "+ synchrony + burden + level"
@@ -566,21 +566,21 @@ imp_top <- imp_main |> head(2)
 
 What the cross-validation shows:
 
-- **`hist_rel` is the single most valuable base feature.** Dropping it makes the quantile forecasts `r pct(rp("current − hist_rel") - 1)` worse overall (about `r f2(mean(c(rp("current − hist_rel", "17–21"), rp("current − hist_rel", "22–26"))), 1)` times the loss in weeks 17–26) and raises the log loss by `r f2(dl("current − hist_rel"), 3)`. base already has the strongest predictor we found.
-- **Synchrony and burden-to-date are the only groups that help consistently, and they help together.** Adding the four synchrony features reduces pinball loss by `r pct(gain(S), 0.1)` overall (by `r pct(min(sync_bins), 0.1)`–`r pct(max(sync_bins), 0.1)` in each bin from week 5 to 21) and beats base in `r sb_main(S)` of `r n_seasons_cv` held-out seasons. Adding the two burden features reduces it by `r pct(gain(B), 0.1)` overall and by `r pct(gain(B, "22–26"), 0.1)` in weeks 22–26. **Adding both reduces pinball loss by `r pct(gain(SBs), 0.1)` overall: `r paste(bins_sb, collapse = ", ")` in weeks 5–11, 12–16, 17–21 and 22–26, with `r ifelse(abs(gain(SBs, "27–31")) < 0.005, "no change", pct(gain(SBs, "27–31"), 0.1))` in 27–31 and a `r pct(-gain(SBs, "32–43"), 0.1)` loss in 32–43** (where $z$ is almost always 0 and absolute losses are tiny). It beats base in `r sb_main(SBs)` of `r n_seasons_cv` seasons, and in `r pct(sb_main(SBs, "boot_win"), 0.1)` of season-level bootstrap resamples (weeks 12–31). Adding the level-vs-history group as well gives about the same result (`r pct(gain(SBL), 0.1)` better, `r sb_main(SBL)` of `r n_seasons_cv` seasons).
-- **Taylor/trend, onset and timing-vs-history features do not help.** Trend features lower pinball loss by a negligible `r pct(gain(TR), 0.1)` overall (they are worse in weeks 17–21 and better only in weeks 32–43) and beat base in only `r sb_main(TR)` of `r n_seasons_cv` seasons; onset features have no effect (`r pct(-gain(ON), 0.1)`); timing-vs-history features make forecasts `r pct(-gain(TI), 0.1)` worse (`r pct(-gain(TI, "12–16"), 1)` worse in weeks 12–16). The trend information is already carried by `rel_max`, `g1`–`g3` and `rm3`, and timing-vs-history has too few past seasons per location (0–10 for ILINet states) to be reliable.
+- **`hist_rel` is the single most valuable core feature.** Dropping it makes the quantile forecasts `r pct(rp("current − hist_rel") - 1)` worse overall (about `r f2(mean(c(rp("current − hist_rel", "17–21"), rp("current − hist_rel", "22–26"))), 1)` times the loss in weeks 17–26) and raises the log loss by `r f2(dl("current − hist_rel"), 3)`. core already has the strongest predictor we found.
+- **Synchrony and burden-to-date are the only groups that help consistently, and they help together.** Adding the four synchrony features reduces pinball loss by `r pct(gain(S), 0.1)` overall (by `r pct(min(sync_bins), 0.1)`–`r pct(max(sync_bins), 0.1)` in each bin from week 5 to 21) and beats core in `r sb_main(S)` of `r n_seasons_cv` held-out seasons. Adding the two burden features reduces it by `r pct(gain(B), 0.1)` overall and by `r pct(gain(B, "22–26"), 0.1)` in weeks 22–26. **Adding both reduces pinball loss by `r pct(gain(SBs), 0.1)` overall: `r paste(bins_sb, collapse = ", ")` in weeks 5–11, 12–16, 17–21 and 22–26, with `r ifelse(abs(gain(SBs, "27–31")) < 0.005, "no change", pct(gain(SBs, "27–31"), 0.1))` in 27–31 and a `r pct(-gain(SBs, "32–43"), 0.1)` loss in 32–43** (where $z$ is almost always 0 and absolute losses are tiny). It beats core in `r sb_main(SBs)` of `r n_seasons_cv` seasons, and in `r pct(sb_main(SBs, "boot_win"), 0.1)` of season-level bootstrap resamples (weeks 12–31). Adding the level-vs-history group as well gives about the same result (`r pct(gain(SBL), 0.1)` better, `r sb_main(SBL)` of `r n_seasons_cv` seasons).
+- **Taylor/trend, onset and timing-vs-history features do not help.** Trend features lower pinball loss by a negligible `r pct(gain(TR), 0.1)` overall (they are worse in weeks 17–21 and better only in weeks 32–43) and beat core in only `r sb_main(TR)` of `r n_seasons_cv` seasons; onset features have no effect (`r pct(-gain(ON), 0.1)`); timing-vs-history features make forecasts `r pct(-gain(TI), 0.1)` worse (`r pct(-gain(TI, "12–16"), 1)` worse in weeks 12–16). The trend information is already carried by `rel_max`, `g1`–`g3` and `rm3`, and timing-vs-history has too few past seasons per location (0–10 for ILINet states) to be reliable.
 - **Adding everything is worse than adding the right few.** All `r n_all_new` candidate features together make forecasts `r pct(-gain(AN), 0.1)` worse overall, even though they help in weeks 22–26 (`r pct(-gain(AN, "22–26"), 0.1)`); removing the timing group from that set recovers a `r pct(gain("all − timing vs history"), 0.1)` gain. With only `r n_seasons_cv` seasons, extra noisy features give the trees more ways to overfit season-specific patterns.
 - **No candidate improves the probability that the peak is still ahead.** Every feature set other than the `hist_rel` ablation changes the $z > 0$ log loss by between `r f2(min(rel9$d_logloss[rel9$bin == "all" & rel9$set != "current − hist_rel"]), 3)` and +`r f2(max(rel9$d_logloss[rel9$bin == "all" & rel9$set != "current − hist_rel"]), 3)` overall, with no consistent gains in any week bin. Whether the peak has passed is already captured by the national and local stage features (the gain importances of the full model are dominated by `` `r imp_top$feature[1]` ``, `r pct(imp_top$gain_share[1])` of total gain, and `` `r imp_top$feature[2]` ``, `r pct(imp_top$gain_share[2])`; @fig-importance).
 
 ```{r fig-importance}
 #| fig-height: 6
 #| fig-width: 7
-#| fig-cap: "**LightGBM gain importance** for the median ($\\tau = 0.5$) quantile model with all base and candidate features, fitted to all CV rows. Grey: base features; blue: candidate features."
+#| fig-cap: "**LightGBM gain importance** for the median ($\\tau = 0.5$) quantile model with all core and candidate features, fitted to all CV rows. Grey: core features; blue: candidate features."
 imp_main |> head(25) |>
   mutate(feature = factor(feature, levels = rev(feature)), kind = ifelse(feature %in% CURRENT, "current", "new")) |>
   ggplot(aes(gain_share, feature, fill = kind)) +
   geom_col(width = 0.7) +
-  scale_fill_manual(values = c(current = "#b7b6b0", new = BLUE), labels = c(current = "base features", new = "candidate features")) +
+  scale_fill_manual(values = c(current = "#b7b6b0", new = BLUE), labels = c(current = "core features", new = "candidate features")) +
   scale_x_continuous("share of total gain", labels = percent_format(1)) + labs(y = NULL) +
   theme(panel.grid.major.y = element_blank(), legend.position = c(0.98, 0.05), legend.justification = c(1, 0))
 ```
@@ -591,7 +591,7 @@ imp_main |> head(25) |>
 idm <- unlist(pnums$consistency$idmodels_feature_max_abs_diff)
 ```
 
-1. **Synchrony and burden-to-date: adopted as feature set SB.** The four synchrony features and the two burden-to-date features (`sync_med_rel_max`, `sync_med_g3`, `sync_frac_past2`, `sync_frac_half`, `cum_vs_hist_total`, `cum_vs_hist_same_week`) are available in idmodels 8c56bf0 as `sync_burden_features = True`. Evidence: `r pct(gain(SBs), 0.1)` lower cross-validated pinball loss overall and `r pct(gain(SBs, "22–26"), 0.1)` lower in weeks 22–26 (late December to late January, when size forecasts matter most), better in `r sb_main(SBs)` of `r n_seasons_cv` held-out seasons. (In `idmodels.peak.series` the burden features agree with the ones used here to within `r formatC(max(idm[grepl("cum", names(idm))]), format = "e", digits = 0)`; its synchrony features differ slightly, by up to `r f2(max(idm[grepl("sync", names(idm))]))`, because it uses the carried-forward definition, whereas this document uses reported-at-t. In the model pipeline, `peak_gbqr__sb` gave slightly better peak-size and slightly worse timing forecasts than `peak_gbqr` on the ILINet development seasons, so base remains the default.)
+1. **Synchrony and burden-to-date: adopted as feature set SB.** The four synchrony features and the two burden-to-date features (`sync_med_rel_max`, `sync_med_g3`, `sync_frac_past2`, `sync_frac_half`, `cum_vs_hist_total`, `cum_vs_hist_same_week`) are available in idmodels 8c56bf0 as `sync_burden_features = True`. Evidence: `r pct(gain(SBs), 0.1)` lower cross-validated pinball loss overall and `r pct(gain(SBs, "22–26"), 0.1)` lower in weeks 22–26 (late December to late January, when size forecasts matter most), better in `r sb_main(SBs)` of `r n_seasons_cv` held-out seasons. (In `idmodels.peak.series` the burden features agree with the ones used here to within `r formatC(max(idm[grepl("cum", names(idm))]), format = "e", digits = 0)`; its synchrony features differ slightly, by up to `r f2(max(idm[grepl("sync", names(idm))]))`, because it uses the carried-forward definition, whereas this document uses reported-at-t. In the model pipeline, `peak_gbqr__sb` gave slightly better peak-size and slightly worse timing forecasts than `peak_gbqr` on the ILINet development seasons, so core remains the default.)
 2. **Keep `hist_rel`**, which is the most important single predictor; any change to how the historical log peak is computed (e.g. how many earlier seasons, what to do when there are none, as for `r pct(mean(is.na(pr$hist_rel)), 0.1)` of rows) should be treated as a change to the model's main input.
 3. **Do not add the Taylor/trend, onset or timing-vs-history features** for now; they add no skill and in some week bins hurt. Do not expect any of these features to improve the "already peaked?" probability.
 4. **Caveats.** The gains are modest and were measured with one fixed LightGBM configuration on ILINet and FluSurv-NET only (NHSN excluded); they should be confirmed in the actual `peak_gbqr` pipeline and on the NHSN test seasons. Synchrony features need all locations of a source to be reported at week $t$, which holds for NHSN in real time, but with real-time (unrevised) data they will be noisier than here, where we used final data throughout. In leave-one-season-out, training seasons later than the held-out season carry "history" that includes the held-out season; this does not leak the held-out season's outcomes into its own features, but it means history-based features were fit with slightly more history than a real-time model would have.
@@ -763,7 +763,7 @@ hb_get <- function(s, ref, metric, what) boot_get(boot, "holiday", s, ref, metri
 
 ```{r fig-holcv}
 #| fig-height: 4.2
-#| fig-cap: "**Cross-validated pinball loss of the eventual $z$ relative to base, by source of the rows and weeks relative to the holidays.** Same x-axis in both panels."
+#| fig-cap: "**Cross-validated pinball loss of the eventual $z$ relative to core, by source of the rows and weeks relative to the holidays.** Same x-axis in both panels."
 hs |> filter(rows != "all", weeks %in% c("all weeks", "holiday weeks", "1–3 wk after", "4–6 wk after")) |>
   mutate(set = factor(vlabel(set), levels = vlabel(rev(hol_sets))), weeks = factor(weeks, levels = c("all weeks", "holiday weeks", "1–3 wk after", "4–6 wk after")),
          rows = factor(paste(rows, "rows"), levels = c("ILINet rows", "FluSurv-NET rows"))) |>
@@ -773,17 +773,17 @@ hs |> filter(rows != "all", weeks %in% c("all weeks", "holiday weeks", "1–3 wk
   facet_wrap(~rows) +
   scale_color_manual(values = c(`all weeks` = INK, `holiday weeks` = "#9ecae1", `1–3 wk after` = "#4292c6", `4–6 wk after` = "#08306b")) +
   scale_shape_manual(values = c(`TRUE` = 18, `FALSE` = 16), guide = "none") +
-  labs(x = "pinball loss relative to base", y = NULL) +
+  labs(x = "pinball loss relative to core", y = NULL) +
   theme(legend.position = "bottom", panel.grid.major.y = element_blank())
 ```
 
 ```{r tbl-holcv}
-#| tbl-cap: "Pinball loss relative to base (below 1 = better)."
+#| tbl-cap: "Pinball loss relative to core (below 1 = better)."
 kable(hol_tab("ratio", 3))
 ```
 
 ```{r tbl-holcvll}
-#| tbl-cap: "Change in log loss for $z > 0$ relative to base (below 0 = better)."
+#| tbl-cap: "Change in log loss for $z > 0$ relative to core (below 0 = better)."
 kable(hol_tab("dll", 4))
 ```
 
@@ -811,7 +811,7 @@ n_fsn_folds <- n_distinct(cva$season)
 An alternative to a feature is to fix the ILINet series before computing targets and features. We tried two versions. **Scaling:** divide the first and second holiday weeks by $e^{`r f2(shift[["0"]], 3)`}$ and $e^{`r f2(shift[["1"]], 3)`}$, the mean ILINet − FluSurv-NET differences estimated above. **Interpolation:** replace all holiday weeks by a log-linear interpolation between the week before and the week after the block. Adjusting ILINet changes ILINet's own targets, so comparing losses on ILINet rows would not be fair. Instead we score only the **FluSurv-NET rows** of each held-out season (`r n_fsn_folds` folds), whose data and targets are untouched, while training on all sources. This asks the question that matters for NHSN: does cleaner ILINet training data give better forecasts of a hospitalization series?
 
 ```{r tbl-holadj}
-#| tbl-cap: "Forecasts of FluSurv-NET rows (leave-one-season-out) with different versions of the ILINet training data, relative to training on ILINet as reported with base."
+#| tbl-cap: "Forecasts of FluSurv-NET rows (leave-one-season-out) with different versions of the ILINet training data, relative to training on ILINet as reported with core."
 adj |> select(`training data` = data, `feature set` = set, weeks, ratio) |>
   mutate(weeks = factor(weeks, levels = c("all weeks", "holiday weeks", "1–3 wk after", "4–6 wk after")), ratio = f2(ratio, 3)) |>
   arrange(weeks) |> pivot_wider(names_from = weeks, values_from = ratio) |>
@@ -821,7 +821,7 @@ adj |> select(`training data` = data, `feature set` = set, weeks, ratio) |>
   kable()
 ```
 
-Neither adjustment helps. Scaling ILINet's holiday weeks leaves forecasts essentially unchanged with base (`r f2(av("ILINet holiday weeks scaled down", "current"), 3)`) and makes them slightly worse with synchrony + burden (`r f2(av("ILINet holiday weeks scaled down", "+ synchrony + burden"), 3)` vs `r f2(av("ILINet as reported", "+ synchrony + burden"), 3)` unadjusted). Interpolating makes them worse (`r f2(av("ILINet holiday weeks interpolated", "current"), 3)` and `r f2(av("ILINet holiday weeks interpolated", "+ synchrony + burden"), 3)`), presumably because it also removes real holiday-time peaks, which @fig-holexcess shows are common in hospitalization data too.
+Neither adjustment helps. Scaling ILINet's holiday weeks leaves forecasts essentially unchanged with core (`r f2(av("ILINet holiday weeks scaled down", "current"), 3)`) and makes them slightly worse with synchrony + burden (`r f2(av("ILINet holiday weeks scaled down", "+ synchrony + burden"), 3)` vs `r f2(av("ILINet as reported", "+ synchrony + burden"), 3)` unadjusted). Interpolating makes them worse (`r f2(av("ILINet holiday weeks interpolated", "current"), 3)` and `r f2(av("ILINet holiday weeks interpolated", "+ synchrony + burden"), 3)`), presumably because it also removes real holiday-time peaks, which @fig-holexcess shows are common in hospitalization data too.
 
 **Recommendation.** Do **not** add holiday features or adjust the ILINet training series for now. The ILINet-specific effect is real but narrow. ILINet runs ahead in late December and then drops back at New Year, and ILINet holiday maxima are exceeded more often than other maxima. But the models already learn most of this from `wks_since_max`, `rel_max` and the national features, and none of the holiday variants gave a consistent cross-validated gain. If the "has the peak passed?" probability is modelled separately, `max_in_holiday` and `weeks_since_holiday_end` are the only candidates worth re-testing, in the real `peak_gbqr` pipeline and on NHSN. NHSN, like FluSurv-NET, has no visit denominator, so the ILINet artefact should matter only through the ILINet training rows.
 
@@ -829,7 +829,7 @@ Neither adjustment helps. Scaling ILINet's holiday weeks leaves forecasts essent
 
 Other fields also have to predict an "ultimate total relative to what has been seen so far". Actuaries predict the final cost of insurance claims from partial payments ("reserving"). Marketers predict a product's eventual sales from its first weeks (Bass diffusion; box office). Probabilists compute how far a random walk will climb above its current level (the reflection principle, record statistics). Hydrologists model how quickly a river falls after its crest (recession curves). Epidemiologists fit growth curves that bend over. We translated eight such ideas into real-time features and tested them exactly as in @sec-predictors. As before, all features use only data through week $t$, all "historical" quantities use only strictly earlier seasons of the same source and location, and the eventual $z$ is the retrospective outcome.
 
-**Comparison set.** Because synchrony + burden (@sec-predictors) was the best set so far, the comparison set here is **SB** = the 13 base features + the 4 synchrony + the 2 burden features. Each idea is added to SB on its own, and then all together.
+**Comparison set.** Because synchrony + burden (@sec-predictors) was the best set so far, the comparison set here is **SB** = the 13 core features + the 4 synchrony + the 2 burden features. Each idea is added to SB on its own, and then all together.
 
 ## The features, in plain language
 
@@ -1050,7 +1050,7 @@ In weeks 22–25, a state whose 5 nearest neighbours have all passed their recor
 
 ## Cross-validation
 
-Same leave-one-season-out design as @sec-predictors (22 folds, even weeks), with SB (base + synchrony + burden) as the reference. These fits were run with a single LightGBM thread and a single worker (`r pnums$runtime_regional_cv_s` s for the new feature sets).
+Same leave-one-season-out design as @sec-predictors (22 folds, even weeks), with SB (core + synchrony + burden) as the reference. These fits were run with a single LightGBM thread and a single worker (`r pnums$runtime_regional_cv_s` s for the new feature sets).
 
 ```{r fig-regcv}
 #| fig-height: 4.5
@@ -1221,7 +1221,7 @@ where $X_{a..b}$ is the sum of weekly positives of type $X$ over season weeks $a
 - **The target has an atom at 0 that dominates after the new year.** Pooled, `r pct(pw(20, "p0"))` of rows have eventual $z = 0$ at week 20, `r pct(pw(25, "p0"))` at week 25 and `r pct(pw(30, "p0"))` at week 30. Models need a probability of "already peaked" plus a continuous part; quantile regression handles this, Gaussian or log-scale likelihoods do not.
 - **The scale of $z$ shrinks with $t$ and with stage.** The median eventual $z$ falls from `r f2(pw(10), 1)` at week 10 to `r f2(pw(15), 1)` at week 15, `r f2(pw(20), 1)` at week 20 and `r f2(pw(25), 1)` at week 25, and the spread shrinks with it. Week-dependent predictive distributions are required.
 - **The strongest real-time predictor is the level relative to the location's history** (`hist_rel`, within-week Spearman correlation with the eventual $z$ of `r f2(rng("hist_rel")[2])` to `r f2(rng("hist_rel")[1])` in weeks 12–26; removing it makes forecasts `r pct(rp("current − hist_rel") - 1)` worse). What remains is the season's "size surprise" (SD `r f2(anom_sd)` on the log scale), which no real-time feature we tried predicts well.
-- **SB (base + synchrony + burden) gives a modest, consistent gain for size** (`r pct(gain(SBs), 0.1)` lower pinball loss than base overall, `r pct(gain(SBs, "22–26"))` in weeks 22–26). It is available in the models as `sync_burden_features`. Taylor/trend, onset and timing-vs-history features do not help.
+- **SB (core + synchrony + burden) gives a modest, consistent gain for size** (`r pct(gain(SBs), 0.1)` lower pinball loss than core overall, `r pct(gain(SBs, "22–26"))` in weeks 22–26). It is available in the models as `sync_burden_features`. Taylor/trend, onset and timing-vs-history features do not help.
 - **$z$ and $k$ are strongly linked** (Spearman `r f2(min(rho_kz$rho))`–`r f2(max(rho_kz$rho))`; median $z$ ≈ `r f2(km(1), 1)`, `r f2(km(4), 1)` and `r f2(km(16), 1)` at 1, 4 and 16 weeks before the peak). Modelling size given timing, or jointly, should be sharper than independent marginal models.
 - **Pooling across sources is reasonable on the $z$ scale** (ILINet and FluSurv-NET $z$ for the same location, season and week have Spearman correlation `r f2(cor(wide$ilinet, wide$flusurvnet, method = "spearman"))`), but not on the absolute scale.
 - **Early-season $z$ is partly an artefact of $\varepsilon$.** Up to about week 12 many rows have $M_t \approx 0$, and the upper tail of $z$ moves by 2+ units when $\varepsilon$ changes tenfold.

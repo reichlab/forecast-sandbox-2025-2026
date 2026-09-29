@@ -178,14 +178,14 @@ cv_table <- function(rel, value, order, digits = 3) {
     rename(`feature set` = set)
 }
 
-# display names for the feature sets (internal names in the saved CV outputs are "current" = base, "SB" = SB);
+# display names for the feature sets (internal names in the saved CV outputs are "current" = core, "SB" = SB);
 # used only for tables and figures, never for filtering
 vlabel <- function(x) {
   x <- as.character(x)
-  x <- sub("^current features$", "base", x)
-  x <- sub("^current(?=$| )", "base", x, perl = TRUE)
+  x <- sub("^current features$", "core", x)
+  x <- sub("^current(?=$| )", "core", x, perl = TRUE)
   x <- gsub("(?<![A-Za-z-])SB(?![A-Za-z])", "SB", x, perl = TRUE)
-  sub("^base \\+ synchrony \\+ burden$", "SB (base + synchrony + burden)", x)
+  sub("^core \\+ synchrony \\+ burden$", "SB (core + synchrony + burden)", x)
 }
 relabel_df <- function(df) {
   df <- as.data.frame(df, check.names = FALSE)

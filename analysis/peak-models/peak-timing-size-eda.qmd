@@ -25,7 +25,7 @@ knitr:
 ---
 
 ::: {.callout-note title="Names of models and feature sets"}
-This document describes the data only; it fits no models. Where it refers to models or feature sets (for example base, SB, `peak_gbqr`, `peak_hier`), the names are those defined in the section *Versions and names used in this document* of the methods document (`peak-models-methods.html`). Candidate features suggested here were tested in `relative-size-eda.html`.
+This document describes the data only; it fits no models. Where it refers to models or feature sets (for example core, SB, `peak_gbqr`, `peak_hier`), the names are those defined in the section *Versions and names used in this document* of the methods document (`peak-models-methods.html`). Candidate features suggested here were tested in `relative-size-eda.html`.
 :::
 
 ::: {.callout-note title="How to run this document"}
