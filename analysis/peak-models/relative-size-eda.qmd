@@ -9,27 +9,60 @@ format:
     toc-depth: 2
     number-sections: true
     html-math-method: katex
+    code-fold: true
+    code-summary: "R code"
     fig-cap-location: bottom
     embed-resources: true
+execute:
+  cache: true
+  warning: false
+  message: false
+knitr:
+  opts_chunk:
+    fig.width: 10
+    dev: "png"
+    dpi: 144
 ---
 
 ::: {.callout-important title="z is never observed in real time"}
 The target $z$ compares the season's **eventual peak** with the largest value seen **so far**. The eventual peak is unknown until the season is over, so a forecaster standing in week $t$ never sees $z_t$: predicting it is the whole forecasting problem. Every value of $z$ in this document was computed **in hindsight**, from completed historical seasons. The document has two jobs: (1) describe the distribution of this retrospective outcome, which a model must learn to predict, and (2) look for **real-time predictors**, quantities that can be computed from data through week $t$ (and, for "historical" quantities, from strictly earlier seasons only) that are associated with the eventual $z$.
 :::
 
-::: {.callout-note title="How this document is built" collapse="true"}
-There are no executable code chunks. Every figure, table and number was produced by two scripts. Both build the training rows with the models' own code (`idmodels.peak.series.build_season_arrays` and `build_replay_rows`, with the model settings: window weeks 10–43, replay from week 5, at least 25 observed in-window weeks). To regenerate, from the repository root:
+::: {.callout-note title="Names of models and feature sets"}
+Feature sets and model versions are named as in the section *Versions and names used in this document* of the methods document (`peak-models-methods.html`).
+
+- **base**: the 13 default features of `peak_gbqr`.
+- **SB**: base plus the 4 synchrony and 2 burden features, available in idmodels as `sync_burden_features = True`.
+- **SB + *group***: SB plus a candidate group tested only in this document's cross-validation harness.
+
+In this document the synchrony features use the **reported-at-t** definition: a location must have a report for week $t$. The model runs used the **carried-forward** definition (@sec-predictors).
+:::
+
+::: {.callout-note title="How to regenerate" collapse="true"}
+The figures, tables and quoted numbers are computed by the R chunks in this document. Python is used only for what needs the model code: building the training rows and features with `idmodels`, and the LightGBM cross-validation. From the repository root:
 
 ```bash
 VENV=/Users/nick/Documents/research-versioned/idmodels/.venv
 export DYLD_FALLBACK_LIBRARY_PATH=$VENV/lib/python3.12/site-packages/sklearn/.dylibs
-$VENV/bin/python analysis/peak-models/relative_size_eda.py                           # sections 1-8, ~1 min
-OMP_NUM_THREADS=1 $VENV/bin/python analysis/peak-models/relative_size_predictors.py  # sections 9-11, ~10 min (cached CV: --reuse_cv --reuse_holiday_cv --reuse_lit_cv)
-quarto render analysis/peak-models/relative-size-eda.qmd
+# 1. export the replay rows (about 15 s)
+$VENV/bin/python analysis/peak-models/relative_size_eda.py
+# 2. features, leakage checks and cross-validation (about 15 min from scratch; about 1 min reusing cached CV;
+#    add --workers 1 to keep the machine light)
+OMP_NUM_THREADS=1 $VENV/bin/python analysis/peak-models/relative_size_predictors.py --reuse_cv --reuse_holiday_cv --reuse_lit_cv --reuse_regional_cv --reuse_types_cv
+# 3. render (R; about 1 min, less when the knitr cache is warm)
+/Applications/quarto/bin/quarto render analysis/peak-models/relative-size-eda.qmd
 ```
 
-The scripts write PNG figures, markdown tables, `key_numbers.json` and `predictors_numbers.json` (every number quoted below) into `analysis/peak-models/eda/`. Data: ILINet (weighted ILI × percent positive) and FluSurv-NET, final data, from the cache `analysis/peak-models/ilinet-validation/data-ilinet-flusurvnet.parquet`.
+Step 1 writes `eda/replay_rows.parquet` (one row per series and season week, with the model's features and the targets) and `eda/season_arrays.parquet` (the weekly series and running maxima). Step 2 writes `eda/predictor_rows.parquet` (all candidate features), per-row cross-validation scores (`eda/cv_*.parquet`), season-bootstrap comparisons (`eda/cv_bootstrap.csv`), gain importances, the holiday tables and the random-walk check; drop the `--reuse_*` flags to recompute the cross-validation. Shared R helpers are in `R/eda_helpers.R` and `R/relative_size_helpers.R`. Data: ILINet (weighted ILI × percent positive) and FluSurv-NET, final data, from `ilinet-validation/data-ilinet-flusurvnet.parquet`. A companion document, `peak-timing-size-eda.qmd`, describes peak timing and size themselves.
 :::
+
+```{r setup}
+#| cache: false
+source("R/relative_size_helpers.R")
+kable <- function(x, ...) knitr::kable(relabel_df(x), ...)  # feature-set names as in the methods document
+rows <- read_rows("eda/replay_rows.parquet")
+arr <- read_parquet("eda/season_arrays.parquet")
+```
 
 # Why a "relative" size target?
 
@@ -55,7 +88,47 @@ Plain-language reading: $e^{z_t}$ is the factor by which the season's record sti
 
 **$z_t$ is not known in real time**, because the eventual peak is not. @fig-realtime shows the difference between what a forecaster sees at week 18 and what we can compute once the season is over.
 
-![**Real time vs hindsight.** Left: at week 18 a forecaster knows the series so far and its running maximum $M_{18}$; everything to the right of the dotted line, including the peak, is unknown. Right: after the season we know the peak (star) and can compute $z_{18}$, the log-distance from $M_{18}$ up to the peak. All training data for the models, and every $z$ plotted in this document, are of the right-hand kind.](eda/fig00_realtime_vs_hindsight.png){#fig-realtime}
+```{r fig-realtime}
+#| fig-height: 3.8
+#| fig-cap: "**Real time vs hindsight** (Massachusetts, ILINet 2017/18). Left: at week 18 a forecaster knows the series so far and its running maximum $M_{18}$; everything to the right of the dotted line, including the peak, is unknown. Right: after the season we know the peak (star) and can compute $z_{18}$, the log-distance from $M_{18}$ up to the peak. All training data for the models, and every $z$ plotted in this document, are of the right-hand kind."
+t0 <- 18
+eps0 <- LOG_EPS[["ilinet"]]
+a <- arr |> filter(source == "ilinet", location == "25", season == "2017/18", season_week >= REPLAY_START,
+                   season_week <= WINDOW[2])
+pk_w <- rows |> filter(source == "ilinet", location == "25", season == "2017/18") |> pull(peak_week) |> first()
+pk <- a$y[a$season_week == pk_w]
+m18 <- a$M[a$season_week == t0]
+base <- function(show_future) {
+  p <- ggplot(a |> filter(season_week <= t0), aes(season_week)) +
+    pre_window(log_y = TRUE) +
+    geom_line(aes(y = y + eps0), color = INK2) + geom_point(aes(y = y + eps0), color = INK2, size = 0.9) +
+    geom_step(aes(y = M + eps0), color = ACCENT, linewidth = 0.9) +
+    geom_vline(xintercept = t0, linetype = "dotted", color = INK2) +
+    annotate("text", x = t0 - 0.5, y = (m18 + eps0) * 1.5, label = "M[18]~(known)", parse = TRUE, color = ACCENT,
+             hjust = 1, size = 3.2) +
+    annotate("text", x = t0 + 0.5, y = 1.4e-3, label = "today: week 18", hjust = 0, size = 3, color = INK2) +
+    scale_y_log10("ILI × % positive + eps (log)", limits = c(eps0 * 0.8, pk * 4), labels = plain_log_labels) +
+    scale_x_season_week()
+  if (!show_future) {
+    p + annotate("text", x = 31, y = 0.3, label = "future weeks,\npeak and z:\nunknown", fontface = "italic",
+                 color = INK2, size = 3.5) +
+      labs(title = "In real time: what a forecaster knows at week t")
+  } else {
+    p + geom_line(data = a |> filter(season_week >= t0), aes(y = y + eps0), color = "#b7b6b0") +
+      geom_point(data = a |> filter(season_week > t0), aes(y = y + eps0), color = "#b7b6b0", size = 0.9) +
+      geom_hline(yintercept = pk + eps0, linetype = "dashed", color = BLUE) +
+      annotate("point", x = pk_w, y = pk + eps0, shape = 8, color = BLUE, size = 3) +
+      annotate("text", x = pk_w + 0.6, y = (pk + eps0) * 1.5, label = paste("actual peak, week", pk_w), hjust = 0, size = 3) +
+      annotate("segment", x = t0, xend = t0, y = m18 + eps0, yend = pk + eps0, color = BLUE,
+               arrow = arrow(ends = "both", length = unit(0.15, "cm"))) +
+      annotate("text", x = t0 - 0.5, y = sqrt((m18 + eps0) * (pk + eps0)),
+               label = paste0("z[18] == ", f2(log(pk + eps0) - log(m18 + eps0), 1)), parse = TRUE, color = BLUE,
+               hjust = 1, size = 3.2) +
+      labs(title = "In hindsight: the rest of the season, the peak, and z", y = NULL)
+  }
+}
+base(FALSE) | base(TRUE)
+```
 
 Three reasons for predicting $z$ rather than the peak itself:
 
@@ -63,96 +136,315 @@ Three reasons for predicting $z$ rather than the peak itself:
 2. **It conditions on the stage of the epidemic.** "How much more growth is left?" has a very different answer in November than in February, and for a state still at baseline versus one visibly past its peak. The model's features describing the season so far (`rel_max`, `wks_since_max`, `g1`, …, defined in @sec-stage) are also measured relative to $M_t$ and are all computable in real time, so the model learns a mapping from "where are we on the curve" to "how much is left".
 3. **It respects a hard constraint.** The peak cannot be below $M_t$, so $z_t \ge 0$ always. A predictive distribution for $z$ on $[0, \infty)$ builds this in automatically.
 
-The price is that $z$ has an awkward distribution: a lump of probability ("atom") exactly at 0 once the peak has passed, a long right tail early in the season, and a strong dependence on $\varepsilon$ when $M_t$ is tiny. Sections 2–8 look at each of these; section 9 searches for better real-time predictors.
+The price is that $z$ has an awkward distribution: a lump of probability ("atom") exactly at 0 once the peak has passed, a long right tail early in the season, and a strong dependence on $\varepsilon$ when $M_t$ is tiny. Sections 2–8 look at each of these; sections 9–13 search for better real-time predictors.
 
 ## What a training row is
 
 The models learn from **season replay**: for every completed historical season of every location and source, and every week $t$ from 5 to 43 with an observation, we pretend we are standing at week $t$, compute the features from weeks $1, \dots, t$ only, and attach the eventual $z_t$ computed from the completed season. One series (for example "ILINet, Massachusetts, 2017/18") contributes up to 39 rows. Because we use **final** (fully revised) data, once the peak week has passed the eventual $z_t$ is *exactly* 0.
 
-**Data used here.** **NHSN is deliberately excluded for now:** its seasons are the held-out test data for the peak models, and looking at them here would contaminate that validation; they may be added back later. We also **drop the ILINet series for Puerto Rico and the US Virgin Islands** (all seasons) before building rows: their ILINet × percent-positive values are zero all season, so the "peak" is 0, $z$ is trivially 0 and a few pre-window rows had $z < 0$. @tbl-coverage shows what remains: 859 series and 31,108 rows.
+```{r coverage}
+n_series <- rows |> distinct(source, agg_level, location, season) |> nrow()
+cov_tab <- rows |> group_by(source = group) |>
+  summarise(seasons = paste(min(season), max(season), sep = "–"), `n seasons` = n_distinct(season),
+            locations = n_distinct(location), series = n_distinct(paste(location, season)), rows = n())
+```
 
-{{< include eda/table_coverage.md >}}
+**Data used here.** **NHSN is deliberately excluded for now:** its seasons are the held-out test data for the peak models, and looking at them here would contaminate that validation; they may be added back later. We also **drop the ILINet series for Puerto Rico and the US Virgin Islands** (all seasons) before building rows: their ILINet × percent-positive values are zero all season, so the "peak" is 0, $z$ is trivially 0 and a few pre-window rows had $z < 0$. @tbl-coverage shows what remains: `r format(n_series, big.mark = ",")` series and `r format(nrow(rows), big.mark = ",")` rows. (The companion peak timing/size document counts slightly fewer ILINet state series because it applies the 25-observed-weeks rule before, rather than after, the models' filling of short gaps.)
 
-: Training data used in this analysis. "series" is a (location, season) pair; "rows" is one per observed season week 5–43. FluSurv-NET has 13 sites plus a national series; ILINet regions are the 10 HHS regions. {#tbl-coverage}
+```{r tbl-coverage}
+#| tbl-cap: "Training data used in this analysis. \"series\" is a (location, season) pair; \"rows\" is one per observed season week 5–43. FluSurv-NET has 13 sites plus a national series; ILINet regions are the 10 HHS regions."
+kable(cov_tab, format.args = list(big.mark = ","))
+```
 
 # The eventual z in individual seasons
 
-![**Massachusetts, three ILINet seasons.** Top: the weekly series (grey), its running maximum $M_t$ (orange staircase) and the eventual peak (star and dashed line), on a log scale so that $z_t$ is the vertical distance between the staircase and the dashed line (the arrow shows it at week 18). Bottom: the eventual $z_t$ by week, computed after the season. Shaded weeks 5–9 are before the window opens.](eda/fig01_examples_ma.png){#fig-ma}
+```{r fig-ma}
+#| fig-height: 5.6
+#| fig-cap: "**Massachusetts, three ILINet seasons.** Top: the weekly series (grey), its running maximum $M_t$ (orange staircase) and the eventual peak (star and dashed line), on a log scale so that $z_t$ is the vertical distance between the staircase and the dashed line (the arrow shows it at week 18). Bottom: the eventual $z_t$ by week, computed after the season. Shaded weeks 5–9 are before the window opens."
+ili_lab <- "ILI × % pos."
+example_row(arr, rows, list(
+  list(src = "ilinet", loc = "25", season = "2017/18", title = "Massachusetts, ILINet 2017/18", ylab = ili_lab),
+  list(src = "ilinet", loc = "25", season = "2019/20", title = "Massachusetts, ILINet 2019/20", ylab = ili_lab),
+  list(src = "ilinet", loc = "25", season = "2012/13", title = "Massachusetts, ILINet 2012/13", ylab = ili_lab)))
+```
 
 In all three Massachusetts seasons, $z_t$ comes down in **steps**: it stays flat during weeks in which no new record is set (e.g. 2019/20, weeks 11–16, when activity was at baseline and wobbling below its week-11 value) and drops each week the record is broken. It hits 0 in the peak week and stays there. Early in the season $z$ is 5–8, because $M_t$ is a baseline-level number. The 2012/13 season was early (peak in week 22) and $z$ collapses from about 3 to 0 within six weeks. The staircases also show why "weeks since the max was set" and "how far below the max is the current value" might carry information: just before the peak the series sets a new record every week, while after the peak it falls away from $M_t$.
 
-![**Montana**, a small state, same layout.](eda/fig02_examples_small.png){#fig-small}
+```{r fig-small}
+#| fig-height: 5.6
+#| fig-cap: "**Montana**, a small state, same layout."
+example_row(arr, rows, list(
+  list(src = "ilinet", loc = "30", season = "2017/18", title = "Montana, ILINet 2017/18", ylab = ili_lab),
+  list(src = "ilinet", loc = "30", season = "2019/20", title = "Montana, ILINet 2019/20", ylab = ili_lab),
+  list(src = "ilinet", loc = "30", season = "2012/13", title = "Montana, ILINet 2012/13", ylab = ili_lab)))
+```
 
 A small state behaves the same way but with far more noise: Montana's ILINet values bounce between zero (plotted at $\varepsilon = 0.001$) and small positive numbers for weeks, so $M_t$ is set by isolated blips. In 2017/18 the series reached a plateau in week 23 and then just exceeded it in week 31, so $z$ sat at a small positive value (about 0.2) for eight weeks; in 2019/20 the same happened between weeks 26 and 32. These near-ties between an early high point and a slightly higher later one are hard for any model and are common in small states.
 
-![**United States**, ILINet 2017/18 and 2019/20 and FluSurv-NET 2017/18.](eda/fig02b_examples_us.png){#fig-us}
+```{r fig-us}
+#| fig-height: 5.6
+#| fig-cap: "**United States**, ILINet 2017/18 and 2019/20 and FluSurv-NET 2017/18."
+example_row(arr, rows, list(
+  list(src = "ilinet", loc = "US", season = "2017/18", title = "US, ILINet 2017/18", ylab = ili_lab),
+  list(src = "ilinet", loc = "US", season = "2019/20", title = "US, ILINet 2019/20", ylab = ili_lab),
+  list(src = "flusurvnet", loc = "US", season = "2017/18", title = "US, FluSurv-NET 2017/18", ylab = "per 100k")))
+```
 
 National series are smooth and never near zero, so their early-season $z$ is lower (about 4–4.5 at week 10, versus 5–8 in the states) and declines steadily in small steps. ILINet 2019/20 again shows a first high point (week 22) narrowly exceeded later (week 28). ILINet and FluSurv-NET for the same 2017/18 national epidemic give similar $z$ curves, although FluSurv-NET peaked earlier (week 23 vs 27): a first hint that $z$ is comparable across sources.
 
 # The distribution of the eventual z over the season
 
-![**Quantiles of the eventual $z$ by season week, for each source.** Bands are the 10–90% and 25–75% ranges across all training rows at that week; the line is the median. Same y-axis in all panels. FluSurv-NET begins at week 10 because its surveillance season starts in October.](eda/fig03_z_fan_by_source.png){#fig-fan}
+```{r fig-fan}
+#| fig-height: 3.8
+#| fig-cap: "**Quantiles of the eventual $z$ by season week, for each source.** Bands are the 10–90% and 25–75% ranges across all training rows at that week; the line is the median. Same y-axis in all panels. FluSurv-NET begins at week 10 because its surveillance season starts in October."
+zq <- ztab(rows, group, season_week)
+ggplot(zq, aes(season_week, fill = group, color = group)) +
+  pre_window() +
+  geom_ribbon(aes(ymin = q10, ymax = q90), alpha = 0.18, color = NA) +
+  geom_ribbon(aes(ymin = q25, ymax = q75), alpha = 0.38, color = NA) +
+  geom_line(aes(y = q50), linewidth = 0.9) +
+  facet_wrap(~group) +
+  scale_fill_manual(values = SOURCE_COLORS, guide = "none") + scale_color_manual(values = SOURCE_COLORS, guide = "none") +
+  scale_x_season_week(breaks = c(5, 10, 20, 30, 40)) +
+  scale_y_continuous("eventual z (known only after the season)", limits = Z_LIM)
+```
 
-The three sources tell the same story: $z$ starts around 5–6.5 (median) before the window opens, declines roughly linearly through November and December, and collapses to 0 over January–February. Pooling all sources, the median eventual $z$ is 5.34 at week 10, 3.61 at week 15, 1.95 at week 20 and 0.33 at week 25 (@tbl-byweek). The spread is wide early (at week 10 the 25–75% range in ILINet states is 4.3–6.9, i.e. peaks between 75 and 1,000 times the current record), and the upper end in October mostly reflects how close $M_t$ is to $\varepsilon$ (@sec-eps). For modelling, the early-season predictive distribution must be very wide on the log scale, and the spread shrinks sharply with $t$, so a constant-variance model for $z$ would be badly miscalibrated.
+```{r fan-numbers}
+pooled <- ztab(rows, season_week)
+pw <- function(w, col = "q50") pooled[[col]][pooled$season_week == w]
+zq_st <- zq |> filter(group == "ILINet states")
+q_st <- function(w, col) zq_st[[col]][zq_st$season_week == w]
+```
 
-{{< include eda/table_z_by_week.md >}}
+The three sources tell the same story: $z$ starts around 5–6.5 (median) before the window opens, declines roughly linearly through November and December, and collapses to 0 over January–February. Pooling all sources, the median eventual $z$ is `r f2(pw(10))` at week 10, `r f2(pw(15))` at week 15, `r f2(pw(20))` at week 20 and `r f2(pw(25))` at week 25 (@tbl-byweek). The spread is wide early (at week 10 the 25–75% range in ILINet states is `r f2(q_st(10, "q25"), 1)`–`r f2(q_st(10, "q75"), 1)`, i.e. peaks between `r round(exp(q_st(10, "q25")), -1)` and `r format(round(exp(q_st(10, "q75")), -2), big.mark = ",")` times the current record), and the upper end in October mostly reflects how close $M_t$ is to $\varepsilon$ (@sec-eps). For modelling, the early-season predictive distribution must be very wide on the log scale, and the spread shrinks sharply with $t$, so a constant-variance model for $z$ would be badly miscalibrated.
 
-: Median eventual $z$ [25%, 75%] and the share of rows with $z = 0$, by season week and source. {#tbl-byweek}
+```{r tbl-byweek}
+#| tbl-cap: "Median eventual $z$ [25%, 75%] and the share of rows with $z = 0$, by season week and source."
+zq |> filter(season_week %in% c(5, 10, 15, 20, 25, 30, 35, 40)) |>
+  mutate(cell = paste0(f2(q50), " [", f2(q25), ", ", f2(q75), "]; ", percent(p0, 1))) |>
+  select(week = season_week, group, cell) |>
+  pivot_wider(names_from = group, values_from = cell, values_fill = "–") |>
+  kable()
+```
 
 ## The atom at zero
 
-![**Share of training rows whose peak had already happened** (eventual $z = 0$ exactly), by season week and source.](eda/fig04_atom_at_zero.png){#fig-atom}
+```{r fig-atom}
+#| fig-height: 3.8
+#| fig-width: 8
+#| fig-cap: "**Share of training rows whose peak had already happened** (eventual $z = 0$ exactly), by season week and source."
+ggplot(zq, aes(season_week, p0, color = group)) +
+  pre_window() +
+  geom_line(linewidth = 0.9) +
+  scale_color_manual(values = SOURCE_COLORS) +
+  scale_x_season_week() +
+  scale_y_continuous("share of rows with z = 0\n(peak already reached)", labels = percent_format(1), limits = c(0, 1)) +
+  theme(legend.position = c(0.02, 0.98), legend.justification = c(0, 1))
+p0g <- function(g, w) zq$p0[zq$group == g & zq$season_week == w]
+```
 
-Before about week 17 (late November) almost no series has peaked; then the share with $z = 0$ climbs steeply, reaching 8% at week 20, 38% at week 25, 78% at week 30 and 97% at week 35 when all rows are pooled. By week 30 the share is 76% for ILINet states, 83% for ILINet national/regions and 75% for FluSurv-NET. The three curves are close, with FluSurv-NET slightly ahead in January (its hospitalization peaks tend to come a little earlier than ILINet's).
+Before about week 17 (late November) almost no series has peaked; then the share with $z = 0$ climbs steeply, reaching `r pct(pw(20, "p0"))` at week 20, `r pct(pw(25, "p0"))` at week 25, `r pct(pw(30, "p0"))` at week 30 and `r pct(pw(35, "p0"))` at week 35 when all rows are pooled. By week 30 the share is `r pct(p0g("ILINet states", 30))` for ILINet states, `r pct(p0g("ILINet national + regions", 30))` for ILINet national/regions and `r pct(p0g("FluSurv-NET", 30))` for FluSurv-NET. The three curves are close, with FluSurv-NET slightly ahead in January (its hospitalization peaks tend to come a little earlier than ILINet's).
 
 This atom is the central modelling fact: from January on, a large share of the outcome distribution is a point mass at 0, and a model must learn a probability of "already peaked" together with a continuous distribution for $z > 0$. Note that "already peaked" is itself not known in real time: a forecaster in week 25 does not know whether this week's record will be broken. A plain quantile regression can represent the atom (lower quantiles equal to 0); a Gaussian likelihood on $z$ or a model on $\log z$ cannot, which is why a two-part (hurdle) formulation or direct modelling of $k$ (weeks to peak) is natural.
 
 # The eventual z by real-time stage features {#sec-stage}
 
-The current model features describe where the season stands relative to its own record, and are all computable at week $t$:
+The base features (the default feature set of `peak_gbqr`) describe where the season stands relative to its own record, and are all computable at week $t$:
 
 - `wks_since_max`: how many weeks ago $M_t$ was set (0 = this week is a new record).
 - `rel_max` $= \log(\text{current value}) - \log(M_t)$: how far below the record the current week is (0 = at the record; −0.7 ≈ half of it).
 - `g1` $= \log(\text{this week}) - \log(\text{last week})$: one-week growth rate on the log scale (0.4 ≈ 50% increase).
 
-![**Eventual $z$ within bins of each real-time stage feature, at three season weeks** (all sources pooled). Thin line: 10–90% range; thick bar: 25–75%; black tick: median. Numbers above each bin: share of rows with eventual $z = 0$ and the number of rows. Same y-axis throughout.](eda/fig05_z_by_stage.png){#fig-stage}
+```{r fig-stage}
+#| fig-height: 10
+#| fig-cap: "**Eventual $z$ within bins of each real-time stage feature, at three season weeks** (all sources pooled). Thin line: 10–90% range; thick bar: 25–75%; black tick: median. Numbers above each bin: share of rows with eventual $z = 0$ and the number of rows. Same y-axis throughout."
+st <- rows |> filter(season_week %in% c(16, 22, 28)) |>
+  mutate(week_lab = paste0("Season week ", season_week, " (~", format(season_week_date("2017/18", season_week), "%b %d"), ")"),
+         wsm_bin = factor(ifelse(wks_since_max >= 4, "4+", as.character(wks_since_max)), levels = c("0", "1", "2", "3", "4+")),
+         rel_bin = cut(rel_max, c(-Inf, -1, -0.4, -0.1, -1e-9, 0.1),
+                       labels = c("< −1", "−1 to −0.4", "−0.4 to −0.1", "−0.1 to 0", "at max (0)")),
+         rel_bin = factor(rel_bin, levels = rev(levels(rel_bin))),
+         g1_bin = cut(g1, c(-Inf, -0.15, 0.15, 0.4, Inf),
+                      labels = c("falling\n< −0.15", "flat\n±0.15", "rising\n0.15–0.4", "fast\n> 0.4")))
+quantile_bars(st, wsm_bin, "weeks since the max was set") /
+  quantile_bars(st, rel_bin, "rel_max = log(current / M_t)") /
+  quantile_bars(st, g1_bin, "g1 = log growth over the last week")
+sb <- function(var, w, lvl) {
+  x <- st |> filter(season_week == w, {{ var }} == lvl)
+  list(p0 = mean(x$at_zero), med = median(x$z), n = nrow(x))
+}
+```
 
-At week 16 (mid-November) almost nothing has peaked (0–7% at $z = 0$ in every bin), and the features mostly separate "still at baseline" from "starting to rise": series whose record was set 4+ weeks ago are ones where nothing has happened yet, and they have the *largest* eventual $z$ (median 3.9, vs 3.0 when the current week is a record). At week 22 (late December) the same feature partly flips meaning: a record set 4+ weeks ago now means the peak has passed in 45% of cases (vs 23% when the current week is the record), but the median $z$ in that bin is still 1.9 because the other half are seasons that have not started. Growth is informative in the same period (46% of falling series with g1 < −0.15 have peaked vs 19% of fast risers with g1 > 0.4), and by week 28 the features separate "peaked" from "not peaked" well (91–95% at $z = 0$ in the "4+ weeks" and "rel_max < −1" bins). But within the weeks that matter most, 17–26, the bins overlap heavily: **none of these three "shape" features strongly predicts the eventual $z$ on its own**. (One current feature does: `hist_rel`, the current record relative to the location's typical peak; see @sec-predictors.) This motivates the search for better real-time predictors in @sec-predictors. The direction of the relationships also changes with $t$, an argument for letting models interact stage features with season week (as tree models do automatically).
+At week 16 (mid-November) almost nothing has peaked (0–7% at $z = 0$ in every bin), and the features mostly separate "still at baseline" from "starting to rise": series whose record was set 4+ weeks ago are ones where nothing has happened yet, and they have the *largest* eventual $z$ (median `r f2(sb(wsm_bin, 16, "4+")$med, 1)`, vs `r f2(sb(wsm_bin, 16, "0")$med, 1)` when the current week is a record). At week 22 (late December) the same feature partly flips meaning: a record set 4+ weeks ago now means the peak has passed in `r pct(sb(wsm_bin, 22, "4+")$p0)` of cases (vs `r pct(sb(wsm_bin, 22, "0")$p0)` when the current week is the record), but the median $z$ in that bin is still `r f2(sb(wsm_bin, 22, "4+")$med, 1)` because the other half are seasons that have not started. Growth is informative in the same period (`r pct(sb(g1_bin, 22, "falling\n< −0.15")$p0)` of falling series with g1 < −0.15 have peaked vs `r pct(sb(g1_bin, 22, "fast\n> 0.4")$p0)` of fast risers with g1 > 0.4), and by week 28 the features separate "peaked" from "not peaked" well (`r pct(sb(wsm_bin, 28, "4+")$p0)` at $z = 0$ in the "4+ weeks" bin and `r pct(sb(rel_bin, 28, "< −1")$p0)` in the "rel_max < −1" bin). But within the weeks that matter most, 17–26, the bins overlap heavily: **none of these three "shape" features strongly predicts the eventual $z$ on its own**. (One current feature does: `hist_rel`, the current record relative to the location's typical peak; see @sec-predictors.) This motivates the search for better real-time predictors in @sec-predictors. The direction of the relationships also changes with $t$, an argument for letting models interact stage features with season week (as tree models do automatically).
 
 # The eventual z and the time to peak
 
 The companion target is $k = \text{peak week} - t$, the number of weeks until the peak ($k \le 0$ means the peak has passed, which is exactly when $z = 0$). Like $z$, $k$ is only known in hindsight.
 
-![**Eventual $z$ against weeks-to-peak $k$, for rows that had not yet peaked** ($k \ge 1$). Hexagon shading: number of rows (log scale). Black: median $z$ at each $k$. Same axes in all panels.](eda/fig06_z_vs_k.png){#fig-kz}
+```{r fig-kz}
+#| fig-height: 3.8
+#| fig-cap: "**Eventual $z$ against weeks-to-peak $k$, for rows that had not yet peaked** ($k \\ge 1$). Shading: number of rows (log scale). Black: median $z$ at each $k$ (where at least 20 rows). Same axes in all panels."
+kz <- rows |> filter(k >= 1)
+rho_kz <- kz |> group_by(group) |> summarise(rho = cor(k, z, method = "spearman"))
+kmed <- kz |> group_by(group, k) |> summarise(med = median(z), n = n(), .groups = "drop") |> filter(n >= 20)
+ggplot(kz, aes(k, z)) +
+  geom_bin2d(bins = c(20, 18)) +
+  geom_line(data = kmed, aes(k, med), color = INK, linewidth = 0.9) +
+  geom_text(data = rho_kz, aes(x = 1, y = 9, label = paste0("Spearman ρ(k, z) = ", f2(rho))), hjust = 0, size = 3) +
+  facet_wrap(~group) +
+  scale_x_log10("k = weeks until the peak (log scale)", breaks = c(1, 2, 4, 8, 16, 32)) +
+  scale_y_continuous("eventual z", limits = c(0, Z_LIM[2])) +
+  scale_fill_distiller("rows", palette = "Blues", direction = 1, trans = "log10") +
+  theme(legend.position = "right")
+kmed_all <- kz |> group_by(k) |> summarise(med = median(z))
+km <- function(k) kmed_all$med[kmed_all$k == k]
+k58 <- quantile(kz$z[kz$k >= 5 & kz$k <= 8], c(0.1, 0.9))
+```
 
-The relative size still to come grows steadily with the time until the peak: pooled across sources the median $z$ is 0.22 one week before the peak, 0.51 two weeks before, 1.14 four weeks before, 2.71 eight weeks before and 4.57 sixteen weeks before; the Spearman correlation between $k$ and $z$ is 0.75–0.79 in every source. The spread at fixed $k$ is still large (for $k$ between 5 and 8 weeks, the 10–90% range of $z$ is 0.68–3.89), but knowing $k$ removes much of the uncertainty in $z$. This supports modelling the two jointly, for example "size given timing": draw $k$ first, then $z$ given $k$ and the real-time features. The FluSurv-NET cluster at $z \approx 6$–8 with $k \approx 10$–20 is early-October rows with near-zero $M_t$ (the $\varepsilon$ effect again).
+The relative size still to come grows steadily with the time until the peak: pooled across sources the median $z$ is `r f2(km(1))` one week before the peak, `r f2(km(2))` two weeks before, `r f2(km(4))` four weeks before, `r f2(km(8))` eight weeks before and `r f2(km(16))` sixteen weeks before; the Spearman correlation between $k$ and $z$ is `r f2(min(rho_kz$rho))`–`r f2(max(rho_kz$rho))` in every source. The spread at fixed $k$ is still large (for $k$ between 5 and 8 weeks, the 10–90% range of $z$ is `r f2(k58[1])`–`r f2(k58[2])`), but knowing $k$ removes much of the uncertainty in $z$. This supports modelling the two jointly, for example "size given timing": draw $k$ first, then $z$ given $k$ and the real-time features. The FluSurv-NET cluster at $z \approx 6$–8 with $k \approx 10$–20 is early-October rows with near-zero $M_t$ (the $\varepsilon$ effect again).
 
 # Are the sources comparable?
 
-![**ILINet vs FluSurv-NET for the same locations and seasons.** Left: the 13 FluSurv-NET sites (all are states) paired with the same state's ILINet series; right: the US national series. Line: median eventual $z$; band: 25–75%; dotted: 90th percentile.](eda/fig07_ilinet_vs_flusurvnet.png){#fig-compare}
+```{r fig-compare}
+#| fig-height: 4
+#| fig-cap: "**ILINet vs FluSurv-NET for the same locations and seasons.** Left: the 13 FluSurv-NET sites (all are states) paired with the same state's ILINet series; right: the US national series. Line: median eventual $z$; band: 25–75%; dotted: 90th percentile."
+both <- inner_join(rows |> filter(source == "flusurvnet") |> distinct(location, season),
+                   rows |> filter(source == "ilinet") |> distinct(location, season), by = c("location", "season"))
+dm <- rows |> semi_join(both, by = c("location", "season")) |>
+  mutate(panel = ifelse(location == "US", "United States", "FluSurv-NET sites (states) and the matching ILINet states"),
+         src = ifelse(source == "ilinet", "ILINet", "FluSurv-NET"))
+dq <- ztab(dm, panel, src, season_week)
+ns <- dm |> distinct(panel, src, location, season) |> count(panel, src)
+ggplot(dq, aes(season_week, color = src, fill = src)) +
+  pre_window() +
+  geom_ribbon(aes(ymin = q25, ymax = q75), alpha = 0.25, color = NA) +
+  geom_line(aes(y = q50), linewidth = 0.9) +
+  geom_line(aes(y = q90), linetype = "dotted") +
+  facet_wrap(~panel) +
+  scale_color_manual(values = c(ILINet = BLUE, `FluSurv-NET` = SOURCE_COLORS[["FluSurv-NET"]])) +
+  scale_fill_manual(values = c(ILINet = BLUE, `FluSurv-NET` = SOURCE_COLORS[["FluSurv-NET"]])) +
+  scale_x_season_week(breaks = c(5, 10, 20, 30, 40)) +
+  scale_y_continuous("eventual z: median, 25–75% (band), 90% (dotted)", limits = Z_LIM)
+wide <- dm |> filter(season_week >= WINDOW[1]) |> select(location, season, season_week, source, z) |>
+  pivot_wider(names_from = source, values_from = z) |> filter(!is.na(ilinet), !is.na(flusurvnet))
+pk_pairs <- dm |> distinct(source, location, season, peak_week) |>
+  pivot_wider(names_from = source, values_from = peak_week)
+mz <- function(src, w) median(dm$z[dm$location != "US" & dm$source == src & dm$season_week == w])
+```
 
-For the 150 (location, season) pairs that both sources cover (14 locations, 2010/11–2022/23), the eventual $z$ distributions are very similar once the window opens: matched-state medians are 3.73 (ILINet) vs 3.28 (FluSurv-NET) at week 15, 1.85 vs 1.96 at week 20 and 0.18 vs 0.11 at week 25. Pair by pair, the Spearman correlation between the two sources' $z$ at the same location, season and week (weeks 10–43) is 0.95, the median absolute difference is 0.09, and the median difference in peak week is 0. The main disagreement is in October, when ILINet $z$ is higher because ILINet × percent positive is more often near zero at baseline. So pooling sources on the $z$ scale looks reasonable, provided the model has a source indicator for the baseline-level differences.
+For the `r nrow(both)` (location, season) pairs that both sources cover (`r n_distinct(both$location)` locations, 2010/11–2022/23), the eventual $z$ distributions are very similar once the window opens: matched-state medians are `r f2(mz("ilinet", 15))` (ILINet) vs `r f2(mz("flusurvnet", 15))` (FluSurv-NET) at week 15, `r f2(mz("ilinet", 20))` vs `r f2(mz("flusurvnet", 20))` at week 20 and `r f2(mz("ilinet", 25))` vs `r f2(mz("flusurvnet", 25))` at week 25. Pair by pair, the Spearman correlation between the two sources' $z$ at the same location, season and week (weeks 10–43) is `r f2(cor(wide$ilinet, wide$flusurvnet, method = "spearman"))`, the median absolute difference is `r f2(median(abs(wide$ilinet - wide$flusurvnet)))`, and the median difference in peak week is `r median(pk_pairs$ilinet - pk_pairs$flusurvnet)`. The main disagreement is in October, when ILINet $z$ is higher because ILINet × percent positive is more often near zero at baseline. So pooling sources on the $z$ scale looks reasonable, provided the model has a source indicator for the baseline-level differences.
 
-![**Absolute vs relative scale.** Left: log of the season peak, one dot per series, in each source's own units. Right: eventual $z$ at season week 18 (early December), one dot per series. Black bar: 25–75% range, white tick: median.](eda/fig08_absolute_vs_relative.png){#fig-scale}
+```{r fig-scale}
+#| fig-height: 3.6
+#| fig-cap: "**Absolute vs relative scale.** Left: log of the season peak, one dot per series, in each source's own units. Right: eventual $z$ at season week 18 (early December), one dot per series. Black bar: 25–75% range, white tick: median."
+peaks_r <- rows |> distinct(source, agg_level, location, season, .keep_all = TRUE)  # one row per series
+z18 <- rows |> filter(season_week == 18)
+strip <- function(df, col, xlab, title, show_y) {
+  s <- df |> group_by(group) |> summarise(q25 = quantile({{ col }}, 0.25), q50 = median({{ col }}), q75 = quantile({{ col }}, 0.75))
+  set.seed(1)
+  ggplot(df, aes({{ col }}, group)) +
+    geom_jitter(aes(color = group), height = 0.18, width = 0, size = 0.8, alpha = 0.4) +
+    geom_linerange(data = s, aes(xmin = q25, xmax = q75, y = as.numeric(group) + 0.32), inherit.aes = FALSE,
+                   linewidth = 2, color = INK) +
+    geom_point(data = s, aes(q50, as.numeric(group) + 0.32), inherit.aes = FALSE, shape = "|", size = 4, color = "white") +
+    scale_color_manual(values = SOURCE_COLORS, guide = "none") +
+    scale_y_discrete(NULL, limits = rev, labels = if (show_y) waiver() else NULL) +
+    labs(x = xlab, title = title) + theme(panel.grid.major.y = element_blank())
+}
+strip(peaks_r, log_peak, "log(peak + eps), in each source's own units", "Absolute peak size: not comparable across sources", TRUE) |
+  strip(z18, z, "eventual z at season week 18", "Relative size z: on a common scale", FALSE)
+lp <- peaks_r |> group_by(group) |> summarise(m = median(log_peak))
+z18m <- z18 |> group_by(group) |> summarise(m = median(z))
+```
 
-On the absolute scale the sources live in different places: median log peaks of 0.52 (ILINet states; a peak of about 1.7 in ILI × percent-positive units), 0.38 (ILINet national/regions) and 2.72 (FluSurv-NET, about 15 per 100k). Pooling absolute peaks would need a source-specific location and scale at the very least. On the relative scale the distributions at week 18 overlap heavily (medians 2.79, 2.92 and 2.57).
+On the absolute scale the sources live in different places: median log peaks of `r f2(lp$m[1])` (ILINet states; a peak of about `r f2(exp(lp$m[1]), 1)` in ILI × percent-positive units), `r f2(lp$m[2])` (ILINet national/regions) and `r f2(lp$m[3])` (FluSurv-NET, about `r round(exp(lp$m[3]))` per 100k). Pooling absolute peaks would need a source-specific location and scale at the very least. On the relative scale the distributions at week 18 overlap heavily (medians `r paste(f2(z18m$m), collapse = ", ")`).
 
 # The role of eps {#sec-eps}
 
-![**Left:** share of rows where the running maximum is smaller than 10 × eps, i.e. essentially zero on the source's scale. **Right:** ILINet (all levels) median and 90th percentile of eventual $z$ recomputed with eps divided by 10, as used, and multiplied by 10.](eda/fig09_eps.png){#fig-eps}
+```{r fig-eps}
+#| fig-height: 4
+#| fig-cap: "**Left:** share of rows where the running maximum is smaller than 10 × eps, i.e. essentially zero on the source's scale. **Right:** ILINet (all levels) median and 90th percentile of eventual $z$ recomputed with eps divided by 10, as used, and multiplied by 10."
+near <- rows |> group_by(group, season_week) |> summarise(near = mean(M < 10 * eps), .groups = "drop")
+ili <- rows |> filter(source == "ilinet") |> mutate(peak = exp(log_peak) - eps)
+eps_q <- bind_rows(lapply(c(0.1, 1, 10), function(f) {
+  ili |> mutate(zf = log(peak + eps * f) - log(M + eps * f)) |> group_by(season_week) |>
+    summarise(median = median(zf), `90th percentile` = quantile(zf, 0.9)) |> mutate(factor = paste("eps ×", f))
+})) |> pivot_longer(c(median, `90th percentile`), names_to = "stat")
+p1 <- ggplot(near, aes(season_week, near, color = group)) +
+  pre_window() + geom_line(linewidth = 0.9) +
+  scale_color_manual(values = SOURCE_COLORS) +
+  scale_x_season_week() + scale_y_continuous("share of rows with M_t < 10·eps", labels = percent_format(1)) +
+  labs(title = "How often is the running max tiny?") +
+  theme(legend.position = c(0.98, 0.98), legend.justification = c(1, 1))
+p2 <- ggplot(eps_q, aes(season_week, value, color = stat, linetype = factor)) +
+  pre_window() + geom_line(linewidth = 0.8) +
+  scale_color_manual(values = c(median = INK, `90th percentile` = "#9a9993")) +
+  scale_linetype_manual(values = c(`eps × 0.1` = "dotted", `eps × 1` = "solid", `eps × 10` = "dashed")) +
+  scale_x_season_week() + scale_y_continuous("eventual z (ILINet, all levels)", limits = c(0, 12)) +
+  labs(title = "Sensitivity of ILINet z to eps") +
+  theme(legend.position = c(0.98, 0.98), legend.justification = c(1, 1), legend.box = "horizontal")
+p1 | p2
+nr <- function(g, w) near$near[near$group == g & near$season_week == w]
+eq <- function(f, st, w) eps_q$value[eps_q$factor == paste("eps ×", f) & eps_q$stat == st & eps_q$season_week == w]
+```
 
-Early in the season $M_t$ is frequently indistinguishable from zero: at week 10, $M_t < 10\varepsilon$ in 62% of ILINet state rows, 62% of ILINet national/regional rows and 44% of FluSurv-NET rows; by week 15 this drops to 21%, 21% and 6%; by week 20 it is essentially gone except for small ILINet states (4%). In these rows $z \approx \log(\text{peak}/\varepsilon)$, so its value is set by the choice of $\varepsilon$. The right panel shows how much: changing ILINet's $\varepsilon$ tenfold either way moves the median $z$ at week 5 from 6.24 to 7.03 or 4.63, and the 90th percentile at week 10 from 7.66 to 9.96 or 5.42; by week 15 the median barely moves (3.75 / 3.72 / 3.44) and by week 20 the curves coincide. Forecasts made in October–early November are therefore sensitive to $\varepsilon$ in the upper tail (on the peak scale this matters less, since $(M_t + \varepsilon)e^z$ largely undoes the change, but it does change what the model learns from pooled rows), and the relative $\varepsilon$ across sources determines how comparable their early-season rows are.
+Early in the season $M_t$ is frequently indistinguishable from zero: at week 10, $M_t < 10\varepsilon$ in `r pct(nr("ILINet states", 10))` of ILINet state rows, `r pct(nr("ILINet national + regions", 10))` of ILINet national/regional rows and `r pct(nr("FluSurv-NET", 10))` of FluSurv-NET rows; by week 15 this drops to `r pct(nr("ILINet states", 15))`, `r pct(nr("ILINet national + regions", 15))` and `r pct(nr("FluSurv-NET", 15))`; by week 20 it is essentially gone except for small ILINet states (`r pct(nr("ILINet states", 20))`). In these rows $z \approx \log(\text{peak}/\varepsilon)$, so its value is set by the choice of $\varepsilon$. The right panel shows how much: changing ILINet's $\varepsilon$ tenfold either way moves the median $z$ at week 5 from `r f2(eq(1, "median", 5))` to `r f2(eq(0.1, "median", 5))` or `r f2(eq(10, "median", 5))`, and the 90th percentile at week 10 from `r f2(eq(1, "90th percentile", 10))` to `r f2(eq(0.1, "90th percentile", 10))` or `r f2(eq(10, "90th percentile", 10))`; by week 15 the median barely moves (`r f2(eq(0.1, "median", 15))` / `r f2(eq(1, "median", 15))` / `r f2(eq(10, "median", 15))`) and by week 20 the curves coincide. Forecasts made in October–early November are therefore sensitive to $\varepsilon$ in the upper tail (on the peak scale this matters less, since $(M_t + \varepsilon)e^z$ largely undoes the change, but it does change what the model learns from pooled rows), and the relative $\varepsilon$ across sources determines how comparable their early-season rows are.
 
 # Season-to-season variability
 
-![**ILINet state-level series, one line per season.** Left: median eventual $z$ across states by week (dashed black: all seasons pooled). Right: share of states whose peak had passed. The earliest (2022/23) and latest (2011/12) seasons are highlighted.](eda/fig10_season_spaghetti.png){#fig-seasons}
+```{r fig-seasons}
+#| fig-height: 4
+#| fig-cap: "**ILINet state-level series, one line per season.** Left: median eventual $z$ across states by week (dashed black: all seasons pooled). Right: share of states whose peak had passed. The earliest and latest seasons (by median state peak week) are highlighted."
+sd_ <- rows |> filter(group == "ILINet states")
+sz <- sd_ |> group_by(season, season_week) |> summarise(med = median(z), p0 = mean(at_zero), .groups = "drop")
+spk <- sd_ |> distinct(location, season, peak_week) |> group_by(season) |> summarise(pk = median(peak_week))
+early_s <- spk$season[which.min(spk$pk)]
+late_s <- spk$season[which.max(spk$pk)]
+sz <- sz |> mutate(hl = case_when(season == early_s ~ paste0(early_s, " (median peak wk ", min(spk$pk), ")"),
+                                  season == late_s ~ paste0(late_s, " (median peak wk ", max(spk$pk), ")"),
+                                  TRUE ~ "other seasons"))
+pooled_st <- sd_ |> group_by(season_week) |> summarise(med = median(z))
+hl_cols <- setNames(c(BLUE, ACCENT, "#b7b6b0"), c(unique(sz$hl[sz$season == early_s]), unique(sz$hl[sz$season == late_s]), "other seasons"))
+p1 <- ggplot(sz, aes(season_week, med, group = season, color = hl, linewidth = hl != "other seasons")) +
+  pre_window() + geom_line() +
+  geom_line(data = pooled_st, aes(season_week, med), inherit.aes = FALSE, linetype = "dashed", color = INK) +
+  scale_y_continuous("median eventual z across states", limits = Z_LIM) +
+  labs(title = "Each line is one season (ILINet, states)")
+p2 <- ggplot(sz, aes(season_week, p0, group = season, color = hl, linewidth = hl != "other seasons")) +
+  pre_window() + geom_line() +
+  scale_y_continuous("share of states already peaked", labels = percent_format(1)) +
+  labs(title = "Timing differs by season, and z follows")
+(p1 | p2) + plot_layout(guides = "collect") &
+  scale_color_manual(values = hl_cols) & scale_linewidth_manual(values = c(`TRUE` = 1.2, `FALSE` = 0.4), guide = "none") &
+  scale_x_season_week() & theme(legend.position = "top")
+srange <- function(w) range(sz$med[sz$season_week == w])
+```
 
-Within a season, states move together: the "share already peaked" curves (right) rise steeply over a few weeks, and the season's position on the calendar varies a lot, from a median state peak in week 18 (2022/23) to week 33 (2011/12). Correspondingly, the median eventual $z$ across states at week 15 ranges from 1.17 to 4.41 across seasons, and at week 20 from 0 to 3.25. This between-season variation is shared across locations and is the kind of variation a season-level random effect in a hierarchical model is meant to capture. It also means rows from the same season are strongly correlated, so the effective sample size for learning timing is closer to the number of seasons (11 for ILINet states, 22 for ILINet national/regions) than to the number of rows, and validation must hold out whole seasons.
+Within a season, states move together: the "share already peaked" curves (right) rise steeply over a few weeks, and the season's position on the calendar varies a lot, from a median state peak in week `r min(spk$pk)` (`r early_s`) to week `r max(spk$pk)` (`r late_s`). Correspondingly, the median eventual $z$ across states at week 15 ranges from `r f2(srange(15)[1])` to `r f2(srange(15)[2])` across seasons, and at week 20 from `r f2(srange(20)[1])` to `r f2(srange(20)[2])`. This between-season variation is shared across locations and is the kind of variation a season-level random effect in a hierarchical model is meant to capture. It also means rows from the same season are strongly correlated, so the effective sample size for learning timing is closer to the number of seasons (`r cov_tab[["n seasons"]][1]` for ILINet states, `r cov_tab[["n seasons"]][2]` for ILINet national/regions) than to the number of rows, and validation must hold out whole seasons.
 
 # Searching for better real-time predictors of z {#sec-predictors}
 
+```{r load-predictors}
+#| cache: false
+pr <- read_rows("eda/predictor_rows.parquet")
+fg <- readr::read_csv("eda/feature_groups.csv", show_col_types = FALSE)
+CURRENT <- fg$feature[fg$group == "current"]
+grp_list <- function(sec) {
+  x <- fg |> filter(section == sec)
+  lapply(split(x$feature, factor(x$group, levels = unique(x$group))), identity)
+}
+G9 <- grp_list("section 9")
+G11 <- grp_list("section 11")
+HOL <- fg$feature[fg$group == "holiday"]
+cv <- read_parquet("eda/cv_results.parquet")
+cv_sets <- readr::read_csv("eda/cv_sets.csv", show_col_types = FALSE)
+boot <- readr::read_csv("eda/cv_bootstrap.csv", show_col_types = FALSE)
+imp <- readr::read_csv("eda/importance.csv", show_col_types = FALSE)
+pnums <- jsonlite::read_json("eda/predictors_numbers.json")
+max_leak <- max(unlist(pnums$leakage_check_max_abs_change))
+```
 
-This is the part of the analysis that matters most for improving the models. We never see $z$ during a season, so the only way to predict it is through quantities we *can* compute at week $t$ that are associated with the eventual $z$. Below, **every candidate feature is real-time**: it uses only the current season's data through week $t$, and any "historical" quantity uses only **strictly earlier seasons** of the same source and location. The **eventual $z$ is the retrospective outcome** we check them against. We compute the candidates, look at their association with the eventual $z$ within narrow week bins (so that we are not just rediscovering "later in the season means smaller $z$"), and then ask the question that really matters: do they make cross-validated forecasts better?
+This is the part of the analysis that matters most for improving the models. We never see $z$ during a season, so the only way to predict it is through quantities we *can* compute at week $t$ that are associated with the eventual $z$. Below, **every candidate feature is real-time**: it uses only the current season's data through week $t$, and any "historical" quantity uses only **strictly earlier seasons** of the same source and location. The **eventual $z$ is the retrospective outcome** we check them against. We compute the candidates, look at their association with the eventual $z$ within narrow week bins (so that we are not just rediscovering "later in the season means smaller $z$"), and then ask the question that really matters: do they make cross-validated forecasts better? The features and the cross-validation are computed in Python (`relative_size_predictors.py`); this document summarizes their output.
 
 ## Candidate features
 
@@ -190,49 +482,117 @@ Notation used below, all known at week $t$: $\ell_s = \log(y_s + \varepsilon)$ i
 **Level vs history** (g). `hist_rel` $= m - $ mean log peak of earlier seasons is already a model feature. New: `cur_vs_hist_peak` $= \ell_t - $ mean earlier log peak; `lvl_vs_hist_same_week` $= \ell_t - $ mean of $\ell$ at week $t$ in earlier seasons; `max_vs_hist_same_week` $= m - $ mean of $m$ at week $t$ in earlier seasons.
 
 ::: {.callout-note title="Checks against look-ahead"}
-Every current-season feature at week $t$ is computed from a copy of the data with all weeks after $t$ deleted, and all history uses strictly earlier seasons. Two perturbation tests confirm this (both give a maximum absolute change of exactly 0): (1) replacing every value after week $t$ by 100× its value + 5 (for $t$ = 14, 22, 30) leaves all trend, onset and synchrony features at week $t$ unchanged; (2) corrupting every series of 2015/16 and later seasons leaves the purely historical (timing) features of 2015/16 rows unchanged. The script also checks that its own recomputation of `rel_max` and `wks_since_max` matches `build_replay_rows` exactly.
+Every current-season feature at week $t$ is computed from a copy of the data with all weeks after $t$ deleted, and all history uses strictly earlier seasons. Perturbation tests confirm this (all give a maximum absolute change of exactly `r max_leak`): (1) replacing every value after week $t$ by 100× its value + 5 (for $t$ = 14, 22, 30) leaves all current-season features at week $t$ unchanged; (2) corrupting every series of 2015/16 and later seasons leaves the purely historical features of 2015/16 rows unchanged; (3) corrupting only the weeks after $t$ of the 2015/16 season leaves *every* feature of that season at week $t$ unchanged. The script also checks that its own recomputation of `rel_max` and `wks_since_max` matches `build_replay_rows` exactly (maximum difference `r pnums$consistency$max_abs_diff_rel_max`).
 :::
 
 ## Which features move with the eventual z?
 
-![**Within-week-bin Spearman correlation of each real-time feature with the eventual $z$ (left) and with the indicator that the peak is still ahead, $z > 0$ (right).** Rows are grouped: current model features first, then each candidate group. Same colour scale in both panels; blue = higher feature value goes with smaller $z$.](eda/fig11_predictor_correlations.png){#fig-corr}
+```{r fig-corr}
+#| fig-height: 15
+#| fig-cap: "**Within-week-bin Spearman correlation of each real-time feature with the eventual $z$ (left) and with the indicator that the peak is still ahead, $z > 0$ (right).** Rows are grouped: base features first, then each candidate group. Same colour scale in both panels; blue = higher feature value goes with smaller $z$."
+ch <- corr_heatmap(pr, G9, setdiff(CURRENT, c("season_week", "src_code")), first_label = "base")
+ch$plot
+rz <- ch$data |> filter(target == "Spearman with z")
+rng <- function(f, bins = c("wk 12–16", "wk 17–21", "wk 22–26"), d = rz) range(d$rho[d$feature == f & d$bin %in% bins])
+timing_max <- max(abs(rz$rho[rz$feature %in% setdiff(G9[["timing vs history"]], "hist_z_same_week")]))
+ser <- pr |> filter(!is.na(hist_rel)) |> distinct(source, agg_level, location, season, .keep_all = TRUE) |>
+  mutate(anom = log_peak - (lm - hist_rel))
+anom_sd <- sd(ser$anom)
+anom_q <- quantile(ser$anom, c(0.1, 0.9))
+anom_sd_st <- sd(ser$anom[ser$group == "ILINet states"])
+z_sd <- sd(pr$z[pr$season_week >= 17 & pr$season_week <= 26])
+x1726 <- pr |> filter(season_week >= 17, season_week <= 26)
+rho_hist_cum <- cor(x1726$hist_rel, x1726$cum_vs_hist_total, method = "spearman", use = "complete.obs")
+```
 
-Three things stand out. First, the strongest associations by far belong to features that compare **this season's level with the same location's history**: the existing `hist_rel` ($-0.85$ to $-0.91$ in weeks 12–26), and the new `cum_vs_hist_total` ($-0.78$ to $-0.89$) and `max_vs_hist_same_week` ($-0.62$ to $-0.79$). Read plainly: if the record so far is already as high as a typical peak here, little growth is left. This is partly built in, because $z = (\log \text{peak} - \text{typical log peak}) - \texttt{hist\_rel}$: the eventual $z$ splits exactly into a "size surprise" (how much bigger or smaller this season's peak is than this location's usual peak, which does not depend on $t$) and `hist_rel`, which we know. The size surprise has standard deviation 0.71 (10–90% range −0.83 to 0.91; 0.81 for ILINet states), compared with a standard deviation of 1.44 for $z$ itself in weeks 17–26, so the history-relative level explains most of the variation in $z$ in the middle of the season, and what remains is the unpredictability of season size. Second, the shape-of-the-curve features (current `rel_max`, `g1`–`g3`, the new Taylor slopes and levels, lags) are weakly related to $z$ before week 22 (mostly $|\rho| < 0.4$) and become strong only in weeks 27–31, when they mainly tell us whether the peak has passed ($\rho \approx 0.5$–0.65 with $z > 0$). Third, **synchrony** features (`sync_med_rel_max`, `sync_med_g3`) track the national features closely and add a similar "is the country past its peak?" signal late in the season, while timing-vs-history features are nearly unrelated to $z$ within week bins ($|\rho| \le 0.23$, except `hist_z_same_week` at about 0.3 before week 22), and onset features are weaker, noisier versions of the level features.
+Three things stand out. First, the strongest associations by far belong to features that compare **this season's level with the same location's history**: `hist_rel` (in base) (`r f2(rng("hist_rel")[2])` to `r f2(rng("hist_rel")[1])` in weeks 12–26), and the burden feature `cum_vs_hist_total` (in SB) (`r f2(rng("cum_vs_hist_total")[2])` to `r f2(rng("cum_vs_hist_total")[1])`) and `max_vs_hist_same_week` (`r f2(rng("max_vs_hist_same_week")[2])` to `r f2(rng("max_vs_hist_same_week")[1])`). Read plainly: if the record so far is already as high as a typical peak here, little growth is left. This is partly built in, because $z = (\log \text{peak} - \text{typical log peak}) - \texttt{hist\_rel}$: the eventual $z$ splits exactly into a "size surprise" (how much bigger or smaller this season's peak is than this location's usual peak, which does not depend on $t$) and `hist_rel`, which we know. The size surprise has standard deviation `r f2(anom_sd)` (10–90% range `r f2(anom_q[1])` to `r f2(anom_q[2])`; `r f2(anom_sd_st)` for ILINet states), compared with a standard deviation of `r f2(z_sd)` for $z$ itself in weeks 17–26, so the history-relative level explains most of the variation in $z$ in the middle of the season, and what remains is the unpredictability of season size. Second, the shape-of-the-curve features (current `rel_max`, `g1`–`g3`, the new Taylor slopes and levels, lags) are weakly related to $z$ before week 22 (mostly $|\rho| < 0.4$) and become strong only in weeks 27–31, when they mainly tell us whether the peak has passed ($\rho \approx 0.5$–0.65 with $z > 0$). Third, **synchrony** features (`sync_med_rel_max`, `sync_med_g3`) track the national features closely and add a similar "is the country past its peak?" signal late in the season, while timing-vs-history features are nearly unrelated to $z$ within week bins ($|\rho| \le$ `r f2(timing_max)`, except `hist_z_same_week` at about `r f2(max(rng("hist_z_same_week", c("wk 12–16", "wk 17–21"))), 1)` before week 22), and onset features are weaker, noisier versions of the level features.
 
-![**Eventual $z$ by decile of the most important features, at three week bins** (median and 25–75% band). The existing `hist_rel` is shown first for reference; the others are the top new features by LightGBM gain. Same y-axis as @fig-stage.](eda/fig14_top_new_features.png){#fig-binned}
+```{r fig-binned}
+#| fig-height: 6.5
+#| fig-cap: "**Eventual $z$ by decile of the most important features, at three week bins** (median and 25–75% band). `hist_rel` (in base) is shown first for comparison; the others are the top candidate features by LightGBM gain. Same y-axis as @fig-stage."
+imp_main <- imp |> filter(`feature set` == "current + all new", model == "median quantile model") |> arrange(desc(gain_share))
+top_new <- head(imp_main$feature[!imp_main$feature %in% CURRENT], 5)
+binned_plot(pr, c("hist_rel", top_new), current = "hist_rel")
+```
 
-The binned plots show the shape of these relationships. `hist_rel` and `cum_vs_hist_total` give nearly straight, parallel lines: each unit increase in the log record relative to history (or in log cumulative burden relative to a typical season) removes about one unit of remaining growth, with little dependence on the week. The two are close substitutes (Spearman 0.97 with each other in weeks 17–26). The synchrony and trend features show much flatter relationships with wide bands, useful mainly for separating "peaked" from "not yet" in weeks 22–26.
+The binned plots show the shape of these relationships. `hist_rel` and `cum_vs_hist_total` give nearly straight, parallel lines: each unit increase in the log record relative to history (or in log cumulative burden relative to a typical season) removes about one unit of remaining growth, with little dependence on the week. The two are close substitutes (Spearman `r f2(rho_hist_cum)` with each other in weeks 17–26). The synchrony and trend features show much flatter relationships with wide bands, useful mainly for separating "peaked" from "not yet" in weeks 22–26.
 
 ## Do they improve forecasts? Leave-one-season-out cross-validation
 
-Association is not the same as predictive value, particularly when a new feature largely duplicates an existing one. The real test is whether adding a feature improves **out-of-sample** forecasts of the eventual $z$ for a season the model has not seen.
+```{r cv-main}
+order9 <- cv_sets$set[order(cv_sets$order)]
+rel9 <- cv_rel(cv, "current")
+rp <- function(s, b = "all", rel = rel9) rel$rel_pinball[rel$set == s & rel$bin == b]
+dl <- function(s, b = "all", rel = rel9) rel$d_logloss[rel$set == s & rel$bin == b]
+gain <- function(s, b = "all", rel = rel9) 1 - rp(s, b, rel)
+sb_main <- function(s, what = "seasons_better", metric = "pinball") boot_get(boot, "main", s, "current", metric, what)
+n_cv_rows <- nrow(cv |> filter(set == "current"))
+n_seasons_cv <- n_distinct(cv$season)
+n_all_new <- length(unlist(G9))
+```
 
-**Design.** We hold out one whole season at a time (all sources and locations of that season; 22 folds, 1997/98–2022/23), fit on all other seasons, and forecast the held-out season's rows. Holding out whole seasons matters because rows from the same season are strongly correlated (@fig-seasons). Models: LightGBM quantile regression of $z$ at levels 0.1, 0.25, 0.5, 0.75 and 0.9 (200 trees, learning rate 0.05, 15 leaves, at least 50 rows per leaf), scored by **pinball loss** averaged over the five levels (the standard proper score for quantile forecasts; lower is better), and a LightGBM classifier for $z > 0$ with the same settings, scored by **log loss** (lower is better). To keep runtime modest, CV uses the even season weeks only (15,321 of 31,108 rows). Feature sets: (i) the current 13 features; (ii–vii) current + one candidate group; (viii) current + all 39 new features; single-group ablations from (viii); and two combinations suggested by the results. All $17 \times 22 \times 6 = 2{,}244$ fits took 290 s (4 single-threaded processes).
+Association is not the same as predictive value, particularly when a candidate feature largely duplicates one already in base. The real test is whether adding a feature improves **out-of-sample** forecasts of the eventual $z$ for a season the model has not seen.
 
-![**Cross-validated skill of each feature set relative to the current features.** Left: mean pinball loss for $z$, as a ratio to the current feature set (below 1 = better). Right: change in log loss for $z > 0$ (below 0 = better). Circles: week bins; diamond: all weeks. The ablation "current − hist_rel" is off the scale (1.63; see table).](eda/fig12_cv_feature_sets.png){#fig-cv}
+**Design.** We hold out one whole season at a time (all sources and locations of that season; `r n_seasons_cv` folds, 1997/98–2022/23), fit on all other seasons, and forecast the held-out season's rows. Holding out whole seasons matters because rows from the same season are strongly correlated (@fig-seasons). Models: LightGBM quantile regression of $z$ at levels 0.1, 0.25, 0.5, 0.75 and 0.9 (200 trees, learning rate 0.05, 15 leaves, at least 50 rows per leaf), scored by **pinball loss** averaged over the five levels (the standard proper score for quantile forecasts; lower is better), and a LightGBM classifier for $z > 0$ with the same settings, scored by **log loss** (lower is better). To keep runtime modest, CV uses the even season weeks only (`r format(n_cv_rows, big.mark = ",")` of `r format(nrow(pr), big.mark = ",")` rows). Feature sets: (i) base, the `r length(CURRENT)` default features; (ii–vii) base + one candidate group; (viii) base + all `r n_all_new` candidate features; single-group ablations from (viii); and two combinations suggested by the results. All $`r length(order9)` \times `r n_seasons_cv` \times 6 = `r format(length(order9) * n_seasons_cv * 6, big.mark = ",")`$ fits took about 5 minutes (4 single-threaded processes).
 
-{{< include eda/table_cv_pinball.md >}}
+```{r fig-cv}
+#| fig-height: 5.5
+#| fig-cap: "**Cross-validated skill of each feature set relative to base.** Left: mean pinball loss for $z$, as a ratio to base (below 1 = better). Right: change in log loss for $z > 0$ (below 0 = better). Circles: week bins; diamond: all weeks. The ablation \"base − hist_rel\" is off the scale (see table)."
+cv_dotplot(rel9, setdiff(order9, "current − hist_rel"), "base")
+```
 
-: Mean pinball loss of the eventual $z$ relative to the current feature set, by week bin (leave-one-season-out; values below 1 are improvements). Absolute pinball loss of the current set: 0.224, 0.215, 0.176, 0.112, 0.048 and 0.014 in the six bins, 0.113 overall. {#tbl-cv-pinball}
+```{r tbl-cv-pinball}
+#| tbl-cap: "Mean pinball loss of the eventual $z$ relative to base, by week bin (leave-one-season-out; values below 1 are improvements)."
+kable(cv_table(rel9, rel_pinball, order9))
+abs_cur <- rel9 |> filter(set == "current")
+```
 
-{{< include eda/table_cv_logloss.md >}}
+Absolute pinball loss of base: `r paste(f2(abs_cur$pinball[abs_cur$bin != "all"], 3), collapse = ", ")` in the six bins, `r f2(abs_cur$pinball[abs_cur$bin == "all"], 3)` overall.
 
-: Change in log loss for $z > 0$ relative to the current feature set (negative values are improvements). Log loss of the current set: 0.083 in weeks 17–21, 0.281 in 22–26, 0.273 in 27–31, 0.120 overall. {#tbl-cv-logloss}
+```{r tbl-cv-logloss}
+#| tbl-cap: "Change in log loss for $z > 0$ relative to base (negative values are improvements)."
+kable(cv_table(rel9, d_logloss, order9))
+```
+
+Log loss of base: `r f2(abs_cur$logloss[abs_cur$bin == "17–21"], 3)` in weeks 17–21, `r f2(abs_cur$logloss[abs_cur$bin == "22–26"], 3)` in 22–26, `r f2(abs_cur$logloss[abs_cur$bin == "27–31"], 3)` in 27–31, `r f2(abs_cur$logloss[abs_cur$bin == "all"], 3)` overall.
+
+```{r cv-main-numbers}
+S <- "+ synchrony"; B <- "+ burden to date"; SBs <- "+ synchrony + burden"; SBL <- "+ synchrony + burden + level"
+TR <- "+ trend (Taylor, rolling means, lags)"; ON <- "+ onset"; TI <- "+ timing vs history"; AN <- "+ all new"
+bins_sb <- sapply(c("5–11", "12–16", "17–21", "22–26"), function(b) pct(gain(SBs, b), 0.1))
+sync_bins <- sapply(c("5–11", "12–16", "17–21"), function(b) gain(S, b))
+imp_top <- imp_main |> head(2)
+```
 
 What the cross-validation shows:
 
-- **`hist_rel` is the single most valuable current feature.** Dropping it makes the quantile forecasts 63% worse overall (about twice the loss in weeks 17–26) and raises the log loss by 0.058. The current model already has the strongest predictor we found.
-- **Synchrony and burden-to-date are the only groups that help consistently, and they help together.** Adding the four synchrony features reduces pinball loss by 1.2% overall (by 1.0–1.6% in each bin from week 5 to 21) and beats the current set in 15 of 22 held-out seasons. Adding the two burden features reduces it by 1.3% overall and by 5.4% in weeks 22–26. **Adding both reduces pinball loss by 2.5% overall: 2.1%, 1.6%, 2.7% and 7.0% in weeks 5–11, 12–16, 17–21 and 22–26, with no change in 27–31 and a 3.5% loss in 32–43** (where $z$ is almost always 0 and absolute losses are tiny). It beats the current set in 17 of 22 seasons, and in 99.9% of season-level bootstrap resamples (weeks 12–31). Adding the level-vs-history group as well gives about the same result (2.2% better, 18 of 22 seasons).
-- **Taylor/trend, onset and timing-vs-history features do not help.** Trend features lower pinball loss by a negligible 0.4% overall (they are worse in weeks 17–21 and better only in weeks 32–43) and beat the current set in only 8 of 22 seasons; onset features have no effect (−0.1%); timing-vs-history features make forecasts 3.6% worse (7% worse in weeks 12–16). The trend information is already carried by `rel_max`, `g1`–`g3` and `rm3`, and timing-vs-history has too few past seasons per location (0–10 for ILINet states) to be reliable.
-- **Adding everything is worse than adding the right few.** All 39 new features together make forecasts 1.5% worse overall, even though they help in weeks 22–26 (−6.6%); removing the timing group from that set recovers a 2.3% gain. With only 22 seasons, extra noisy features give the trees more ways to overfit season-specific patterns.
-- **No candidate improves the probability that the peak is still ahead.** Every feature set changes the $z > 0$ log loss by between −0.000 and +0.005 overall, with no consistent gains in any week bin. Whether the peak has passed is already captured by the national and local stage features (the gain importances of the full model are dominated by `nat_rel_max`, 52% of total gain, and `cum_vs_hist_total`, 25%; @fig-importance).
+- **`hist_rel` is the single most valuable base feature.** Dropping it makes the quantile forecasts `r pct(rp("current − hist_rel") - 1)` worse overall (about `r f2(mean(c(rp("current − hist_rel", "17–21"), rp("current − hist_rel", "22–26"))), 1)` times the loss in weeks 17–26) and raises the log loss by `r f2(dl("current − hist_rel"), 3)`. base already has the strongest predictor we found.
+- **Synchrony and burden-to-date are the only groups that help consistently, and they help together.** Adding the four synchrony features reduces pinball loss by `r pct(gain(S), 0.1)` overall (by `r pct(min(sync_bins), 0.1)`–`r pct(max(sync_bins), 0.1)` in each bin from week 5 to 21) and beats base in `r sb_main(S)` of `r n_seasons_cv` held-out seasons. Adding the two burden features reduces it by `r pct(gain(B), 0.1)` overall and by `r pct(gain(B, "22–26"), 0.1)` in weeks 22–26. **Adding both reduces pinball loss by `r pct(gain(SBs), 0.1)` overall: `r paste(bins_sb, collapse = ", ")` in weeks 5–11, 12–16, 17–21 and 22–26, with `r ifelse(abs(gain(SBs, "27–31")) < 0.005, "no change", pct(gain(SBs, "27–31"), 0.1))` in 27–31 and a `r pct(-gain(SBs, "32–43"), 0.1)` loss in 32–43** (where $z$ is almost always 0 and absolute losses are tiny). It beats base in `r sb_main(SBs)` of `r n_seasons_cv` seasons, and in `r pct(sb_main(SBs, "boot_win"), 0.1)` of season-level bootstrap resamples (weeks 12–31). Adding the level-vs-history group as well gives about the same result (`r pct(gain(SBL), 0.1)` better, `r sb_main(SBL)` of `r n_seasons_cv` seasons).
+- **Taylor/trend, onset and timing-vs-history features do not help.** Trend features lower pinball loss by a negligible `r pct(gain(TR), 0.1)` overall (they are worse in weeks 17–21 and better only in weeks 32–43) and beat base in only `r sb_main(TR)` of `r n_seasons_cv` seasons; onset features have no effect (`r pct(-gain(ON), 0.1)`); timing-vs-history features make forecasts `r pct(-gain(TI), 0.1)` worse (`r pct(-gain(TI, "12–16"), 1)` worse in weeks 12–16). The trend information is already carried by `rel_max`, `g1`–`g3` and `rm3`, and timing-vs-history has too few past seasons per location (0–10 for ILINet states) to be reliable.
+- **Adding everything is worse than adding the right few.** All `r n_all_new` candidate features together make forecasts `r pct(-gain(AN), 0.1)` worse overall, even though they help in weeks 22–26 (`r pct(-gain(AN, "22–26"), 0.1)`); removing the timing group from that set recovers a `r pct(gain("all − timing vs history"), 0.1)` gain. With only `r n_seasons_cv` seasons, extra noisy features give the trees more ways to overfit season-specific patterns.
+- **No candidate improves the probability that the peak is still ahead.** Every feature set other than the `hist_rel` ablation changes the $z > 0$ log loss by between `r f2(min(rel9$d_logloss[rel9$bin == "all" & rel9$set != "current − hist_rel"]), 3)` and +`r f2(max(rel9$d_logloss[rel9$bin == "all" & rel9$set != "current − hist_rel"]), 3)` overall, with no consistent gains in any week bin. Whether the peak has passed is already captured by the national and local stage features (the gain importances of the full model are dominated by `` `r imp_top$feature[1]` ``, `r pct(imp_top$gain_share[1])` of total gain, and `` `r imp_top$feature[2]` ``, `r pct(imp_top$gain_share[2])`; @fig-importance).
 
-![**LightGBM gain importance** for the median ($\tau = 0.5$) quantile model with all current and new features, fitted to all CV rows. Grey: current features; blue: new candidates.](eda/fig13_importance.png){#fig-importance}
+```{r fig-importance}
+#| fig-height: 6
+#| fig-width: 7
+#| fig-cap: "**LightGBM gain importance** for the median ($\\tau = 0.5$) quantile model with all base and candidate features, fitted to all CV rows. Grey: base features; blue: candidate features."
+imp_main |> head(25) |>
+  mutate(feature = factor(feature, levels = rev(feature)), kind = ifelse(feature %in% CURRENT, "current", "new")) |>
+  ggplot(aes(gain_share, feature, fill = kind)) +
+  geom_col(width = 0.7) +
+  scale_fill_manual(values = c(current = "#b7b6b0", new = BLUE), labels = c(current = "base features", new = "candidate features")) +
+  scale_x_continuous("share of total gain", labels = percent_format(1)) + labs(y = NULL) +
+  theme(panel.grid.major.y = element_blank(), legend.position = c(0.98, 0.05), legend.justification = c(1, 0))
+```
 
 ## Recommendation
 
-1. **Add the four synchrony features and the two burden-to-date features** to the $z$ (size) part of the peak models: `sync_med_rel_max`, `sync_med_g3`, `sync_frac_past2`, `sync_frac_half`, `cum_vs_hist_total` and `cum_vs_hist_same_week`, exactly as defined above. Evidence: 2.5% lower cross-validated pinball loss overall and 7.0% lower in weeks 22–26 (late December to late January, when size forecasts matter most), better in 17 of 22 held-out seasons.
-2. **Keep `hist_rel`**, which is the most important single predictor; any change to how the historical log peak is computed (e.g. how many earlier seasons, what to do when there are none, as for 7.8% of rows) should be treated as a change to the model's main input.
+```{r idm-check}
+idm <- unlist(pnums$consistency$idmodels_feature_max_abs_diff)
+```
+
+1. **Synchrony and burden-to-date: adopted as feature set SB.** The four synchrony features and the two burden-to-date features (`sync_med_rel_max`, `sync_med_g3`, `sync_frac_past2`, `sync_frac_half`, `cum_vs_hist_total`, `cum_vs_hist_same_week`) are available in idmodels 8c56bf0 as `sync_burden_features = True`. Evidence: `r pct(gain(SBs), 0.1)` lower cross-validated pinball loss overall and `r pct(gain(SBs, "22–26"), 0.1)` lower in weeks 22–26 (late December to late January, when size forecasts matter most), better in `r sb_main(SBs)` of `r n_seasons_cv` held-out seasons. (In `idmodels.peak.series` the burden features agree with the ones used here to within `r formatC(max(idm[grepl("cum", names(idm))]), format = "e", digits = 0)`; its synchrony features differ slightly, by up to `r f2(max(idm[grepl("sync", names(idm))]))`, because it uses the carried-forward definition, whereas this document uses reported-at-t. In the model pipeline, `peak_gbqr__sb` gave slightly better peak-size and slightly worse timing forecasts than `peak_gbqr` on the ILINet development seasons, so base remains the default.)
+2. **Keep `hist_rel`**, which is the most important single predictor; any change to how the historical log peak is computed (e.g. how many earlier seasons, what to do when there are none, as for `r pct(mean(is.na(pr$hist_rel)), 0.1)` of rows) should be treated as a change to the model's main input.
 3. **Do not add the Taylor/trend, onset or timing-vs-history features** for now; they add no skill and in some week bins hurt. Do not expect any of these features to improve the "already peaked?" probability.
 4. **Caveats.** The gains are modest and were measured with one fixed LightGBM configuration on ILINet and FluSurv-NET only (NHSN excluded); they should be confirmed in the actual `peak_gbqr` pipeline and on the NHSN test seasons. Synchrony features need all locations of a source to be reported at week $t$, which holds for NHSN in real time, but with real-time (unrevised) data they will be noisier than here, where we used final data throughout. In leave-one-season-out, training seasons later than the held-out season carry "history" that includes the held-out season; this does not leak the held-out season's outcomes into its own features, but it means history-based features were fit with slightly more history than a real-time model would have.
 
@@ -242,31 +602,117 @@ What the cross-validation shows:
 
 ILINet's main ingredient is **% ILI**: the share of all outpatient visits that are for influenza-like illness. Around Christmas and New Year many routine visits (check-ups, elective appointments) are postponed while sick people still come in, so the *denominator* shrinks and % ILI can jump even if the number of flu cases does not. If that happens, a running maximum set during the holidays may be partly artificial: an "initial peak" that the real epidemic later exceeds. FluSurv-NET counts laboratory-confirmed hospitalizations per 100,000 people; it has no visit denominator, so it is a useful contrast. (Hospitalizations can still genuinely rise over the holidays, e.g. because of holiday gatherings, so a bump in both sources would point to a real epidemic effect rather than an artefact.)
 
-We call a week a **holiday week** if its Saturday week-ending date falls between **December 22 and January 7**. That is two or three weeks per season: season weeks 21–23, i.e. MMWR weeks 51, 52 and 53 or 1 (@tbl-holcal). The calendar is known in advance, so any feature based on it is real-time.
+```{r holiday-cal}
+cal <- readr::read_csv("eda/holiday_calendar.csv", show_col_types = FALSE)
+```
 
-{{< include eda/table_holiday_calendar.md >}}
+We call a week a **holiday week** if its Saturday week-ending date falls between **December 22 and January 7**. That is two or three weeks per season: season weeks `r min(cal$season_week)`–`r max(cal$season_week)`, i.e. MMWR weeks 51, 52 and 53 or 1 (@tbl-holcal). The calendar is known in advance, so any feature based on it is real-time.
 
-: Holiday weeks (week-ending Saturday in Dec 22 – Jan 7) in each training season. {#tbl-holcal}
+```{r tbl-holcal}
+#| tbl-cap: "Holiday weeks (week-ending Saturday in Dec 22 – Jan 7) in each training season."
+cal |> group_by(season) |>
+  summarise(`season weeks` = paste(season_week, collapse = ", "),
+            `week-ending dates` = paste(format(as.Date(date), "%b %d"), collapse = ", "),
+            `MMWR weeks` = paste(mmwr_week, collapse = ", ")) |>
+  kable()
+```
 
 ## Is there a holiday spike, and is it specific to ILINet?
 
 For each series we compare the log value in each holiday week with the average log value of the two weeks before and the two weeks after the holiday block (the **holiday excess**; 0.4 means about 50% above the surrounding weeks). The same calculation for blocks shifted 6 weeks earlier or later is a placebo: it shows how big the "excess" is simply from the curvature of the epidemic curve.
 
-![**Left:** mean holiday excess by source, with placebo blocks 6 weeks earlier and later (95% intervals from resampling seasons). **Right:** ILINet minus FluSurv-NET excess for the same location and season, by position within the holiday block.](eda/fig15_holiday_excess.png){#fig-holexcess}
+```{r fig-holexcess}
+#| fig-height: 4
+#| fig-cap: "**Left:** mean holiday excess by source, with placebo blocks 6 weeks earlier and later (95% intervals from resampling seasons). **Right:** ILINet minus FluSurv-NET excess for the same location and season, by position within the holiday block."
+ex <- read_parquet("eda/holiday_excess.parquet") |> mutate(group = factor(group, levels = SOURCE_GROUPS))
+blocks <- c("placebo −6 wk", "holiday", "placebo +6 wk")
+exs <- ex |> group_by(group, block) |>
+  summarise(ci = list(cluster_ci(excess, season)), .groups = "drop") |>
+  mutate(mean = sapply(ci, `[`, "mean"), lo = sapply(ci, `[`, "lo"), hi = sapply(ci, `[`, "hi"),
+         block = factor(block, levels = blocks))
+hx <- ex |> filter(block == "holiday")
+pair <- inner_join(hx |> filter(source == "ilinet"), hx |> filter(source == "flusurvnet"),
+                   by = c("location", "season"), suffix = c("_ili", "_fsn"))
+pdiff <- bind_rows(lapply(0:2, function(k) {
+  dk <- pair[[paste0("excess_k", k, "_ili")]] - pair[[paste0("excess_k", k, "_fsn")]]
+  ok <- !is.na(dk)
+  if (sum(ok) < 10) return(NULL)
+  ci <- cluster_ci(dk[ok], pair$season[ok])
+  tibble(pos = c("1st holiday\nweek", "2nd", "3rd")[k + 1], mean = ci["mean"], lo = ci["lo"], hi = ci["hi"], n = sum(ok))
+}), {
+  ci <- cluster_ci(pair$excess_ili - pair$excess_fsn, pair$season)
+  tibble(pos = "block\nmean", mean = ci["mean"], lo = ci["lo"], hi = ci["hi"], n = nrow(pair))
+}) |> mutate(pos = factor(pos, levels = pos))
+p1 <- ggplot(exs, aes(block, mean, color = group)) +
+  geom_hline(yintercept = 0, color = INK2) +
+  geom_pointrange(aes(ymin = lo, ymax = hi), position = position_dodge(width = 0.5)) +
+  scale_color_manual(values = SOURCE_COLORS) +
+  scale_x_discrete(labels = c("6 weeks earlier\n(placebo)", "holiday weeks\n(Dec 22 – Jan 7)", "6 weeks later\n(placebo)")) +
+  labs(x = NULL, y = "mean log excess vs 2 weeks before + 2 after", title = "Holiday excess by source") +
+  theme(legend.position = c(0.02, 0.98), legend.justification = c(0, 1))
+p2 <- ggplot(pdiff, aes(pos, mean)) +
+  geom_hline(yintercept = 0, color = INK2) +
+  geom_pointrange(aes(ymin = lo, ymax = hi), shape = 18, size = 0.6) +
+  labs(x = NULL, y = "ILINet excess − FluSurv-NET excess", title = paste0("Same location & season (", nrow(pair), " pairs)"))
+(p1 | p2) + plot_layout(widths = c(1.3, 1))
+ciq <- function(g, b = "holiday") exs |> filter(group == g, block == b)
+cis <- function(r, d = 2) paste0(f2(r$mean, d), " (", f2(r$lo, d), "–", f2(r$hi, d), ")")
+placebo_rng <- range(exs$mean[exs$block != "holiday"])
+# how often the peak falls in a holiday week vs the 3 weeks either side
+hw <- cal |> group_by(season) |> summarise(first = min(season_week), last = max(season_week), nh = n())
+pk_h <- rows |> distinct(source, agg_level, location, season, .keep_all = TRUE) |> left_join(hw, by = "season") |>
+  mutate(in_hol = peak_week >= first & peak_week <= last,
+         near = (peak_week >= first - 3 & peak_week < first) | (peak_week > last & peak_week <= last + 3)) |>
+  group_by(group) |> summarise(per_week_hol = mean(in_hol) / mean(nh), per_week_near = mean(near) / 6)
+pkh <- function(g, col) pk_h[[col]][pk_h$group == g]
+pdk <- function(p) pdiff |> filter(pos == p)
+```
 
-There is a clear holiday bump, **but it is just as large in FluSurv-NET as in ILINet**: mean excess 0.40 (95% interval 0.25–0.53) for ILINet states, 0.39 (0.28–0.49) for ILINet national/regions and 0.40 (0.22–0.51) for FluSurv-NET, against placebo values between −0.09 and 0.20. Epidemic peaks also fall in holiday weeks more often than in nearby weeks, and about equally in both sources: per week, 9.3% of ILINet state peaks and 11.5% of FluSurv-NET peaks fall in a holiday week, versus 2.7% and 3.5% per week in the three weeks either side. So most of the holiday bump is a real feature of the epidemics, seen in hospitalizations too. What does differ is the **timing within the block** (right panel). For the same location and season, ILINet's excess is 0.28 higher (0.20–0.35) in the first holiday week and 0.25 lower (−0.35 to −0.17) in the third week (early January), with no difference in the block average (0.09, −0.06 to 0.22). That is the pattern the denominator story predicts: ILINet runs ahead of hospitalizations over Christmas and then drops back at New Year. (Part of it may also be that outpatient ILI generally leads hospitalizations by about a week.)
+There is a clear holiday bump, **but it is just as large in FluSurv-NET as in ILINet**: mean excess `r cis(ciq("ILINet states"))` for ILINet states, `r cis(ciq("ILINet national + regions"))` for ILINet national/regions and `r cis(ciq("FluSurv-NET"))` for FluSurv-NET, against placebo values between `r f2(placebo_rng[1])` and `r f2(placebo_rng[2])`. Epidemic peaks also fall in holiday weeks more often than in nearby weeks, and about equally in both sources: per week, `r pct(pkh("ILINet states", "per_week_hol"), 0.1)` of ILINet state peaks and `r pct(pkh("FluSurv-NET", "per_week_hol"), 0.1)` of FluSurv-NET peaks fall in a holiday week, versus `r pct(pkh("ILINet states", "per_week_near"), 0.1)` and `r pct(pkh("FluSurv-NET", "per_week_near"), 0.1)` per week in the three weeks either side. So most of the holiday bump is a real feature of the epidemics, seen in hospitalizations too. What does differ is the **timing within the block** (right panel). For the same location and season, ILINet's excess is `r f2(pdk("1st holiday\nweek")$mean)` higher (`r f2(pdk("1st holiday\nweek")$lo)`–`r f2(pdk("1st holiday\nweek")$hi)`) in the first holiday week and `r f2(-pdk("3rd")$mean)` lower (`r f2(pdk("3rd")$lo)` to `r f2(pdk("3rd")$hi)`) in the third week (early January), with no clear difference in the block average (`r f2(pdk("block\nmean")$mean)`, `r f2(pdk("block\nmean")$lo)` to `r f2(pdk("block\nmean")$hi)`). That is the pattern the denominator story predicts: ILINet runs ahead of hospitalizations over Christmas and then drops back at New Year. (Part of it may also be that outpatient ILI generally leads hospitalizations by about a week.)
 
 ## Are holiday-week maxima less likely to be the real peak?
 
-![**Share of running maxima that turned out to be the final peak, by how many weeks ago the maximum was set,** for rows at season weeks 20–30, split by whether the maximum was set in a holiday week. Eventual $z = 0$ means the maximum was the final peak.](eda/fig16_holiday_max_final.png){#fig-holmax}
+```{r fig-holmax}
+#| fig-height: 3.8
+#| fig-cap: "**Share of running maxima that turned out to be the final peak, by how many weeks ago the maximum was set,** for rows at season weeks 20–30, split by whether the maximum was set in a holiday week. Eventual $z = 0$ means the maximum was the final peak."
+hm <- pr |> filter(season_week >= 20, season_week <= 30, wks_since_max >= 1, wks_since_max <= 5) |>
+  mutate(where = ifelse(max_in_holiday == 1, "max set in a holiday week", "max set in another week")) |>
+  group_by(group, where, wks_since_max) |> summarise(p0 = mean(at_zero), n = n(), .groups = "drop")
+ggplot(hm, aes(wks_since_max, p0, color = group, linetype = where)) +
+  geom_line(linewidth = 0.9) + geom_point(size = 1.5) +
+  facet_wrap(~group) +
+  scale_color_manual(values = SOURCE_COLORS, guide = "none") +
+  scale_linetype_manual(values = c("max set in a holiday week" = "solid", "max set in another week" = "dashed")) +
+  scale_y_continuous("share whose max was the final peak\n(eventual z = 0)", labels = percent_format(1), limits = c(0, 1)) +
+  labs(x = "weeks since the running max was set")
+hmv <- function(g, w, hol) pct(hm$p0[hm$group == g & hm$wks_since_max == w &
+                                     hm$where == ifelse(hol, "max set in a holiday week", "max set in another week")])
+hmp <- function(g) paste(sapply(1:3, function(w) paste(hmv(g, w, TRUE), "vs", hmv(g, w, FALSE))), collapse = ", ")
+```
 
-This is where ILINet and FluSurv-NET part ways. Compare maxima set the same number of weeks ago, in the same part of the season. In **ILINet**, maxima set in a holiday week are **less** often the final peak than maxima set in other weeks, at least in the first three weeks after they are set. For ILINet states it is 35% vs 41% one week after the max was set, 47% vs 64% two weeks after and 63% vs 66% three weeks after. For ILINet national and regional series it is 27% vs 61%, 39% vs 88% and 53% vs 85%. In **FluSurv-NET** there is no such penalty: 51% vs 33%, 63% vs 61% and 69% vs 69%. (Some of the gap is timing: other-week maxima in this window tend to be set later in the season, when a peak is more likely. That confound affects FluSurv-NET equally, and FluSurv-NET shows no gap.) So an ILINet holiday maximum is more often an "initial peak" that is later exceeded, which supports the idea that holiday maxima in ILINet deserve discounting.
+This is where ILINet and FluSurv-NET part ways. Compare maxima set the same number of weeks ago, in the same part of the season. In **ILINet**, maxima set in a holiday week are **less** often the final peak than maxima set in other weeks, at least in the first three weeks after they are set. For ILINet states it is `r hmp("ILINet states")` one, two and three weeks after the max was set. For ILINet national and regional series it is `r hmp("ILINet national + regions")`. In **FluSurv-NET** there is no such penalty: `r hmp("FluSurv-NET")`. (Some of the gap is timing: other-week maxima in this window tend to be set later in the season, when a peak is more likely. That confound affects FluSurv-NET equally, and FluSurv-NET shows no gap.) So an ILINet holiday maximum is more often an "initial peak" that is later exceeded, which supports the idea that holiday maxima in ILINet deserve discounting.
 
-@tbl-holpost looks at the weeks right after the holidays. One week after the holiday block, 57% of ILINet state series have their running maximum in a holiday week (53% for FluSurv-NET). Those maxima are *already* more often final than the other maxima in the same week (41% vs 27% for ILINet states), because they are older, not because they are more reliable.
+```{r holpost}
+post <- pr |> filter(weeks_since_holiday_end >= 1, weeks_since_holiday_end <= 4) |>
+  group_by(source = group, `weeks after holidays` = weeks_since_holiday_end) |>
+  summarise(rows = n(), share_hol = mean(max_in_holiday == 1),
+            p0_hol = mean(at_zero[max_in_holiday == 1]), p0_oth = mean(at_zero[max_in_holiday == 0]),
+            med_hol = median(z[max_in_holiday == 1]), med_oth = median(z[max_in_holiday == 0]),
+            q90_hol = quantile(z[max_in_holiday == 1], 0.9), q90_oth = quantile(z[max_in_holiday == 0], 0.9),
+            .groups = "drop")
+pp <- function(g, w, col) post[[col]][post$source == g & post$`weeks after holidays` == w]
+```
 
-{{< include eda/table_holiday_post.md >}}
+@tbl-holpost looks at the weeks right after the holidays. One week after the holiday block, `r pct(pp("ILINet states", 1, "share_hol"))` of ILINet state series have their running maximum in a holiday week (`r pct(pp("FluSurv-NET", 1, "share_hol"))` for FluSurv-NET). Those maxima are *already* more often final than the other maxima in the same week (`r pct(pp("ILINet states", 1, "p0_hol"))` vs `r pct(pp("ILINet states", 1, "p0_oth"))` for ILINet states), because they are older, not because they are more reliable.
 
-: Rows 1–4 weeks after the last holiday week: share whose running maximum was set in a holiday week, and the eventual $z$ given where the maximum was set. {#tbl-holpost}
+```{r tbl-holpost}
+#| tbl-cap: "Rows 1–4 weeks after the last holiday week: share whose running maximum was set in a holiday week, and the eventual $z$ given where the maximum was set."
+post |> mutate(across(c(share_hol, p0_hol, p0_oth), ~ percent(.x, 1)), across(c(med_hol, med_oth, q90_hol, q90_oth), f2)) |>
+  rename(`max in holiday week` = share_hol, `P(z=0) holiday max` = p0_hol, `P(z=0) other max` = p0_oth,
+         `median z holiday max` = med_hol, `median z other max` = med_oth, `q90 z holiday max` = q90_hol,
+         `q90 z other max` = q90_oth) |>
+  kable()
+```
 
 ## Real-time holiday features
 
@@ -283,29 +729,99 @@ The perturbation checks described earlier (@sec-predictors) also cover these fea
 
 ## Do holiday features improve forecasts?
 
-Same leave-one-season-out design as above (22 folds, even weeks). Results are reported for all rows and separately for ILINet and FluSurv-NET rows, for all weeks, weeks 17–31, the holiday weeks themselves, and 1–3 and 4–6 weeks after the holidays (the weeks where a holiday maximum could mislead).
+Same leave-one-season-out design as above (`r n_seasons_cv` folds, even weeks). Results are reported for all rows and separately for ILINet and FluSurv-NET rows, for all weeks, weeks 17–31, the holiday weeks themselves, and 1–3 and 4–6 weeks after the holidays (the weeks where a holiday maximum could mislead).
 
-![**Cross-validated pinball loss of the eventual $z$ relative to the current features, by source of the rows and weeks relative to the holidays.**](eda/fig17_holiday_cv.png){#fig-holcv}
+```{r holiday-cv}
+cvh <- read_parquet("eda/cv_holiday.parquet")
+meta <- pr |> select(source, agg_level, location, season, season_week, weeks_since_holiday_end, hol_now)
+hbin <- function(w, h) case_when(w >= 1 & w <= 3 ~ "1–3 wk after", w >= 4 & w <= 6 ~ "4–6 wk after",
+                                 h == 1 ~ "holiday weeks", TRUE ~ "other weeks")
+hol_sets <- c("+ holiday", "+ holiday flags", "+ holiday-adjusted max", "+ synchrony + burden", "+ synchrony + burden + holiday")
+hol_bins <- c("all weeks", "weeks 17–31", "holiday weeks", "1–3 wk after", "4–6 wk after")
+xh <- cvh |> left_join(meta, by = c("source", "agg_level", "location", "season", "season_week")) |>
+  mutate(hb = hbin(weeks_since_holiday_end, hol_now), src = ifelse(source == "ilinet", "ILINet", "FluSurv-NET"))
+hol_summary <- function(x) {
+  bind_rows(
+    x |> group_by(set) |> summarise(p = mean(pinball), l = mean(logloss)) |> mutate(weeks = "all weeks"),
+    x |> filter(season_week >= 17, season_week <= 31) |> group_by(set) |> summarise(p = mean(pinball), l = mean(logloss)) |>
+      mutate(weeks = "weeks 17–31"),
+    x |> filter(hb != "other weeks") |> group_by(set, weeks = hb) |> summarise(p = mean(pinball), l = mean(logloss), .groups = "drop")
+  ) |> group_by(weeks) |> mutate(ratio = p / p[set == "current"], dll = l - l[set == "current"]) |> ungroup()
+}
+hs <- bind_rows(hol_summary(xh) |> mutate(rows = "all"),
+                hol_summary(xh |> filter(src == "ILINet")) |> mutate(rows = "ILINet"),
+                hol_summary(xh |> filter(src == "FluSurv-NET")) |> mutate(rows = "FluSurv-NET")) |>
+  filter(set != "current")
+hv <- function(r, s, w, col = "ratio") hs[[col]][hs$rows == r & hs$set == s & hs$weeks == w]
+hol_tab <- function(col, d) hs |> select(rows, `feature set` = set, weeks, v = all_of(col)) |>
+  mutate(weeks = factor(weeks, levels = hol_bins), rows = factor(rows, levels = c("all", "ILINet", "FluSurv-NET")),
+         `feature set` = factor(`feature set`, levels = hol_sets)) |>
+  arrange(rows, `feature set`, weeks) |> mutate(v = formatC(v, format = "f", digits = d)) |>
+  pivot_wider(names_from = weeks, values_from = v)
+hb_get <- function(s, ref, metric, what) boot_get(boot, "holiday", s, ref, metric, what)
+```
 
-{{< include eda/table_holiday_cv_pinball.md >}}
+```{r fig-holcv}
+#| fig-height: 4.2
+#| fig-cap: "**Cross-validated pinball loss of the eventual $z$ relative to base, by source of the rows and weeks relative to the holidays.** Same x-axis in both panels."
+hs |> filter(rows != "all", weeks %in% c("all weeks", "holiday weeks", "1–3 wk after", "4–6 wk after")) |>
+  mutate(set = factor(vlabel(set), levels = vlabel(rev(hol_sets))), weeks = factor(weeks, levels = c("all weeks", "holiday weeks", "1–3 wk after", "4–6 wk after")),
+         rows = factor(paste(rows, "rows"), levels = c("ILINet rows", "FluSurv-NET rows"))) |>
+  ggplot(aes(ratio, set, color = weeks, shape = weeks == "all weeks")) +
+  geom_vline(xintercept = 1, color = INK2) +
+  geom_point(position = position_dodge(width = 0.6), size = 2) +
+  facet_wrap(~rows) +
+  scale_color_manual(values = c(`all weeks` = INK, `holiday weeks` = "#9ecae1", `1–3 wk after` = "#4292c6", `4–6 wk after` = "#08306b")) +
+  scale_shape_manual(values = c(`TRUE` = 18, `FALSE` = 16), guide = "none") +
+  labs(x = "pinball loss relative to base", y = NULL) +
+  theme(legend.position = "bottom", panel.grid.major.y = element_blank())
+```
 
-: Pinball loss relative to the current feature set (below 1 = better). {#tbl-holcv}
+```{r tbl-holcv}
+#| tbl-cap: "Pinball loss relative to base (below 1 = better)."
+kable(hol_tab("ratio", 3))
+```
 
-{{< include eda/table_holiday_cv_logloss.md >}}
+```{r tbl-holcvll}
+#| tbl-cap: "Change in log loss for $z > 0$ relative to base (below 0 = better)."
+kable(hol_tab("dll", 4))
+```
 
-: Change in log loss for $z > 0$ relative to the current feature set (below 0 = better). {#tbl-holcvll}
-
-The holiday features **do not improve the quantile forecasts of $z$**. Adding all six changes pinball loss by +0.5% overall and by −0.6% in the 1–3 weeks after the holidays, for all rows and for ILINet rows alone (+0.6% and +0.1%). The adjusted-maximum trio does slightly better, but only on FluSurv-NET rows (−1.0% overall, −6.3% 1–3 weeks after, from few rows). Added on top of synchrony + burden, the holiday features make things worse (0.984 vs 0.975 relative to current overall; synchrony + burden alone is better in 98% of season bootstrap resamples). For the probability that the peak is still ahead, the holiday features help very slightly: log loss −0.0024 overall and −0.005 in the 1–3 weeks after the holidays (−0.005 overall for FluSurv-NET rows, −0.002 for ILINet rows). That is small against a log loss of about 0.28 at those weeks and is not consistent across seasons (better in 12 of 22 seasons). Added to synchrony + burden, they remove most of that set's small log-loss penalty (Δ = −0.0005 vs +0.0031; better in 15 of 22 seasons) but cost pinball loss.
+The holiday features **do not improve the quantile forecasts of $z$**. Adding all six changes pinball loss by `r sprintf("%+.1f%%", 100 * (hv("all", "+ holiday", "all weeks") - 1))` overall and by `r sprintf("%+.1f%%", 100 * (hv("all", "+ holiday", "1–3 wk after") - 1))` in the 1–3 weeks after the holidays, for all rows, and by `r sprintf("%+.1f%%", 100 * (hv("ILINet", "+ holiday", "all weeks") - 1))` and `r sprintf("%+.1f%%", 100 * (hv("ILINet", "+ holiday", "1–3 wk after") - 1))` for ILINet rows alone. The adjusted-maximum trio does slightly better, but only on FluSurv-NET rows (`r sprintf("%+.1f%%", 100 * (hv("FluSurv-NET", "+ holiday-adjusted max", "all weeks") - 1))` overall, `r sprintf("%+.1f%%", 100 * (hv("FluSurv-NET", "+ holiday-adjusted max", "1–3 wk after") - 1))` 1–3 weeks after, from few rows). Added on top of synchrony + burden, the holiday features make things worse (`r f2(hv("all", "+ synchrony + burden + holiday", "all weeks"), 3)` vs `r f2(hv("all", "+ synchrony + burden", "all weeks"), 3)` relative to current overall; synchrony + burden alone is better in `r pct(1 - hb_get("+ synchrony + burden + holiday", "+ synchrony + burden", "pinball", "boot_win"))` of season bootstrap resamples). For the probability that the peak is still ahead, the holiday features help very slightly: log loss `r f2(hv("all", "+ holiday", "all weeks", "dll"), 4)` overall and `r f2(hv("all", "+ holiday", "1–3 wk after", "dll"), 3)` in the 1–3 weeks after the holidays (`r f2(hv("FluSurv-NET", "+ holiday", "all weeks", "dll"), 3)` overall for FluSurv-NET rows, `r f2(hv("ILINet", "+ holiday", "all weeks", "dll"), 3)` for ILINet rows). That is small against a log loss of about 0.28 at those weeks and is not consistent across seasons (better in `r hb_get("+ holiday", "current", "logloss", "seasons_better")` of `r n_seasons_cv` seasons). Added to synchrony + burden, they remove most of that set's small log-loss penalty (Δ = `r f2(hv("all", "+ synchrony + burden + holiday", "all weeks", "dll"), 4)` vs +`r f2(hv("all", "+ synchrony + burden", "all weeks", "dll"), 4)`; better in `r hb_get("+ synchrony + burden + holiday", "+ synchrony + burden", "logloss", "seasons_better")` of `r n_seasons_cv` seasons) but cost pinball loss.
 
 ## Would adjusting the ILINet training data be better?
 
-An alternative to a feature is to fix the ILINet series before computing targets and features. We tried two versions. **Scaling:** divide the first and second holiday weeks by $e^{0.275}$ and $e^{0.027}$, the ILINet − FluSurv-NET differences estimated above. **Interpolation:** replace all holiday weeks by a log-linear interpolation between the week before and the week after the block. Adjusting ILINet changes ILINet's own targets, so comparing losses on ILINet rows would not be fair. Instead we score only the **FluSurv-NET rows** of each held-out season (11 folds), whose data and targets are untouched, while training on all sources. This asks the question that matters for NHSN: does cleaner ILINet training data give better forecasts of a hospitalization series?
+```{r holiday-adjust}
+shift <- unlist(pnums$holiday$adjust_shift)
+cva <- read_parquet("eda/cv_holiday_adjust.parquet") |>
+  left_join(meta, by = c("source", "agg_level", "location", "season", "season_week")) |>
+  mutate(hb = hbin(weeks_since_holiday_end, hol_now))
+ref_a <- cva |> filter(data == "ILINet as reported", set == "current")
+adj <- bind_rows(
+  cva |> group_by(data, set) |> summarise(p = mean(pinball), l = mean(logloss), .groups = "drop") |>
+    mutate(weeks = "all weeks", ratio = p / mean(ref_a$pinball), dll = l - mean(ref_a$logloss)),
+  cva |> filter(hb != "other weeks") |> group_by(data, set, weeks = hb) |> summarise(p = mean(pinball), .groups = "drop") |>
+    left_join(ref_a |> filter(hb != "other weeks") |> group_by(weeks = hb) |> summarise(pr = mean(pinball)), by = "weeks") |>
+    mutate(ratio = p / pr)
+)
+av <- function(d, s, w = "all weeks") adj$ratio[adj$data == d & adj$set == s & adj$weeks == w]
+n_fsn_folds <- n_distinct(cva$season)
+```
 
-{{< include eda/table_holiday_adjust.md >}}
+An alternative to a feature is to fix the ILINet series before computing targets and features. We tried two versions. **Scaling:** divide the first and second holiday weeks by $e^{`r f2(shift[["0"]], 3)`}$ and $e^{`r f2(shift[["1"]], 3)`}$, the mean ILINet − FluSurv-NET differences estimated above. **Interpolation:** replace all holiday weeks by a log-linear interpolation between the week before and the week after the block. Adjusting ILINet changes ILINet's own targets, so comparing losses on ILINet rows would not be fair. Instead we score only the **FluSurv-NET rows** of each held-out season (`r n_fsn_folds` folds), whose data and targets are untouched, while training on all sources. This asks the question that matters for NHSN: does cleaner ILINet training data give better forecasts of a hospitalization series?
 
-: Forecasts of FluSurv-NET rows (leave-one-season-out) with different versions of the ILINet training data, relative to training on ILINet as reported with the current features. {#tbl-holadj}
+```{r tbl-holadj}
+#| tbl-cap: "Forecasts of FluSurv-NET rows (leave-one-season-out) with different versions of the ILINet training data, relative to training on ILINet as reported with base."
+adj |> select(`training data` = data, `feature set` = set, weeks, ratio) |>
+  mutate(weeks = factor(weeks, levels = c("all weeks", "holiday weeks", "1–3 wk after", "4–6 wk after")), ratio = f2(ratio, 3)) |>
+  arrange(weeks) |> pivot_wider(names_from = weeks, values_from = ratio) |>
+  left_join(adj |> filter(weeks == "all weeks") |> transmute(`training data` = data, `feature set` = set, `Δ log loss (all)` = f2(dll, 3)),
+            by = c("training data", "feature set")) |>
+  arrange(`training data`, `feature set`) |>
+  kable()
+```
 
-Neither adjustment helps. Scaling ILINet's holiday weeks leaves forecasts essentially unchanged with the current features (0.996) and makes them slightly worse with synchrony + burden (0.990 vs 0.980 unadjusted). Interpolating makes them worse (1.042 and 1.053), presumably because it also removes real holiday-time peaks, which @fig-holexcess shows are common in hospitalization data too.
+Neither adjustment helps. Scaling ILINet's holiday weeks leaves forecasts essentially unchanged with base (`r f2(av("ILINet holiday weeks scaled down", "current"), 3)`) and makes them slightly worse with synchrony + burden (`r f2(av("ILINet holiday weeks scaled down", "+ synchrony + burden"), 3)` vs `r f2(av("ILINet as reported", "+ synchrony + burden"), 3)` unadjusted). Interpolating makes them worse (`r f2(av("ILINet holiday weeks interpolated", "current"), 3)` and `r f2(av("ILINet holiday weeks interpolated", "+ synchrony + burden"), 3)`), presumably because it also removes real holiday-time peaks, which @fig-holexcess shows are common in hospitalization data too.
 
 **Recommendation.** Do **not** add holiday features or adjust the ILINet training series for now. The ILINet-specific effect is real but narrow. ILINet runs ahead in late December and then drops back at New Year, and ILINet holiday maxima are exceeded more often than other maxima. But the models already learn most of this from `wks_since_max`, `rel_max` and the national features, and none of the holiday variants gave a consistent cross-validated gain. If the "has the peak passed?" probability is modelled separately, `max_in_holiday` and `weeks_since_holiday_end` are the only candidates worth re-testing, in the real `peak_gbqr` pipeline and on NHSN. NHSN, like FluSurv-NET, has no visit denominator, so the ILINet artefact should matter only through the ILINet training rows.
 
@@ -313,9 +829,13 @@ Neither adjustment helps. Scaling ILINet's holiday weeks leaves forecasts essent
 
 Other fields also have to predict an "ultimate total relative to what has been seen so far". Actuaries predict the final cost of insurance claims from partial payments ("reserving"). Marketers predict a product's eventual sales from its first weeks (Bass diffusion; box office). Probabilists compute how far a random walk will climb above its current level (the reflection principle, record statistics). Hydrologists model how quickly a river falls after its crest (recession curves). Epidemiologists fit growth curves that bend over. We translated eight such ideas into real-time features and tested them exactly as in @sec-predictors. As before, all features use only data through week $t$, all "historical" quantities use only strictly earlier seasons of the same source and location, and the eventual $z$ is the retrospective outcome.
 
-**Reference set.** Because synchrony + burden (@sec-predictors) was the best set so far, the reference here is **SB** = the 13 current features + the 4 synchrony + the 2 burden features. Each idea is added to SB on its own, and then all together.
+**Comparison set.** Because synchrony + burden (@sec-predictors) was the best set so far, the comparison set here is **SB** = the 13 base features + the 4 synchrony + the 2 burden features. Each idea is added to SB on its own, and then all together.
 
 ## The features, in plain language
+
+```{r lit-coverage}
+covl <- function(f) mean(!is.na(pr[[f]]))
+```
 
 Notation: $\ell_s = \log(y_s + \varepsilon)$ (carried forward over missing weeks); $D = \log(M_t+\varepsilon) - \ell_t = -$`rel_max` $\ge 0$ is how far the current week is below the record, on the log scale; $r_t = g_3/3$ is the average weekly log growth over the last three weeks; $\tau = \max(43 - t, 1)$ is the number of weeks left in the window.
 
@@ -333,7 +853,7 @@ Notation: $\ell_s = \log(y_s + \varepsilon)$ (carried forward over missing weeks
    - `cl_z` is the median eventual $z$ at the same week $t$ over the location's earlier seasons. It uses all series of the source in earlier seasons when the location has fewer than 3.
    - `p0_hist` is the share of those earlier seasons already peaked by week $t$.
    - `z_bf` is a Bornhuetter–Ferguson blend. The actuarial version says: expected ultimate = what we have + (a prior guess of the ultimate) × (the share of it that is typically still to come). Here the prior guess is the location's typical peak, $M_t e^{-\texttt{hist\_rel}}$, and the share still to come is $1 - e^{-\texttt{cl\_z}}$. So `z_bf` $= \log\big(1 + (1 - e^{-\texttt{cl\_z}})\,e^{-\texttt{hist\_rel}}\big)$.
-   - `z_bf` is always well defined and non-negative (it is 0 when history says the peak is usually past, and grows when the record is small relative to the typical peak). It is missing only where `hist_rel` is missing. Observed range 0–9.1.
+   - `z_bf` is always well defined and non-negative (it is 0 when history says the peak is usually past, and grows when the record is small relative to the typical peak). It is missing only where `hist_rel` is missing. Observed range `r f2(min(pr$z_bf, na.rm = TRUE), 1)`–`r f2(max(pr$z_bf, na.rm = TRUE), 1)`.
 4. **Deceleration** (growth curves bend before they peak). With $r_s$ the 3-week growth rate at week $s$ (weeks 5 to $t$):
    - `r_max` is the largest $r_s$ so far, set in week $t_g$.
    - `gfrac` $= r_t / r_{\max}$ (NaN if $r_{\max} \le 0$); `wks_since_gmax` $= t - t_g$.
@@ -346,72 +866,371 @@ Notation: $\ell_s = \log(y_s + \varepsilon)$ (carried forward over missing weeks
 6. **Record counts.**
    - `n_rec4` is the number of new in-window records in the last 4 weeks.
    - `rec_frac` is the share of weeks since week 10 that set a record.
-7. **Bass-style implied peak.** Fit $y_s = a + b\,C_{s-1} + c\,C_{s-1}^2$ by least squares, where $C$ is cumulative incidence, over the weeks from onset (the first week above 2 × (early-season minimum + ε)) through $t$, with at least 5 points. If $c < 0$ the curve implies a peak value $a - b^2/(4c)$, and `bass_rel` $= \log\big((\max(\text{implied peak}, M_t)+\varepsilon)/(M_t+\varepsilon)\big)$, clipped to [0, 5]. It is missing otherwise (55% of rows).
-8. **Cross-source discrepancy** (actuaries' "Munich chain ladder" compares paid and incurred claims). For the 13 FluSurv-NET sites and the US, the partner series is the same location and season in the *other* source (ILINet ↔ FluSurv-NET). `xs_rel_max`, `xs_wsm` and `xs_g3` are the partner's `rel_max`, `wks_since_max` and `g3` minus the row's own, when the partner is observed at $t$ (29% of rows). Using this in real time needs a second real-time source. For NHSN forecasting, ILINet via Delphi's versioned data (vintages) could provide it.
+7. **Bass-style implied peak.** Fit $y_s = a + b\,C_{s-1} + c\,C_{s-1}^2$ by least squares, where $C$ is cumulative incidence, over the weeks from onset (the first week above 2 × (early-season minimum + ε)) through $t$, with at least 5 points. If $c < 0$ the curve implies a peak value $a - b^2/(4c)$, and `bass_rel` $= \log\big((\max(\text{implied peak}, M_t)+\varepsilon)/(M_t+\varepsilon)\big)$, clipped to [0, 5]. It is missing otherwise (`r pct(1 - covl("bass_rel"))` of rows).
+8. **Cross-source discrepancy** (actuaries' "Munich chain ladder" compares paid and incurred claims). For the 13 FluSurv-NET sites and the US, the partner series is the same location and season in the *other* source (ILINet ↔ FluSurv-NET). `xs_rel_max`, `xs_wsm` and `xs_g3` are the partner's `rel_max`, `wks_since_max` and `g3` minus the row's own, when the partner is observed at $t$ (`r pct(covl("xs_rel_max"))` of rows). Using this in real time needs a second real-time source. For NHSN forecasting, ILINet via Delphi's versioned data (vintages) could provide it.
 
-**Checking the random-walk formulas.** The formulas above are the classical results for *continuous* Brownian motion. We checked them by simulating Gaussian random walks (40,000 paths per case). With 100 sub-steps per week, the simulated probability of exceeding $D$ and the expected excess match the formulas to within about 0.015 in every case (@tbl-refl). With **weekly** steps, which is how the data arrive, the formulas overstate both, because a weekly walk can cross the record between observations without being seen. For example, the formula gives 0.405 for $D = 0.5$, $\sigma = 0.3$, $\tau = 4$, but the weekly simulation gives 0.269. The standard fix (Broadie–Glasserman) is to shift the barrier up by $0.5826\,\sigma$. With that shift the formulas agree with the weekly simulations to within about 0.02 (0.261 vs 0.269 in the example), so the features use the shifted $D'$.
+```{r reflection}
+refl <- readr::read_csv("eda/reflection_check.csv", show_col_types = FALSE)
+r1 <- refl[1, ]
+fine_err <- max(abs(c(refl$`P formula` - refl$`P sim fine`, refl$`E formula` - refl$`E sim fine`)), na.rm = TRUE)
+bg_err <- max(abs(c(refl$`P formula BG` - refl$`P sim weekly`, refl$`E formula BG` - refl$`E sim weekly`)), na.rm = TRUE)
+```
 
-{{< include eda/table_reflection_check.md >}}
+**Checking the random-walk formulas.** The formulas above are the classical results for *continuous* Brownian motion. We checked them by simulating Gaussian random walks (40,000 paths per case). With 100 sub-steps per week, the simulated probability of exceeding $D$ and the expected excess match the formulas to within `r f2(fine_err, 3)` in every case (@tbl-refl). With **weekly** steps, which is how the data arrive, the formulas overstate both, because a weekly walk can cross the record between observations without being seen. For example, the formula gives `r f2(r1[["P formula"]], 3)` for $D = 0.5$, $\sigma = 0.3$, $\tau = 4$, but the weekly simulation gives `r f2(r1[["P sim weekly"]], 3)`. The standard fix (Broadie–Glasserman) is to shift the barrier up by $0.5826\,\sigma$. With that shift the formulas agree with the weekly simulations to within `r f2(bg_err, 3)` (`r f2(r1[["P formula BG"]], 3)` vs `r f2(r1[["P sim weekly"]], 3)` in the example), so the features use the shifted $D'$.
 
-: Closed-form exceedance probability ("P") and expected excess ("E", zero drift only) vs simulated random walks with weekly steps and fine (100 per week) steps; "BG" = with the continuity correction. {#tbl-refl}
+```{r tbl-refl}
+#| tbl-cap: "Closed-form exceedance probability (\"P\") and expected excess (\"E\", zero drift only) vs simulated random walks with weekly steps and fine (100 per week) steps; \"BG\" = with the continuity correction."
+refl |> mutate(across(everything(), ~ ifelse(is.na(.x), "–", formatC(.x, format = "fg", digits = 3)))) |> kable()
+```
 
-The perturbation tests of @sec-predictors were extended to all of these features. They add a third test, which corrupts all weeks after $t$ in one season only (2015/16) and checks that *every* feature of that season at week $t$ is unchanged. All give a maximum change of exactly 0.
+The perturbation tests of @sec-predictors cover all of these features, including the third test, which corrupts all weeks after $t$ in one season only (2015/16) and checks that *every* feature of that season at week $t$ is unchanged. All give a maximum change of exactly `r max_leak`.
 
 ## Associations
 
-![**Within-week-bin Spearman correlation with the eventual $z$ (left) and with $z > 0$ (right)** for the new features, with `hist_rel`, `cum_vs_hist_total` and `rel_max` as reference. Same colour scale as @fig-corr.](eda/fig18_lit_correlations.png){#fig-litcorr}
+```{r fig-litcorr}
+#| fig-height: 11
+#| fig-cap: "**Within-week-bin Spearman correlation with the eventual $z$ (left) and with $z > 0$ (right)** for the candidate features, with `hist_rel`, `cum_vs_hist_total` and `rel_max` as reference. Same colour scale as @fig-corr."
+chl <- corr_heatmap(pr, G11, c("hist_rel", "cum_vs_hist_total", "rel_max"))
+chl$plot
+rl <- chl$data |> filter(target == "Spearman with z")
+rngl <- function(f, bins) rng(f, bins, rl)
+xs_max <- max(abs(rl$rho[rl$feature %in% G11[["cross-source"]]]))
+```
 
-Two of the new features are as strongly associated with $z$ as `hist_rel`, and both largely restate it. `z_bf` has Spearman 0.85–0.91 in weeks 12–21; it is a transformation of `hist_rel` scaled by the chain-ladder share. `sev_peaked` has −0.65 to −0.76 in weeks 17–26: in big seasons, locations that have peaked have high records relative to their history, and so does this location. Its "surprise" version `sev_gap` is only weakly associated after week 16. The random-walk features (`p_exc`, `p_exc0`, `ez_rw`), `gfrac`, `z_par` and `n_rec4` behave like the existing shape features: weak before week 22 and strong (0.5–0.65) in weeks 27–31, when they mainly say whether the peak has passed. `cl_z` alone is only moderately related (0.34–0.36 before week 22, near 0 after). The cross-source differences are essentially unrelated to $z$ ($|\rho| \le 0.17$).
+Two of the candidate features are as strongly associated with $z$ as `hist_rel`, and both largely restate it. `z_bf` has Spearman `r f2(rngl("z_bf", c("wk 12–16", "wk 17–21"))[1])`–`r f2(rngl("z_bf", c("wk 12–16", "wk 17–21"))[2])` in weeks 12–21; it is a transformation of `hist_rel` scaled by the chain-ladder share. `sev_peaked` has `r f2(rngl("sev_peaked", c("wk 17–21", "wk 22–26"))[2])` to `r f2(rngl("sev_peaked", c("wk 17–21", "wk 22–26"))[1])` in weeks 17–26: in big seasons, locations that have peaked have high records relative to their history, and so does this location. Its "surprise" version `sev_gap` is only weakly associated after week 16. The random-walk features (`p_exc`, `p_exc0`, `ez_rw`), `gfrac`, `z_par` and `n_rec4` behave like the existing shape features: weak before week 22 and strong (0.5–0.65) in weeks 27–31, when they mainly say whether the peak has passed. `cl_z` alone is only moderately related (`r f2(rngl("cl_z", c("wk 12–16", "wk 17–21"))[1])`–`r f2(rngl("cl_z", c("wk 12–16", "wk 17–21"))[2])` before week 22, near 0 after). The cross-source differences are essentially unrelated to $z$ ($|\rho| \le$ `r f2(xs_max)`).
 
-![**Eventual $z$ by decile of the top new features (by LightGBM gain in SB + all)**, at three week bins.](eda/fig20_lit_top_features.png){#fig-littop}
+```{r fig-littop}
+#| fig-height: 6.5
+#| fig-cap: "**Eventual $z$ by decile of the top candidate features (by LightGBM gain in SB + all)**, at three week bins."
+imp_lit <- imp |> filter(`feature set` == "SB + all literature", model == "median quantile model") |> arrange(desc(gain_share))
+top_lit <- head(imp_lit$feature[imp_lit$feature %in% unlist(G11)], 6)
+binned_plot(pr, top_lit)
+```
 
 ## Cross-validation
 
-![**Cross-validated skill relative to SB.** Left: pinball loss ratio for $z$; right: change in log loss for $z > 0$.](eda/fig19_lit_cv.png){#fig-litcv}
+```{r lit-cv}
+cvl <- read_parquet("eda/cv_lit.parquet")
+order11 <- c("SB", paste("SB +", names(G11)), "SB + all", "SB + recession + records")
+rel11 <- cv_rel(cvl, "SB")
+lb <- function(s, what, metric = "pinball") boot_get(boot, "literature", s, "SB", metric, what)
+abs_sb <- rel11 |> filter(set == "SB")
+others11 <- setdiff(order11, "SB")
+```
 
-{{< include eda/table_lit_cv_pinball.md >}}
+```{r fig-litcv}
+#| fig-height: 5
+#| fig-cap: "**Cross-validated skill relative to SB.** Left: pinball loss ratio for $z$; right: change in log loss for $z > 0$."
+cv_dotplot(rel11, order11, "SB")
+```
 
-: Pinball loss relative to SB by week bin (leave-one-season-out, 22 folds, even weeks; below 1 = better). Absolute SB loss: 0.110 overall, 0.171 in weeks 17–21, 0.105 in 22–26. {#tbl-litpin}
+```{r tbl-litpin}
+#| tbl-cap: "Pinball loss relative to SB by week bin (leave-one-season-out, even weeks; below 1 = better)."
+kable(cv_table(rel11, rel_pinball, order11))
+```
 
-{{< include eda/table_lit_cv_logloss.md >}}
+Absolute SB pinball loss: `r f2(abs_sb$pinball[abs_sb$bin == "all"], 3)` overall, `r f2(abs_sb$pinball[abs_sb$bin == "17–21"], 3)` in weeks 17–21, `r f2(abs_sb$pinball[abs_sb$bin == "22–26"], 3)` in 22–26.
 
-: Change in log loss for $z > 0$ relative to SB (below 0 = better). SB log loss: 0.123 overall, 0.296 in weeks 22–26, 0.285 in 27–31. {#tbl-litll}
+```{r tbl-litll}
+#| tbl-cap: "Change in log loss for $z > 0$ relative to SB (below 0 = better)."
+kable(cv_table(rel11, d_logloss, order11, digits = 4))
+```
 
-{{< include eda/table_lit_bootstrap.md >}}
+SB log loss: `r f2(abs_sb$logloss[abs_sb$bin == "all"], 3)` overall, `r f2(abs_sb$logloss[abs_sb$bin == "22–26"], 3)` in weeks 22–26, `r f2(abs_sb$logloss[abs_sb$bin == "27–31"], 3)` in 27–31.
 
-: Share of season-bootstrap resamples (weeks 12–31) in which the set beats SB, for pinball loss and log loss, and the number of the 22 held-out seasons in which its pinball loss is lower. {#tbl-litboot}
+```{r tbl-litboot}
+#| tbl-cap: "Share of season-bootstrap resamples (weeks 12–31) in which the set beats SB, for pinball loss and log loss, and the number of the held-out seasons in which its pinball loss is lower."
+tibble(`feature set` = others11,
+       `pinball win` = sapply(others11, lb, what = "boot_win"),
+       `log loss win` = sapply(others11, lb, what = "boot_win", metric = "logloss"),
+       `seasons better (pinball)` = sapply(others11, lb, what = "seasons_better")) |>
+  mutate(across(c(`pinball win`, `log loss win`), ~ percent(.x, 1))) |>
+  kable()
+```
 
-{{< include eda/table_lit_cv_by_source.md >}}
+```{r tbl-litsrc}
+#| tbl-cap: "Relative pinball loss and log-loss change vs SB, separately for the held-out rows of each source and for the rows that have a cross-source partner."
+xl <- cvl |> left_join(pr |> select(source, agg_level, location, season, season_week, group, xs_rel_max),
+                       by = c("source", "agg_level", "location", "season", "season_week"))
+by_src <- bind_rows(
+  lapply(SOURCE_GROUPS, function(g) cv_rel(xl |> filter(group == g), "SB") |> mutate(rows = g)),
+  cv_rel(xl |> filter(!is.na(xs_rel_max)), "SB") |> mutate(rows = "rows with a partner source"))
+src_tab <- by_src |> filter(set != "SB", bin %in% c("all", "17–21", "22–26")) |>
+  select(rows, `feature set` = set, bin, rel_pinball, d_logloss) |>
+  pivot_wider(names_from = bin, values_from = c(rel_pinball, d_logloss)) |>
+  transmute(rows, `feature set` = factor(`feature set`, levels = order11), `pinball all` = f2(rel_pinball_all, 3),
+            `pinball 17–21` = f2(`rel_pinball_17–21`, 3), `pinball 22–26` = f2(`rel_pinball_22–26`, 3),
+            `Δ log loss all` = f2(d_logloss_all, 4)) |>
+  arrange(factor(rows, levels = c(SOURCE_GROUPS, "rows with a partner source")), `feature set`)
+kable(src_tab)
+n_partner <- nrow(xl |> filter(set == "SB", !is.na(xs_rel_max)))
+src_all <- by_src |> filter(set %in% setdiff(others11, c("SB + all", "SB + chain ladder")), bin == "all", rows %in% SOURCE_GROUPS)
+imp_l <- function(f) imp_lit$gain_share[imp_lit$feature == f]
+```
 
-: Relative pinball loss and log-loss change vs SB, separately for the held-out rows of each source and for the rows that have a cross-source partner. {#tbl-litsrc}
+```{r lit-numbers}
+pin_all <- sapply(others11, function(s) rp(s, "all", rel11))
+best_seasons <- max(sapply(others11, lb, what = "seasons_better"))
+CL <- "SB + chain ladder"; ALL <- "SB + all"; RF <- "SB + reflection principle"; XS <- "SB + cross-source"
+RC <- "SB + recession"; RD <- "SB + record counts"; RR <- "SB + recession + records"
+sev_fsn <- by_src$rel_pinball[by_src$rows == "FluSurv-NET" & by_src$set == "SB + severity in peaked locations" & by_src$bin == "17–21"]
+xs_partner <- by_src$rel_pinball[by_src$rows == "rows with a partner source" & by_src$set == XS & by_src$bin == "all"]
+rrb <- rel11 |> filter(set %in% c(RC, RD), bin %in% c("17–21", "22–26", "27–31"))
+```
 
 **None of the eight ideas improves the quantile forecasts of $z$ beyond SB.**
 
-- Overall pinball ratios run from 1.001 to 1.050, and none of the sets beats SB in more than 13 of 22 seasons.
-- The chain-ladder group is clearly harmful: 1.050 overall and 1.129 in weeks 22–26. Its season-to-season medians of past $z$ are noisy with 0–10 earlier seasons per location, and the trees split on them instead of on `hist_rel` and `cum_vs_hist_total`.
-- Adding all 27 features together is similarly worse (1.046), even though `sev_peaked`, `p_exc` and `z_bf` rank just after the existing top features in gain (4.2%, 3.7% and 1.8% of total gain, after `nat_rel_max` 51% and `cum_vs_hist_total` 27%).
-- The random-walk features help only in weeks 32–43, where $z$ is nearly always 0 (0.841).
-- The results are the same within each source: no group improves ILINet or FluSurv-NET rows by more than 0.4% overall. The only sub-1% gain is severity on FluSurv-NET rows in weeks 17–21 (0.978).
-- The cross-source discrepancy features do not help even on the rows that have a partner (1.006).
+- Overall pinball ratios run from `r f2(min(pin_all), 3)` to `r f2(max(pin_all), 3)`, and none of the sets beats SB in more than `r best_seasons` of `r n_seasons_cv` seasons.
+- The chain-ladder group is clearly harmful: `r f2(rp(CL, "all", rel11), 3)` overall and `r f2(rp(CL, "22–26", rel11), 3)` in weeks 22–26. Its season-to-season medians of past $z$ are noisy with 0–10 earlier seasons per location, and the trees split on them instead of on `hist_rel` and `cum_vs_hist_total`.
+- Adding all `r length(unlist(G11))` features together is similarly worse (`r f2(rp(ALL, "all", rel11), 3)`), even though `sev_peaked`, `p_exc` and `z_bf` rank just after the top SB features in gain (`r pct(imp_l("sev_peaked"), 0.1)`, `r pct(imp_l("p_exc"), 0.1)` and `r pct(imp_l("z_bf"), 0.1)` of total gain, after `nat_rel_max` `r pct(imp_l("nat_rel_max"))` and `cum_vs_hist_total` `r pct(imp_l("cum_vs_hist_total"))`).
+- The random-walk features help only in weeks 32–43, where $z$ is nearly always 0 (`r f2(rp(RF, "32–43", rel11), 3)`).
+- The results are the same within each source: apart from chain ladder and "all", no group improves ILINet or FluSurv-NET rows by more than `r pct(1 - min(src_all$rel_pinball), 0.1)` overall. The only sub-1% gain in a mid-season bin is severity on FluSurv-NET rows in weeks 17–21 (`r f2(sev_fsn, 3)`).
+- The cross-source discrepancy features do not help even on the `r format(n_partner, big.mark = ",")` rows that have a partner (`r f2(xs_partner, 3)`).
 
-For the probability that the peak is still ahead, **recession and record counts give small but fairly consistent gains**. Log loss falls by 0.0020 (recession) and 0.0015 (records) overall, and by about 0.003 in weeks 17–31; they beat SB in 96% and 89% of season-bootstrap resamples. Both groups together give −0.0024 (−0.006 in weeks 27–31; 79% bootstrap), with a negligible pinball cost (1.002). These are small effects: about 1–2% of the SB log loss in weeks 22–31.
+For the probability that the peak is still ahead, **recession and record counts give small but fairly consistent gains**. Log loss falls by `r f2(-dl(RC, "all", rel11), 4)` (recession) and `r f2(-dl(RD, "all", rel11), 4)` (records) overall, and by about `r f2(-mean(rrb$d_logloss), 3)` in weeks 17–31; they beat SB in `r pct(lb(RC, "boot_win", "logloss"))` and `r pct(lb(RD, "boot_win", "logloss"))` of season-bootstrap resamples. Both groups together give `r f2(dl(RR, "all", rel11), 4)` (`r f2(dl(RR, "27–31", rel11), 3)` in weeks 27–31; `r pct(lb(RR, "boot_win", "logloss"))` bootstrap), with a negligible pinball cost (`r f2(rp(RR, "all", rel11), 3)`). These are small effects: about 1–2% of the SB log loss in weeks 22–31.
 
 ## Recommendation
 
 - **Keep SB as the size feature set.** None of the reflection-principle, severity, chain-ladder, deceleration, recession, record, Bass or cross-source features improved cross-validated quantile forecasts of $z$, and chain-ladder features made them worse.
-- **Optional, for the "has the peak passed?" part only:** `rec_consist` (share of weeks since the record in which the series fell) and `rec_rate` (average weekly log decline since the record), possibly with `n_rec4`. The gain is small (log loss −0.002 overall) and should be confirmed in the real pipeline before adopting.
+- **Optional, for the "has the peak passed?" part only:** `rec_consist` (share of weeks since the record in which the series fell) and `rec_rate` (average weekly log decline since the record), possibly with `n_rec4`. The gain is small (log loss `r f2(dl(RC, "all", rel11), 3)` overall) and should be confirmed in the real pipeline before adopting.
 - The reflection formulas are correct for continuous-time random walks. For weekly data they need the continuity correction $D + 0.5826\,\sigma$.
 - **Future work:** a "short-term forecast relative to $M_t$" feature. The idea is to use the existing weekly forecasting models' 1–4-week-ahead predictions relative to the running maximum as an input. This needs out-of-sample weekly forecasts for every training season and truncation week, so it was not tested here.
 
+# Regional and neighbour synchrony {#sec-regional}
+
+The companion document (`peak-timing-size-eda.qmd`, section 2.4) found that peak timing is spatially clustered: neighbouring states peak at similar times (Moran's I 0.56 with 5-nearest-neighbour weights), and each season has its own geographic pattern that explains more than a fixed "this state is early" effect. That suggests a real-time signal the models do not yet use directly: **what have this state's neighbours already done this season?** The synchrony features of @sec-predictors look at *all* locations of a source; the features here look only at nearby ones.
+
+## Features
+
+For each **state** series (ILINet states; FluSurv-NET sites, among the other FluSurv-NET sites), using only data through week $t$ of the same source and season, and only the other state series observed at week $t$:
+
+- `nbr5_frac_past2`: share of the **5 nearest states** (by distance between state centres) whose record was set 2 or more weeks ago (0 before week 10); `nbr5_med_rel_max`, `nbr5_med_wsm`, `nbr5_med_g3`: the neighbours' median `rel_max`, `wks_since_max` and 3-week log growth. For FluSurv-NET the "5 nearest" are the 5 nearest other sites, which can be far away.
+- `hhs_frac_past2`, `hhs_med_rel_max`: the same over the other states of the state's **HHS region** (missing when no other state of the region is in the data, as for many FluSurv-NET sites).
+- `wave_lead`: "does my neighbourhood lead or lag the country?" = the share of other states past their record weighted by inverse squared distance, minus the unweighted share over all other states. Positive = the states near me have peaked more than the country as a whole.
+- `lat`, `lon`: the state's centre (static), as a check on the south-to-north delay.
+
+National and HHS-region series get missing values (LightGBM handles them). The perturbation tests of @sec-predictors include all of these features (every change exactly `r max_leak`).
+
+```{r regional-data}
+G12 <- grp_list("section 12")
+cvr <- read_parquet("eda/cv_regional.parquet")
+order12 <- c("SB", paste("SB +", names(G12)), "SB + all regional")
+rel12 <- cv_rel(cvr, "SB")
+ili_st <- cvr |> filter(source == "ilinet", agg_level == "state")
+rel12s <- cv_rel(ili_st, "SB")
+rb <- function(s, fam, metric, what = "boot_win") boot_get(boot, fam, s, "SB", metric, what)
+st_rows <- pr |> filter(agg_level == "state")
+```
+
+## Do neighbours tell us whether a state has peaked?
+
+```{r fig-nbr}
+#| fig-height: 4
+#| fig-cap: "**ILINet states: share already peaked (eventual $z = 0$) against what the neighbours have done, at matched season weeks.** Left: by the share of the 5 nearest states whose record was set 2+ weeks ago. Right: by the same share over all states (the synchrony feature `sync_frac_past2`, binned). Lines: week bins; point size: number of rows."
+nb <- st_rows |> filter(source == "ilinet", season_week >= 18, season_week <= 29) |>
+  mutate(weeks = cut(season_week, c(17, 21, 25, 29), labels = c("weeks 18–21", "weeks 22–25", "weeks 26–29")))
+p_n <- nb |> filter(!is.na(nbr5_frac_past2)) |> mutate(x = round(nbr5_frac_past2 * 5) / 5) |>
+  group_by(weeks, x) |> summarise(p0 = mean(at_zero), n = n(), .groups = "drop") |> filter(n >= 15)
+p_a <- nb |> mutate(x = pmin(floor(sync_frac_past2 * 5) / 5 + 0.1, 0.9)) |>
+  group_by(weeks, x) |> summarise(p0 = mean(at_zero), n = n(), .groups = "drop") |> filter(n >= 15)
+shades3 <- c("#6baed6", "#2171b5", "#08306b")
+pl <- function(d, xl, title) ggplot(d, aes(x, p0, color = weeks)) + geom_line(linewidth = 0.8) + geom_point(aes(size = n)) +
+  scale_color_manual(values = shades3) + scale_size_area(max_size = 4, guide = "none") +
+  scale_x_continuous(xl, labels = percent_format(1), limits = c(0, 1)) +
+  scale_y_continuous("share already peaked", labels = percent_format(1), limits = c(0, 1)) + labs(title = title)
+(pl(p_n, "share of the 5 nearest states past their record", "Neighbours") |
+    pl(p_a, "share of all states past their record (binned)", "Whole country")) + plot_layout(guides = "collect")
+x2225 <- nb |> filter(weeks == "weeks 22–25")
+rho_n <- cor(x2225$nbr5_frac_past2, x2225$pos, method = "spearman", use = "complete.obs")
+rho_a <- cor(x2225$sync_frac_past2, x2225$pos, method = "spearman", use = "complete.obs")
+pn <- function(w, v) p_n$p0[p_n$weeks == w & abs(p_n$x - v) < 1e-9]
+```
+
+In weeks 22–25, a state whose 5 nearest neighbours have all passed their record has already peaked `r pct(pn("weeks 22–25", 1))` of the time, versus `r pct(pn("weeks 22–25", 0))` when none of them has. The within-bin rank correlation with "peak still ahead" is `r f2(-rho_n)` for the neighbour share and `r f2(-rho_a)` for the country-wide share (sign flipped so that larger = more informative about having peaked); that is, on their own the 5 nearest states are `r ifelse(abs(abs(rho_n) - abs(rho_a)) < 0.03, "about as informative as", ifelse(abs(rho_n) > abs(rho_a), "somewhat more informative than", "less informative than"))` the country as a whole, before accounting for everything else the model already knows.
+
+## Cross-validation
+
+Same leave-one-season-out design as @sec-predictors (22 folds, even weeks), with SB (base + synchrony + burden) as the reference. These fits were run with a single LightGBM thread and a single worker (`r pnums$runtime_regional_cv_s` s for the new feature sets).
+
+```{r fig-regcv}
+#| fig-height: 4.5
+#| fig-cap: "**Regional features added to SB.** Left: pinball loss ratio for $z$; right: change in log loss for $z > 0$; all held-out rows."
+cv_dotplot(rel12, order12, "SB")
+```
+
+```{r tbl-regpin}
+#| tbl-cap: "Pinball loss relative to SB by week bin: all held-out rows (top) and ILINet state rows only (bottom)."
+bind_rows(cv_table(rel12, rel_pinball, order12) |> mutate(rows = "all rows"),
+          cv_table(rel12s, rel_pinball, order12) |> mutate(rows = "ILINet states")) |>
+  relocate(rows) |> kable()
+```
+
+```{r tbl-regll}
+#| tbl-cap: "Change in log loss for $z > 0$ relative to SB: all held-out rows (top) and ILINet state rows only (bottom)."
+bind_rows(cv_table(rel12, d_logloss, order12, digits = 4) |> mutate(rows = "all rows"),
+          cv_table(rel12s, d_logloss, order12, digits = 4) |> mutate(rows = "ILINet states")) |>
+  relocate(rows) |> kable()
+```
+
+```{r tbl-regboot}
+#| tbl-cap: "Share of season-bootstrap resamples (weeks 12–31) in which the set beats SB, and the number of held-out seasons (of 22) in which it is better, for all rows and for ILINet state rows."
+others12 <- setdiff(order12, "SB")
+bind_rows(lapply(c("regional", "regional, ILINet states"), function(fam) tibble(
+  rows = ifelse(fam == "regional", "all rows", "ILINet states"), `feature set` = others12,
+  `pinball win` = percent(sapply(others12, rb, fam = fam, metric = "pinball"), 1),
+  `log loss win` = percent(sapply(others12, rb, fam = fam, metric = "logloss"), 1),
+  `seasons better (pinball)` = sapply(others12, rb, fam = fam, metric = "pinball", what = "seasons_better"),
+  `seasons better (log loss)` = sapply(others12, rb, fam = fam, metric = "logloss", what = "seasons_better")))) |>
+  kable()
+```
+
+```{r regional-numbers}
+N5 <- "SB + 5 nearest states"; HH <- "SB + HHS region"; WV <- "SB + wave position"; LL <- "SB + latitude/longitude"; AR <- "SB + all regional"
+rp12 <- function(s, b = "all", r = rel12) rp(s, b, r)
+dl12 <- function(s, b = "all", r = rel12) dl(s, b, r)
+pin12 <- sapply(others12, rp12)
+n_ili_seasons <- n_distinct(ili_st$season)
+```
+
+**The regional features do not improve the quantile forecasts of $z$.** Every set is slightly worse than SB overall (pinball ratios `r f2(min(pin12), 3)` to `r f2(max(pin12), 3)`), and none is better in weeks 22–26, where the neighbours' progress should matter most (`r f2(min(sapply(others12, rp12, b = "22–26")), 3)` to `r f2(max(sapply(others12, rp12, b = "22–26")), 3)`). The same holds for ILINet state rows alone (`r f2(min(sapply(others12, rp12, r = rel12s)), 3)` to `r f2(max(sapply(others12, rp12, r = rel12s)), 3)`). The 5-nearest-neighbour features beat SB in only `r pct(rb(N5, "regional", "pinball"))` of season-bootstrap resamples.
+
+For **"has this state peaked?"** there is a small, fairly consistent gain from the full regional set: log loss changes by `r f2(dl12(AR), 4)` overall and `r f2(dl12(AR, r = rel12s), 4)` on ILINet state rows (`r f2(dl12(AR, "27–31", rel12s), 4)` in weeks 27–31), better than SB in `r pct(rb(AR, "regional", "logloss"))` (all rows) and `r pct(rb(AR, "regional, ILINet states", "logloss"))` (ILINet states) of season-bootstrap resamples and in `r rb(AR, "regional, ILINet states", "logloss", "seasons_better")` of `r n_ili_seasons` ILINet seasons. Most of it comes from latitude/longitude (`r f2(dl12(LL, r = rel12s), 4)` on ILINet state rows), not from the neighbours' progress (`r f2(dl12(N5, r = rel12s), 4)` for the 5 nearest states, `r f2(dl12(HH, r = rel12s), 4)` for the HHS region, `r f2(dl12(WV, r = rel12s), 4)` for the wave position). That is about `r pct(-dl12(AR, r = rel12s) / rel12s$logloss[rel12s$set == "SB" & rel12s$bin == "all"], 1)` of SB's log loss on ILINet state rows (`r f2(rel12s$logloss[rel12s$set == "SB" & rel12s$bin == "all"], 3)`), and it comes with a `r pct(rp12(AR) - 1, 0.1)` pinball penalty.
+
+Why so little, given the clear spatial clustering in the descriptive figure? The country-wide synchrony features in SB already capture most of "where is the season": once the model knows how far the country as a whole has progressed, the extra information in the nearest few states (a small, noisy sample of 5) is mostly redundant, and its geography-specific part is exactly the season-specific, non-repeating pattern found in the companion document, which is hard to learn from 11–22 training seasons.
+
+**Recommendation.** Do not add the regional features to the size model. If the "has it peaked?" probability is modelled separately, latitude and longitude (or an equivalent smooth location effect) are worth a re-test in the real pipeline, together with the recession features of @sec-literature; the neighbour-based features are not.
+
+# Influenza type and subtype {#sec-types}
+
+The companion document (`peak-timing-size-eda.qmd`, section 6) found that state-level series with a high share of influenza B positives are more often double-humped, that roughly 4 in 10 double-humped series have their later hump at the B peak, and that H3N2-dominant seasons have larger hospitalization peaks. Here we test whether real-time type and subtype information improves the forecasts.
+
+**Data.** Weekly WHO/NREVSS laboratory positives by type and subtype, from the iddata copy of the CDC FluView files (`who-nrevss.csv`: A, B, A H1, A H3 by nation, HHS region and state, the latter from 2010/11). These are **final** values, not the values as first published; clinical-lab A/B counts are published weekly with the same lag as ILINet (and Delphi keeps vintages from October 2018, not used here), but public health lab **subtyping is reported with a longer and more variable lag** in reality, so the H3 features below are somewhat optimistic about what is known at week $t$.
+
+## Features
+
+All use only weeks up to $t$ of the same season. **Type (B) features** use the row's own geography (the state for ILINet state rows and for FluSurv-NET sites; the HHS region for region rows; the nation for national rows). Shares are computed only when the window has at least 20 positives (otherwise missing).
+
+- `b_share_3wk` = B / (A + B) over weeks $t-2$ to $t$; `b_share_cum` = the same over weeks 5 to $t$; `b_share_trend` = `b_share_3wk` minus the same share over weeks $t-5$ to $t-3$.
+- `b_rising` = log((B positives in weeks $t-2..t$ + 1) / (B positives in weeks $t-5..t-3$ + 1)); `a_rising` the same for A; `b_minus_a_growth` = `b_rising` − `a_rising` (is B growing faster than A?).
+- `b_frac_of_peak` = B positives in the last 3 weeks divided by the largest 3-week B total so far this season (1 = B is at or setting a new high).
+
+**Subtype (H3) features** use the row's HHS region (the nation for national rows), because weekly state subtype data stop after 2014/15: `h3_share_cum` = H3 / (H1 + H3) among subtyped A positives in weeks 5 to $t$ (at least 20 subtyped), `h3_share_3wk` the same over the last 3 weeks, and `h3_share_nat` the national cumulative share.
+
+A perturbation test (all type and subtype counts after week $t$ replaced by 100× + 5, for $t$ = 14, 22, 30) leaves all of these features unchanged (maximum change `r max(unlist(pnums$leakage_check_max_abs_change[grepl("type", names(pnums$leakage_check_max_abs_change))]))`).
+
+```{r types-data}
+G13 <- grp_list("section 13")
+cvt <- read_parquet("eda/cv_types.parquet")
+order13 <- c("SB", "SB + B share / B rising", "SB + H3 share", "SB + both")
+rel13 <- cv_rel(cvt, "SB")
+rel13s <- cv_rel(cvt |> filter(source == "ilinet", agg_level == "state"), "SB")
+rel13f <- cv_rel(cvt |> filter(source == "flusurvnet"), "SB")
+tb <- function(s, fam, metric, what = "boot_win") boot_get(boot, fam, s, "SB", metric, what)
+imp_t <- imp |> filter(`feature set` == "SB + types")
+```
+
+## Does the B signal tell us whether the peak is still ahead?
+
+```{r fig-types-desc}
+#| fig-height: 4
+#| fig-cap: "**ILINet state rows at season weeks 25–31: share with the peak still ahead (eventual $z > 0$) by the state's recent B share (left) and by `b_minus_a_growth` (right: B growing faster than A over the last 3 weeks vs the 3 before).** Bins are quintiles; point size = rows."
+tw <- pr |> filter(source == "ilinet", agg_level == "state", season_week >= 25, season_week <= 31)
+qb <- function(df, v, lab) df |> filter(!is.na(.data[[v]])) |> mutate(bin = ntile(.data[[v]], 5)) |>
+  group_by(bin) |> summarise(x = median(.data[[v]]), p = mean(pos), n = n()) |> mutate(feature = lab)
+bind_rows(qb(tw, "b_share_3wk", "B share of positives, last 3 weeks"),
+          qb(tw, "b_minus_a_growth", "b_minus_a_growth (log ratio)")) |>
+  ggplot(aes(x, p)) + geom_line(color = BLUE) + geom_point(aes(size = n), color = BLUE) +
+  facet_wrap(~feature, scales = "free_x") + scale_size_area(max_size = 4, guide = "none") +
+  scale_y_continuous("share with peak still ahead", labels = percent_format(1), limits = c(0, 1)) + labs(x = NULL)
+td <- bind_rows(qb(tw, "b_share_3wk", "b"), qb(tw, "b_minus_a_growth", "g"))
+```
+
+In weeks 25–31, the share of ILINet states whose peak is still ahead goes from `r pct(td$p[td$feature == "b" & td$bin == 1])` in the lowest quintile of recent B share to `r pct(td$p[td$feature == "b" & td$bin == 5])` in the highest, and from `r pct(td$p[td$feature == "g" & td$bin == 1])` to `r pct(td$p[td$feature == "g" & td$bin == 5])` across quintiles of `b_minus_a_growth`. So, perhaps surprisingly, a high or rising B share at this point more often means the season has *already* peaked: B rising faster than A usually means A is falling, and A dominates the target. A late B wave that overtakes the A peak is the exception, not the rule. Much of this signal overlaps with what the curve itself shows (when A is falling, the target is usually falling too), which is why the cross-validation below is the real test.
+
+## Cross-validation
+
+Same leave-one-season-out design as before (22 folds, even weeks), comparison set SB, run single-threaded (`r pnums$runtime_types_cv_s` s).
+
+```{r fig-typescv}
+#| fig-height: 3.8
+#| fig-cap: "**Type and subtype features added to SB** (all held-out rows). Left: pinball loss ratio; right: change in log loss for $z > 0$."
+cv_dotplot(rel13, order13, "SB")
+```
+
+```{r tbl-typespin}
+#| tbl-cap: "Pinball loss relative to SB by week bin: all rows, ILINet state rows and FluSurv-NET rows."
+bind_rows(cv_table(rel13, rel_pinball, order13) |> mutate(rows = "all rows"),
+          cv_table(rel13s, rel_pinball, order13) |> mutate(rows = "ILINet states"),
+          cv_table(rel13f, rel_pinball, order13) |> mutate(rows = "FluSurv-NET")) |>
+  filter(`feature set` != "SB") |> relocate(rows) |> kable()
+```
+
+```{r tbl-typesll}
+#| tbl-cap: "Change in log loss for $z > 0$ relative to SB by week bin: all rows, ILINet state rows and FluSurv-NET rows."
+bind_rows(cv_table(rel13, d_logloss, order13, 4) |> mutate(rows = "all rows"),
+          cv_table(rel13s, d_logloss, order13, 4) |> mutate(rows = "ILINet states"),
+          cv_table(rel13f, d_logloss, order13, 4) |> mutate(rows = "FluSurv-NET")) |>
+  filter(`feature set` != "SB") |> relocate(rows) |> kable()
+```
+
+```{r tbl-typesboot}
+#| tbl-cap: "Share of season-bootstrap resamples (weeks 12–31) in which the set beats SB, and the number of held-out seasons in which it is better."
+others13 <- setdiff(order13, "SB")
+fams13 <- c("types" = "all rows", "types, ILINet states" = "ILINet states", "types, FluSurv-NET" = "FluSurv-NET")
+bind_rows(lapply(names(fams13), function(fam) tibble(
+  rows = fams13[[fam]], `feature set` = others13,
+  `pinball win` = percent(sapply(others13, tb, fam = fam, metric = "pinball"), 1),
+  `log loss win` = percent(sapply(others13, tb, fam = fam, metric = "logloss"), 1),
+  `seasons better (pinball)` = sapply(others13, tb, fam = fam, metric = "pinball", what = "seasons_better"),
+  `seasons better (log loss)` = sapply(others13, tb, fam = fam, metric = "logloss", what = "seasons_better")))) |>
+  kable()
+```
+
+```{r fig-types-imp}
+#| fig-height: 4
+#| fig-width: 8
+#| fig-cap: "**LightGBM gain importance of the type and subtype features** in SB + both (share of total gain; left: median quantile model for $z$; right: classifier for $z > 0$)."
+imp_t |> filter(feature %in% unlist(G13)) |>
+  mutate(feature = factor(feature, levels = rev(unlist(G13)))) |>
+  ggplot(aes(gain_share, feature)) + geom_col(fill = BLUE, width = 0.7) +
+  facet_wrap(~model) + scale_x_continuous("share of total gain", labels = percent_format(0.1)) + labs(y = NULL) +
+  theme(panel.grid.major.y = element_blank())
+imp_share <- function(model_name, feats = unlist(G13)) sum(imp_t$gain_share[imp_t$model == model_name & imp_t$feature %in% feats])
+```
+
+```{r types-numbers}
+BB <- "SB + B share / B rising"; HH3 <- "SB + H3 share"; BH <- "SB + both"
+g13 <- function(s, b = "all", r = rel13) rp(s, b, r)
+d13 <- function(s, b = "all", r = rel13) dl(s, b, r)
+sb_ll <- function(b, r = rel13) r$logloss[r$set == "SB" & r$bin == b]
+```
+
+**B share / B rising helps the "has it peaked?" question.** Adding the seven B features lowers the $z > 0$ log loss by `r f2(-d13(BB), 4)` overall (`r pct(-d13(BB) / sb_ll("all"))` of SB's log loss), with the gain concentrated in weeks 17–21 (`r f2(d13(BB, "17–21"), 4)`, `r pct(-d13(BB, "17–21") / sb_ll("17–21"))` of SB's loss there) and 22–26 (`r f2(d13(BB, "22–26"), 4)`, `r pct(-d13(BB, "22–26") / sb_ll("22–26"))`); in weeks 27–31 it is small (`r f2(d13(BB, "27–31"), 4)`). It holds for ILINet state rows (`r f2(d13(BB, r = rel13s), 4)` overall) and FluSurv-NET rows (`r f2(d13(BB, r = rel13f), 4)`), beats SB in `r pct(tb(BB, "types", "logloss"))` of season-bootstrap resamples (`r pct(tb(BB, "types, ILINet states", "logloss"))` for ILINet states, `r pct(tb(BB, "types, FluSurv-NET", "logloss"))` for FluSurv-NET) and in `r tb(BB, "types", "logloss", "seasons_better")` of `r n_seasons_cv` held-out seasons. This is the largest and most consistent log-loss gain of any feature group in this document. For the size quantiles the B features are neutral overall (pinball ratio `r f2(g13(BB), 3)`; better in weeks 12–21, `r f2(g13(BB, "12–16"), 3)`–`r f2(g13(BB, "17–21"), 3)`, but worse in 27–31, `r f2(g13(BB, "27–31"), 3)`). The most-used B features are `b_share_cum` and `a_rising` (whether influenza A is still growing), followed by `b_share_trend` and `b_share_3wk`; together the B features take `r pct(imp_share("z > 0 classifier", G13[["B"]]), 0.1)` of the classifier's gain.
+
+**The H3 share does not help, even for size.** Adding the subtype features makes the size quantiles worse (pinball ratio `r f2(g13(HH3), 3)` overall, `r f2(g13(HH3, r = rel13f), 3)` on FluSurv-NET rows, where the season-level association with hospitalization peak size was strongest) and slightly worsens the log loss (`r f2(d13(HH3), 4)`). With only 22 seasons, a season-level quantity like the regional H3 share mostly lets the trees memorize seasons, and the location's `hist_rel` and the synchrony features already reflect how big the season is turning out to be. Combining both groups (SB + both) is worse than B alone on both scores.
+
+**Recommendation.** Consider adding the B-share features to the model for the peak-passed probability (and, if the size and timing models are separate, to the timing/peak-passed part only): `b_share_cum`, `b_share_3wk`, `b_share_trend` and `a_rising` carry most of the signal. Before adopting, (1) rebuild them from **as-published** clinical-lab counts (Delphi `fluview_clinical` vintages, from October 2018) to check that revisions do not erase the gain, and (2) confirm in the real `peak_gbqr` pipeline and on NHSN. Do not add the H3 subtype features. Exact definitions (weeks $\le t$ of the same season; own geography; shares need at least 20 A + B positives in the window, otherwise missing):
+
+- `b_share_3wk` $= B_{t-2..t} / (A_{t-2..t} + B_{t-2..t})$; `b_share_cum` $= B_{5..t} / (A_{5..t} + B_{5..t})$; `b_share_trend` $=$ `b_share_3wk` $- B_{t-5..t-3} / (A_{t-5..t-3} + B_{t-5..t-3})$;
+- `a_rising` $= \log\big((A_{t-2..t} + 1) / (A_{t-5..t-3} + 1)\big)$, `b_rising` the same for B, `b_minus_a_growth` = `b_rising` − `a_rising`; `b_frac_of_peak` $= B_{t-2..t} / \max_{s \le t} B_{s-2..s}$;
+
+where $X_{a..b}$ is the sum of weekly positives of type $X$ over season weeks $a$ to $b$ (missing weeks ignored; missing if all are missing).
+
 # Implications for modelling
 
-- **The target has an atom at 0 that dominates after the new year.** Pooled, 8% of rows have eventual $z = 0$ at week 20, 38% at week 25 and 78% at week 30. Models need a probability of "already peaked" plus a continuous part; quantile regression handles this, Gaussian or log-scale likelihoods do not.
-- **The scale of $z$ shrinks with $t$ and with stage.** The median eventual $z$ falls from 5.3 at week 10 to 3.6 at week 15, 2.0 at week 20 and 0.3 at week 25, and the spread shrinks with it. Week-dependent predictive distributions are required.
-- **The strongest real-time predictor is the level relative to the location's history** (`hist_rel`, within-week Spearman correlation with the eventual $z$ of −0.85 to −0.91 in weeks 12–26; removing it makes forecasts 63% worse). What remains is the season's "size surprise" (SD 0.71 on the log scale), which no real-time feature we tried predicts well.
-- **Adding synchrony and burden-to-date features gives a modest, consistent gain** (2.5% lower pinball loss overall, 7% in weeks 22–26); Taylor, onset and timing-vs-history features do not help.
-- **$z$ and $k$ are strongly linked** (Spearman 0.75–0.79; median $z$ ≈ 0.2, 1.1 and 4.6 at 1, 4 and 16 weeks before the peak). Modelling size given timing, or jointly, should be sharper than independent marginal models.
-- **Pooling across sources is reasonable on the $z$ scale** (ILINet and FluSurv-NET $z$ for the same location, season and week have Spearman correlation 0.95), but not on the absolute scale.
+- **The target has an atom at 0 that dominates after the new year.** Pooled, `r pct(pw(20, "p0"))` of rows have eventual $z = 0$ at week 20, `r pct(pw(25, "p0"))` at week 25 and `r pct(pw(30, "p0"))` at week 30. Models need a probability of "already peaked" plus a continuous part; quantile regression handles this, Gaussian or log-scale likelihoods do not.
+- **The scale of $z$ shrinks with $t$ and with stage.** The median eventual $z$ falls from `r f2(pw(10), 1)` at week 10 to `r f2(pw(15), 1)` at week 15, `r f2(pw(20), 1)` at week 20 and `r f2(pw(25), 1)` at week 25, and the spread shrinks with it. Week-dependent predictive distributions are required.
+- **The strongest real-time predictor is the level relative to the location's history** (`hist_rel`, within-week Spearman correlation with the eventual $z$ of `r f2(rng("hist_rel")[2])` to `r f2(rng("hist_rel")[1])` in weeks 12–26; removing it makes forecasts `r pct(rp("current − hist_rel") - 1)` worse). What remains is the season's "size surprise" (SD `r f2(anom_sd)` on the log scale), which no real-time feature we tried predicts well.
+- **SB (base + synchrony + burden) gives a modest, consistent gain for size** (`r pct(gain(SBs), 0.1)` lower pinball loss than base overall, `r pct(gain(SBs, "22–26"))` in weeks 22–26). It is available in the models as `sync_burden_features`. Taylor/trend, onset and timing-vs-history features do not help.
+- **$z$ and $k$ are strongly linked** (Spearman `r f2(min(rho_kz$rho))`–`r f2(max(rho_kz$rho))`; median $z$ ≈ `r f2(km(1), 1)`, `r f2(km(4), 1)` and `r f2(km(16), 1)` at 1, 4 and 16 weeks before the peak). Modelling size given timing, or jointly, should be sharper than independent marginal models.
+- **Pooling across sources is reasonable on the $z$ scale** (ILINet and FluSurv-NET $z$ for the same location, season and week have Spearman correlation `r f2(cor(wide$ilinet, wide$flusurvnet, method = "spearman"))`), but not on the absolute scale.
 - **Early-season $z$ is partly an artefact of $\varepsilon$.** Up to about week 12 many rows have $M_t \approx 0$, and the upper tail of $z$ moves by 2+ units when $\varepsilon$ changes tenfold.
-- **Holiday weeks: a real bump, a small ILINet-specific artefact, no forecast gain.** Holiday weeks run about 0.4 log units above the surrounding weeks in ILINet *and* FluSurv-NET. ILINet leads in the first holiday week (+0.28 vs FluSurv-NET) and dips in early January (−0.25), and its holiday-set maxima are exceeded more often (ILINet states, 2 weeks after the max: 47% final vs 64% for other maxima; FluSurv-NET 63% vs 61%). But holiday features and adjusting the ILINet series did not improve cross-validated forecasts.
-- **Ideas from other fields did not beat synchrony + burden** (reflection principle, chain ladder, Bornhuetter–Ferguson, deceleration, recession, records, Bass, cross-source: pinball ratios 1.001–1.050 vs SB). Recession and record-count features gave a small gain for the peak-passed probability (log loss −0.002).
-- **Season effects are large and shared across locations** (median peak week 18–33 across ILINet seasons), motivating a season random effect and season-blocked validation.
+- **Holiday weeks: a real bump, a small ILINet-specific artefact, no forecast gain.** Holiday weeks run about `r f2(ciq("ILINet states")$mean, 1)` log units above the surrounding weeks in ILINet *and* FluSurv-NET. ILINet leads in the first holiday week (`r sprintf("%+.2f", pdk("1st holiday\nweek")$mean)` vs FluSurv-NET) and dips in early January (`r sprintf("%+.2f", pdk("3rd")$mean)`), and its holiday-set maxima are exceeded more often (ILINet states, 2 weeks after the max: `r hmv("ILINet states", 2, TRUE)` final vs `r hmv("ILINet states", 2, FALSE)` for other maxima; FluSurv-NET `r hmv("FluSurv-NET", 2, TRUE)` vs `r hmv("FluSurv-NET", 2, FALSE)`). But holiday features and adjusting the ILINet series did not improve cross-validated forecasts.
+- **Ideas from other fields did not beat synchrony + burden** (reflection principle, chain ladder, Bornhuetter–Ferguson, deceleration, recession, records, Bass, cross-source: pinball ratios `r f2(min(pin_all), 3)`–`r f2(max(pin_all), 3)` vs SB). Recession and record-count features gave a small gain for the peak-passed probability (log loss `r f2(dl(RC, "all", rel11), 3)`).
+- **Neighbours add little beyond country-wide synchrony.** Features describing the 5 nearest states, the HHS region, the "wave position" and latitude/longitude did not improve quantile forecasts of $z$ (pinball ratios `r f2(min(pin12), 3)`–`r f2(max(pin12), 3)` vs SB); together they gave a small gain for the peak-passed probability on ILINet states (log loss `r f2(dl12(AR, r = rel12s), 4)`), mostly from latitude/longitude.
+- **Influenza B share helps the "has it peaked?" question.** Recent and cumulative B share, its trend, and whether A is still rising lowered the $z > 0$ log loss by `r f2(-d13(BB), 4)` (`r pct(-d13(BB) / sb_ll("all"))` of SB; `r pct(tb(BB, "types", "logloss"))` bootstrap win), mostly in weeks 17–26, the most consistent log-loss gain found; the H3 subtype share did not help, even for size. These used final lab data and need re-checking with as-published counts.
+- **Season effects are large and shared across locations** (median peak week `r min(spk$pk)`–`r max(spk$pk)` across ILINet seasons), motivating a season random effect and season-blocked validation.
+- **What has and has not gone into the models.**
+  - Only SB is implemented: an option in idmodels 8c56bf0, off by default.
+  - The B-share, latitude/longitude and recession/records groups are candidates for the already-peaked probability. They are now available in `peak_gbqr` (`size_feature_groups`, `timing_feature_groups`) and are being tested there (runs `gbqr__R1`–`gbqr__R10`, methods document section "GBQR feature-set runs").
+  - These, and the choice between the carried-forward and reported-at-t synchrony definitions, are listed as future work in the methods document (*Open questions and future work*), with the development model results (*Development results*).

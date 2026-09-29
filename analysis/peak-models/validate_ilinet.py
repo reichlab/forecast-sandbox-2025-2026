@@ -52,7 +52,7 @@ ILINET_REVISION_OFFSET = 0.01
 ILINET_FALLBACK_SD = 0.25
 
 MODEL_CLASSES = {"baseline": "PeakBaselineModel", "gbqr": "PeakGBQRModel", "gbqr_offset": "PeakGBQRModel",
-                 "kcde": "PeakKCDEModel", "hier": "PeakHierModel"}
+                 "kcde": "PeakKCDEModel", "hier": "PeakHierModel", "hybrid": "PeakHybridModel"}
 
 
 def load_model(name: str):
@@ -92,11 +92,43 @@ VARIANTS: dict[str, dict] = {
     "hier__w05c12": dict(likelihood_weight=0.05, current_update_components=[1, 2]),  # + no censored update of comp 0
     "hier__w05c12sb": dict(likelihood_weight=0.05, current_update_components=[1, 2], sync_burden_features=True),
     "hier__w02c12": dict(likelihood_weight=0.02, current_update_components=[1, 2]),
+    # GBQR feature-set runs (reported-at-t synchrony; separate size / timing feature groups)
+    "gbqr__R1": dict(sync_reported_only=True, size_feature_groups=["base", "sb"], timing_feature_groups=["base", "sb"]),
+    "gbqr__R2": dict(sync_reported_only=True, size_offset=True, size_feature_groups=["base", "sb"],
+                     timing_feature_groups=["base", "bshare"]),
+    "gbqr__R3": dict(sync_reported_only=True, size_feature_groups=["base", "sb", "bshare"],
+                     timing_feature_groups=["base", "latlon"]),
+    "gbqr__R4": dict(sync_reported_only=True, size_feature_groups=["base", "sb", "trend"],
+                     timing_feature_groups=["base", "recession"]),
+    "gbqr__R5": dict(sync_reported_only=True, size_feature_groups=["base", "sb", "h3"],
+                     timing_feature_groups=["base", "holiday"]),
+    "gbqr__R6": dict(sync_reported_only=True, size_feature_groups=["base", "sb", "recession"],
+                     timing_feature_groups=["base", "bshare", "latlon", "recession", "holiday"]),
+    "gbqr__R7": dict(sync_reported_only=True, size_feature_groups=["base", "sb", "latlon"],
+                     timing_feature_groups=["base", "sb", "bshare"]),
+    "gbqr__R8": dict(sync_reported_only=True, size_offset=True, size_feature_groups=["base", "sb", "bshare"],
+                     timing_feature_groups=["base", "sb", "latlon", "recession"]),
+    "gbqr__R9": dict(sync_reported_only=True, size_feature_groups=["base", "sb", "trend", "bshare"],
+                     timing_feature_groups=["base", "sb", "bshare", "latlon", "recession"]),
+    "gbqr__R10": dict(sync_reported_only=True, size_offset=True, size_feature_groups=["base"],
+                      timing_feature_groups=["base", "sb", "bshare", "latlon", "recession", "holiday"]),
+    "hybrid__w02": dict(likelihood_weight=0.02),
+    "hybrid__feat": dict(hybrid_keep_features=True),  # also keep the hierarchical model's own feature terms
+    "hybrid__cu01": dict(current_update_weight=0.01),  # weaker censored current-season update
+    "hybrid__cu003": dict(current_update_weight=0.003),
     "hier__w05d": dict(likelihood_weight=0.05, wsm_dummies=True),  # + indicators for weeks since max 0..3
     "hier__w05dtv": dict(likelihood_weight=0.05, wsm_dummies=True, time_varying_coefs=True),
     "hier__smoke": dict(num_warmup=30, num_samples=30, num_chains=1, origin_stride=3, num_posterior_draws=30,
                         progress_bar=True),
 }
+
+
+def load_strain() -> dict:
+    """Final weekly A, B, A(H1), A(H3) positives by (geography, season) (WHO/NREVSS via the iddata S3 file; cached
+    under eda/strain/ by the exploratory analysis)."""
+    from relative_size_predictors import load_strain as _load
+
+    return _load()
 
 
 def load_data() -> pd.DataFrame:
@@ -172,11 +204,12 @@ def run_model(name: str, data: pd.DataFrame, seasons: list[str], realtime: bool 
         import epidata_ilinet as E
 
         table = E.lag_table()
+    strain = load_strain()
     for season in seasons:
         out_path = OUT / "forecasts" / f"{label}_{season.replace('/', '-')}.parquet"
         t0 = time.time()
         # no NHSN rows exist in `data`; fit() further restricts training to seasons before `season`
-        model.fit(data, season, Q_LEVELS)
+        model.fit(data, season, Q_LEVELS, strain=strain)
         print(f"{name} {season}: fit {time.time() - t0:.0f}s", flush=True)
         if hasattr(model, "mcmc_stats_"):
             print(f"{name} {season}: MCMC {json.dumps(model.mcmc_stats_)}", flush=True)
@@ -201,8 +234,15 @@ def run_model(name: str, data: pd.DataFrame, seasons: list[str], realtime: bool 
 
                 rev = RevisionModel(max_lag=E.MAX_LAG, strata_bounds=(), offset=ILINET_REVISION_OFFSET,
                                     fallback_sd=ILINET_FALLBACK_SD).fit(E.revision_vintages(table, ref_date))
+            cur_strain = strain
+            if realtime:
+                ili = data.loc[(data["source"] == TARGET_SOURCE) & (data["season"] == season)]
+                week_map = ili[["wk_end_date", "season_week"]].drop_duplicates().assign(
+                    wk_end_date=lambda d: pd.to_datetime(d["wk_end_date"]))
+                cur_strain = E.strain_as_of(table, ref_date, season, week_map, strain)
             pmf, q = model.predict_series(reported[ok], locs, TARGET_SOURCE, nat_loc="US" if "US" in locs else None,
-                                          revision_model=rev, rng=np.random.default_rng(r_sw))
+                                          revision_model=rev, rng=np.random.default_rng(r_sw), season=season,
+                                          strain=cur_strain)
             pmf_df = pd.DataFrame(pmf, columns=week_dates).assign(location=locs).melt(
                 id_vars="location", var_name="output_type_id", value_name="value").assign(output_type="pmf")
             q_df = pd.DataFrame(q, columns=[str(x) for x in Q_LEVELS]).assign(location=locs).melt(

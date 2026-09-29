@@ -8,7 +8,9 @@ docs/
 # peak model analysis outputs (regenerate with the scripts in analysis/peak-models/)
 analysis/peak-models/*.csv
 analysis/peak-models/*.html
+analysis/peak-models/*.pdf
 analysis/peak-models/*_files/
+analysis/peak-models/*_cache/
 analysis/peak-models/viz/*.json
 analysis/peak-models/ilinet-validation/
 **/__pycache__/

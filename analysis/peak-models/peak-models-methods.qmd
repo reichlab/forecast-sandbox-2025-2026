@@ -17,8 +17,56 @@ format:
 ---
 
 ::: {.callout-important title="Status of this document"}
-This methods document describes the direct peak models as they are implemented in `idmodels` (module `idmodels.peak`: `series.py`, `revision.py`, `base.py`, `baseline.py`, `gbqr.py`, `kcde.py`, `hier.py`; configuration classes `PeakModelConfig`, `PeakBaselineModelConfig`, `PeakGBQRModelConfig`, `PeakKCDEModelConfig` and `PeakHierModelConfig` in `idmodels/config.py`) and in the sandbox scripts `src/peak_*` and `analysis/peak-models/*.py`. Every specific setting is stated in a callout titled *Implementation*, with the name of the configuration field that controls it where one exists. Four models are implemented: the conditional-climatology baseline (`peak_baseline`), gradient-boosted direct models (`peak_gbqr`), kernel conditional density estimation (`peak_kcde`), and a Bayesian hierarchical model (`peak_hier`, not yet evaluated). The ensembles are **planned but not yet implemented**; their section is labelled as such. Design choices that were considered but not implemented appear in remarks titled *Alternatives considered*. The document contains **no results**.
+This methods document describes the direct peak models as implemented in `idmodels` (module `idmodels.peak`: `series.py`, `revision.py`, `base.py`, `baseline.py`, `gbqr.py`, `kcde.py`, `hier.py`, `hybrid.py`; configuration classes in `idmodels/config.py`) and in the sandbox scripts `src/peak_*` and `analysis/peak-models/*.py`. Every specific setting is stated in a callout titled *Implementation*, with the name of the configuration field that controls it where one exists. Design choices that were considered but not implemented appear in remarks titled *Alternatives considered*.
+
+Model and feature-set names follow the table in @sec-versions. In brief:
+
+- **Committed** in idmodels 8c56bf0: the baseline `peak_baseline`, GBQR `peak_gbqr` (optionally with feature set SB), KCDE `peak_kcde`, and the hierarchical model `peak_hier`.
+- **Uncommitted:** GBQR's separate size and timing feature groups with the candidate feature groups (`extra_features.py`) and the reported-at-t synchrony option; the GBQR-offset hybrid `peak_hybrid` and `current_update_weight`.
+- **Not yet a model directory:** the equal-weight ensembles, which have been evaluated.
+
+**Current focus: locking in a GBQR model.** Development of the hierarchical and hybrid models is paused until then. The only results so far are **development results** on two ILINet seasons (@sec-dev-results); nothing developed since the 2023/24–2025/26 NHSN hindcasts has been run on NHSN. Everything not yet done is listed in @sec-future.
 :::
+
+# Versions and names used in this document {#sec-versions}
+
+Several versions of each model and several feature sets were compared during development. So that every statement refers to something specific, this document (and the two exploratory documents, `peak-timing-size-eda.qmd` and `relative-size-eda.qmd`) uses the names below.
+
+**Feature sets** (@sec-features)
+
+| Name | Contents | How to get it |
+|---|---|---|
+| **base** | The 13 original state features: `season_week`, `rel_max`, `wks_since_max`, `g1`, `g2`, `g3`, `rm3`, `cum_rel`, `hist_rel`, `nat_rel_max`, `nat_wks_since_max`, `nat_g3`, `src_code` | Default |
+| **SB** | base plus 4 synchrony features (`sync_med_rel_max`, `sync_med_g3`, `sync_frac_past2`, `sync_frac_half`) and 2 burden features (`cum_vs_hist_total`, `cum_vs_hist_same_week`) | `sync_burden_features = True` |
+| base / SB + *group* | A feature set plus candidate groups. **Available in GBQR** (`idmodels/peak/extra_features.py`, identical to the exploratory harness on all 31,108 training rows): **trend** (local-polynomial level, slope and curvature, rolling means, lags), **recession** (recession and records: `rec_rate`, `rec_consist`, `n_rec4`, `rec_frac`), **holiday**, **latlon**, **bshare** (influenza B share: `b_share_3wk`, `b_share_cum`, `b_share_trend`, `a_rising`, `b_rising`, `b_minus_a_growth`, `b_frac_of_peak`), **h3** (H3N2 share). **Exploratory harness only** (`relative_size_predictors.py`): onset, timing-vs-history, reflection, severity-in-peaked, chain-ladder, deceleration, Bass, cross-source, and the neighbor groups `nbr5`, `hhs`, `wave` | `PeakGBQRModelConfig.size_feature_groups` and `timing_feature_groups`, e.g. `["base", "sb", "bshare"]` (uncommitted) |
+
+Two definitions of the synchrony features exist. **Carried-forward** (the default): a location counts at week $t$ if it has any value through $t$, its latest value carried forward. **Reported-at-t** (`sync_reported_only = True`, used by the exploratory harness and the `gbqr__R` runs): it counts only if week $t$ itself was reported. In as-published ILINet at least one state lacks the latest week at 98% of reference dates (median 3 of about 45), and the synchrony features then differ by a median of 0.008–0.02 and a 90th percentile of 0.03–0.12 (up to 0.45). `peak_gbqr__sb` and `hier__w05c12sb` used carried-forward.
+
+**Models and variants.** In validation outputs the `peak_` prefix is dropped and the evaluation setting is appended, for example `gbqr__sb@rtrev`.
+
+| Name | What it is | Code |
+|---|---|---|
+| `peak_baseline` | Conditional climatology (@sec-baseline) | 8c56bf0 |
+| `peak_gbqr` | GBQR with base (@sec-gbqr) | 8c56bf0 |
+| `peak_gbqr__sb` | GBQR with SB | 8c56bf0 |
+| `gbqr__R1` … `gbqr__R10` | GBQR with separate size and timing feature sets and reported-at-t synchrony (@sec-dev-gbqr-runs) | uncommitted |
+| `peak_kcde` | Kernel conditional density estimation (@sec-kcde) | 8c56bf0 |
+| `peak_hier` | Hierarchical model with the committed defaults: tempering $w_{\text{lik}} = 0.15$, current-season update on all three components (@sec-hier) | 8c56bf0 |
+| `hier__w05`, `hier__w02c12` | `peak_hier` with $w_{\text{lik}} = 0.05$; with $w_{\text{lik}} = 0.02$ and the current-season update on the hazard and size components only | 8c56bf0 (config) |
+| `hier__nocur`, `hier__tv` | `peak_hier` without the current-season update; with time-varying coefficients | 8c56bf0 (config) |
+| `hier__w05d`, `hier__w05dtv`, `hier__w05c12`, `hier__w05c12sb` | `hier__w05` plus weeks-since-max indicators; plus those and time-varying coefficients; with the update on hazard and size only; the latter with SB-derived features | 8c56bf0 (config) |
+| `peak_hybrid` (`hybrid`) | Hierarchical model with GBQR offsets, $w_{\text{lik}} = 0.05$ (@sec-hier-hybrid) | uncommitted |
+| `hybrid__w02`, `hybrid__feat` | `hybrid` with $w_{\text{lik}} = 0.02$; `hybrid` also keeping the hierarchical model's own feature terms | uncommitted |
+| `hybrid__cu01`, `hybrid__cu003` | `hybrid` with a separate censored-update weight `current_update_weight` of 0.01 and 0.003 | uncommitted |
+| `ens_gbqr_hierw05`, `ens_gbqr_hierw02`, `ens_gbqr_hierw05_base` | Equal-weight ensembles of `peak_gbqr` and `hier__w05`; of `peak_gbqr` and `hier__w02c12`; of `peak_gbqr`, `hier__w05` and `peak_baseline` (@sec-ensemble) | `ensemble_validation.py` |
+
+**Evaluation settings** for the ILINet development seasons (@sec-dev-design):
+
+- **final**: the current-season series is today's final data, truncated at the last week available at the reference date.
+- **@rt**: the series is as published by the reference date.
+- **@rtrev**: as published, plus revision simulation.
+
+The validation harness and first exploratory analyses are in sandbox commit c88a6ca; later changes are uncommitted.
 
 # The problem in plain terms {#sec-problem}
 
@@ -386,22 +434,13 @@ Features describe the series as observed through week $t$ and are scale-free (lo
 | `cum_vs_hist_total` | *(optional)* $\log(\sum_{u=5}^{t} x_u + \varepsilon) - \log(\bar H + \varepsilon)$, where $\bar H$ is the mean season total (weeks 5 to $\overline\omega$) over earlier complete seasons of the same source and location: how much of a typical season's burden has already occurred |
 | `cum_vs_hist_same_week` | *(optional)* the same with $\bar H$ replaced by the mean cumulative incidence through week $t$ in those seasons |
 
-GBQR uses all 13 features; KCDE uses a subset (@sec-kcde); the baseline uses only `season_week` and `wks_since_max`. For the current season, `hist_rel` uses the mean NHSN log peak over all training seasons of that location, which are exactly the strictly earlier ones, and the national features come from the US series of the same revision draw (@sec-backfill).
+GBQR uses base by default, SB with `sync_burden_features = True`, or any combination of feature groups, separately for size and timing (@sec-versions). KCDE uses a subset (@sec-kcde); the hierarchical model uses 12 features derived from ten of them (@sec-hier); the baseline uses only `season_week` and `wks_since_max`. For the current season, `hist_rel` uses the mean log peak of the forecast source over all training seasons of that location, which are exactly the strictly earlier ones, and the national features come from the US series of the same revision draw (@sec-backfill).
 :::
 
 ::: {.callout-tip title="Alternatives considered"}
 The original plan reused the `idmodels` weekly-model feature machinery (Taylor-polynomial features on fourth-root, centered and scaled series; rolling means and lags; a Christmas indicator; one-hot aggregation level; $\log N_l$; the fraction of states past their maximum; the previous season's peak week). The implemented features are a smaller set of log ratios, chosen so that no scale factors are needed.
 
-The exploratory analysis of $z$ (`relative-size-eda.qmd`) tested more candidates in leave-one-season-out LightGBM fits on ILINet and FluSurv-NET. Two groups gave small but consistent improvements, together reducing the pinball loss for $z$ by 2.5% overall and 7% in season weeks 22–26: synchrony across locations and burden to date. They are now available as optional features.
-
-These did not help:
-
-- local-polynomial ("Taylor") trend features, rolling means and lags;
-- time relative to the location's historical peak week, which made the pinball loss 3.6% worse;
-- onset-based features;
-- holiday-week features.
-
-On holidays: around Christmas and New Year all sources, FluSurv-NET included, rise by about 0.4 on the log scale relative to the surrounding weeks, so most of the holiday bump is real epidemic activity. What is specific to ILINet is that it runs ahead within the holiday block, and that ILINet maxima set in holiday weeks are more often exceeded later. Neither holiday indicators nor adjusting the ILINet holiday weeks before training improved cross-validated forecasts.
+Many more candidate groups were tested in the exploratory analysis (`relative-size-eda.qmd`); see @sec-dev-features. On holidays: all sources, FluSurv-NET included, rise by about 0.4 on the log scale around Christmas and New Year, so most of the bump is real epidemic activity; ILINet runs ahead within the holiday block, and its holiday-week maxima are more often exceeded later. Adjusting the ILINet holiday weeks before training did not help.
 :::
 
 ## Avoiding leakage
@@ -439,7 +478,7 @@ LOSO treats seasons as exchangeable draws from a common population of seasons. T
 **Score comparisons should be blocked by season.** When comparing models on held-out forecasts, differences are strongly correlated within a season; standard errors should be computed treating seasons (not forecasts) as the independent units.
 
 ::: {.callout-note title="Implementation"}
-**Excluded seasons and row weights.** The pandemic seasons 2008/09, 2009/10, 2020/21 and 2021/22 are excluded because `iddata` sets their values to missing (@sec-transforms). All training rows have equal weight in the baseline and GBQR; ILINet therefore contributes many more rows than NHSN. KCDE has one tuned parameter, $\lambda$, that down-weights analogs from a different source than the query row; for real forecasts the query is NHSN, so this down-weights ILINet and FluSurv-NET rows (@sec-kcde).
+**Excluded seasons, series and row weights.** The pandemic seasons 2008/09, 2009/10, 2020/21 and 2021/22 are excluded because `iddata` sets their values to missing (@sec-transforms). ILINet for Puerto Rico and the US Virgin Islands is excluded (`PeakModelConfig.exclude_training_series`), and any series that is zero in every window week is dropped, since it has no peak. These two exclusions were added after the 2023/24–2025/26 NHSN hindcasts were made, so they change the training data of those hindcasts slightly. All training rows have equal weight in the baseline and GBQR; ILINet therefore contributes many more rows than NHSN. KCDE has one tuned parameter, $\lambda$, that down-weights analogs from a different source than the query row; for real forecasts the query is NHSN, so this down-weights ILINet and FluSurv-NET rows (@sec-kcde).
 :::
 
 ::: {.callout-tip title="Alternatives considered"}
@@ -464,7 +503,7 @@ $$
 normalized to sum to 1 over the window. Each series contributes a Gaussian kernel with standard deviation $h_{\text{clim}}$ weeks, truncated and renormalized to the window. The weight $1/n_{s(i)}$ gives every season the same total weight, so that sources and seasons with many locations do not dominate. Smoothing avoids giving zero probability to weeks in which no historical peak happened to occur.
 
 ::: {.callout-note title="Implementation"}
-**Climatology** (`series.peak_week_climatology`). $h_{\text{clim}} = 1.5$ weeks: `PeakModelConfig.timing_smoothing_sd = 1.5`, shared by all three models.
+**Climatology** (`series.peak_week_climatology`). $h_{\text{clim}} = 1.5$ weeks: `PeakModelConfig.timing_smoothing_sd = 1.5`, shared by all models.
 :::
 
 **Allowed classes.** At origin $t$, class $j \ge 1$ is **allowed** if the week $t + j$ lies in the window, $\underline\omega \le t + j \le \overline\omega$. Class $0$ ("already peaked") is allowed only if $t \ge \underline\omega$, that is, once a window week has been reported. Disallowed classes are set to zero and the remaining probabilities are divided by their total. This renormalization simply conditions on an event we know to be certain (the peak lies in the window). Models trained on window-restricted targets already give these classes little probability, so the correction is small.
@@ -502,9 +541,9 @@ These numbers come from the baseline trained for the 2019/20 ILINet development 
 
 Suppose it is season week 25 (the week ending 18 January 2020), and a state's biggest week so far was two weeks ago ($d_t = 2$).
 
-- **Already peaked?** 78 historical rows were also at season week 25 and two weeks past their running maximum. In 47 of them that maximum was the season's peak. So $\hat\pi_0 = (47 + 0.5)/(78 + 1) pprox 0.60$: a 60% chance that the week two weeks ago was the peak.
+- **Already peaked?** 78 historical rows were also at season week 25 and two weeks past their running maximum. In 47 of them that maximum was the season's peak. So $\hat\pi_0 = (47 + 0.5)/(78 + 1) \approx 0.60$: a 60% chance that the week two weeks ago was the peak.
 - **When, if not?** The other 40% is spread over the weeks still ahead by climatology. The weights for 1, 2, 3, 4 and 6 weeks ahead are 10%, 13%, 16%, 16% and 10% of the remaining 40%. Mid-January to mid-February is when US flu seasons most often peak, so the next month gets most of it.
-- **How much bigger?** Among the 456 rows within two weeks of season week 25 that were also two weeks past their maximum, 52% had $z = 0$ (they had already peaked). The median of $z$ is therefore 0: the median forecast of the peak is the current maximum. The 75% and 90% quantiles of $z$ are 1.01 and 1.95, so there is a 25% chance that the peak is at least $e^{1.01} pprox 2.7$ times, and a 10% chance at least $e^{1.95} pprox 7$ times, the largest week so far.
+- **How much bigger?** Among the 456 rows within two weeks of season week 25 that were also two weeks past their maximum, 52% had $z = 0$ (they had already peaked). The median of $z$ is therefore 0: the median forecast of the peak is the current maximum. The 75% and 90% quantiles of $z$ are 1.01 and 1.95, so there is a 25% chance that the peak is at least $e^{1.01} \approx 2.7$ times, and a 10% chance at least $e^{1.95} \approx 7$ times, the largest week so far.
 
 This also shows the baseline's weakness. At the same season week, the already-peaked rate is 60% for series two weeks past their maximum and 67% for three weeks past, but it drops to 41% for four or more weeks past. By mid-January, a maximum more than a month old is often a small early-season bump before the real epidemic has started. The baseline cannot tell such a bump from a real peak, but the level and growth features of the other models can.
 
@@ -557,14 +596,7 @@ applied to a residual $e = z - q$ (here $\mathbf{1}\{\cdot\}$ is the indicator f
 
 An option, `PeakGBQRModelConfig.size_offset = True` (sandbox model `peak_gbqr_offset`), starts each row from a sensible value instead. Each quantile regression is then boosted from an **offset** (LightGBM's `init_score`) equal to the conditional-climatology baseline's $\tau$-quantile of $z$ for that row (@sec-baseline), which already depends on the season week and on the weeks since the maximum. The trees learn only a correction to the baseline, and the prediction is the offset plus the boosted correction. On the training rows this brings the late-season 97.5% prediction to 0, while the early-season 97.5% quantile still covers about 99% of outcomes.
 
-The offset is not the default, because it did not score better where it matters. In the 2023/24 to 2025/26 hindcasts:
-
-- It improved the calibration of early-season intervals.
-- It worsened the log-scale WIS of peak size overall (0.169 against 0.157), mostly for forecasts made one to four weeks after the peak.
-- After the peak, where it tightens the intervals, the default's extra width mainly covered small late revisions to the reported peak and cost little.
-- Adding trees (400 instead of 100) to fix the slow start instead was worse in held-out seasons, with or without the offset. With so few training seasons, more boosting overfits.
-
-Both versions are kept so that combinations can be explored later. Peak-week forecasts are identical between them, because only the size regressions change.
+The offset is not the default. In the 2023/24–2025/26 NHSN hindcasts it improved the calibration of early-season intervals but worsened the log-scale WIS of peak size overall (0.169 against 0.157), mostly one to four weeks after the peak, where the default's extra width mainly covered small late revisions to the reported peak. Adding trees (400 instead of 100) was worse in held-out seasons, with or without the offset. Peak-week forecasts do not depend on it; it is being retested on ILINet with richer features (@sec-dev-gbqr-runs).
 
 ### The timing classifier
 
@@ -590,6 +622,7 @@ The fit is repeated over $n_{\text{bag}}$ **bags**. For bag $\beta = 1, \dots, n
 - $n_{\text{bag}}$ = `num_bags` = 25 (3 with `--short_run`); $f_{\text{bag}}$ = `bag_frac_samples` = 0.7 (at least one season per bag).
 - $K$ = `max_k` = 12, so the classifier has $K + 2 = 14$ classes.
 - LightGBM: `n_estimators = 100`, `learning_rate = 0.05`, `min_child_samples = 50`; all other hyperparameters at LightGBM defaults; `src_code` treated as categorical.
+- Features: `size_feature_groups` for the quantile regressions and `timing_feature_groups` for the classifier (default: base, or SB with `sync_burden_features`). Size and timing are separate models sharing only the bag seasons, so peak-size forecasts depend only on the size features and peak-week pmfs only on the timing features (checked by a unit test).
 - Per bag, 23 `LGBMRegressor(objective="quantile", alpha=τ)` models and one `LGBMClassifier(objective="multiclass")`.
 - Aggregation: median across bags then sort (quantiles); mean across bags (class probabilities).
 - Seeds: the random number generator is seeded with a CRC-32 hash of the sorted list of training seasons, so the fit is deterministic for a given set of training seasons (it does not depend on the reference date).
@@ -662,20 +695,35 @@ A state vector containing the recent trajectory shape $\bigl(\log\{(x_{t-n} + \v
 
 ## Model 4: Bayesian hierarchical model of timing and size (`peak_hier`) {#sec-hier}
 
-::: {.callout-warning title="Implemented, not yet evaluated"}
-The model below is implemented in `idmodels/peak/hier.py` and has passed a short smoke test on a subsample. It has **not** yet been fit with full MCMC settings or scored. The settings in the *Implementation* callout are starting values to be checked on the development seasons (@sec-dev-design). The design choices that are open for review are listed at the end of this section.
+::: {.callout-warning title="Status: evaluated on development seasons only"}
+The model is implemented in `idmodels/peak/hier.py` (idmodels commit 8c56bf0). It has been fit with full MCMC settings and scored on the two ILINet development seasons (@sec-dev-results). It has **not** yet been run on the NHSN test seasons. Development results favor a weaker likelihood tempering than the committed default (@sec-hier-temper); the default has not been changed pending a decision.
 :::
+
+### In plain terms
+
+GBQR and KCDE each learn one rule, shared by every location and season, that maps "what the season looks like now" to "when and how high the peak will be". The hierarchical model uses the same kind of rule. It adds two adjustments that the others lack:
+
+- a **season adjustment**, shared by every state in the season (some seasons peak early everywhere, others late); and
+- a **location adjustment**, shared by every season of a state (some states tend to peak earlier than others).
+
+What makes the season adjustment useful in real time is that the model *learns the current season's adjustment from the current season*, using every state at once. Picture mid-January with 45 states observed. Suppose 30 of them have been rising for six weeks without peaking. Then the historical rule, which would have expected many of them to have peaked by now, is too early for *this* season, so the season's timing adjustment moves toward "later". Every state's forecast then shifts later, including the 15 states whose own data say little yet. That is the "pooling across locations" the other models do not have. The development results show that it matters: without it, forecasts made 5 to 8 weeks before the peak are much worse (@sec-dev-results).
+
+The model has three parts, each with its own season (and, for timing, location) adjustment:
+
+1. **Has the peak already happened?** A probability, given the current state of the season.
+2. **If not, when?** For each future week, the chance that the peak comes that week, given that it has not come earlier (a "hazard", as in survival analysis).
+3. **How big?** Given how many weeks away the peak is, the distribution of the remaining growth $z$.
+
+Parts 2 and 3 are linked: a peak eight weeks away is expected to be much higher, relative to today, than one next week. So the model gives joint forecasts of timing and size.
 
 ### What this model adds
 
-The models so far learn one mapping from "what the season looks like now" to "when and how high the peak will be", shared by every location and season. They treat two kinds of structure only indirectly.
+The models so far treat two kinds of structure only indirectly.
 
-1. **Seasons differ as a whole.** In some seasons almost every state peaks around Christmas; in others the peak comes in February or March, or a second virus produces a late wave. All locations in a season are exposed to the same viruses, so their peaks are correlated. When half the states have already peaked, that is informative about the other half. GBQR and KCDE see this only through the three national features.
+1. **Seasons differ as a whole.** In some seasons almost every state peaks around Christmas; in others the peak comes in February or March, or a second virus produces a late wave. All locations in a season are exposed to the same viruses, so their peaks are correlated. When half the states have already peaked, that is informative about the other half. GBQR and KCDE see this only through the national and synchrony features.
 2. **Locations differ persistently.** Some states tend to peak earlier than others, for example because of when school terms start, which strains arrive first, or the mix of urban and rural populations. The NHSN record for any one state is only two or three usable seasons long, far too short to estimate a state-specific tendency from NHSN alone, but the same state has eight or more seasons of ILINet data.
 
-A **hierarchical** (multilevel) model represents both with random effects: a **season effect** shared by all locations and sources in a season, and a **location effect** shared by all seasons and sources for a location. The key feature for real-time use is that the *current* season's effect is estimated from the current season's data in every location at once (@sec-hier-current). This is the "pooling across locations" that the other models lack.
-
-A further benefit is that timing and size come from one joint model, and every source of parameter uncertainty is carried into the forecast through posterior draws.
+A **hierarchical** (multilevel) model represents both with random effects: a **season effect** shared by all locations and sources in a season, and a **location effect** shared by all seasons and sources for a location. The key feature for real-time use is that the *current* season's effect is estimated from the current season's data in every location at once (@sec-hier-current).
 
 ### Data and notation
 
@@ -697,7 +745,7 @@ where $\operatorname{logit}^{-1}(x) = 1/(1 + e^{-x})$ maps any real number to a 
 
 **Stage 2, when.** If the peak is still to come, it occurs at week $t_i + m$ for some $m \in \mathcal{M}_i$. We model this with a **discrete-time hazard**, the standard tool of survival analysis for event times measured in whole weeks. The hazard $\chi_{i,m}$ is the probability that the peak is at offset $m$, *given that it is not at any earlier offset in* $\mathcal{M}_i$:
 $$
-\operatorname{logit} \chi_{i,m} = f_\omega(t_i + m) + f_m(m) + \phi_i^\top \beta + (\log m - \log 4)\,\phi_i^\top \beta_m + \gamma_{g_i,1} + r_{i,1},
+\operatorname{logit} \chi_{i,m} = f_\omega(t_i + m) + f_m(m) + \phi_i^\top \beta + (\log m - \bar c_m)\,\phi_i^\top \beta_m + \gamma_{g_i,1} + r_{i,1},
 \qquad m \in \mathcal{M}_i,\ m < m^{\max}_i,
 $$
 and $\chi_{i,m^{\max}_i} = 1$, because the peak must fall in the window. Then
@@ -713,7 +761,9 @@ The terms have these roles:
 - $f_\omega(w)$, a smooth function of the calendar week $w$ of the candidate peak, captures seasonality: peaks are common in late December through February and rare in October or May.
 - $f_m(m)$, a smooth function of $\log m$, captures how the chance of peaking depends on how far ahead we look.
 - $\phi_i^\top\beta$ shifts the hazard according to the current state of the season. For example, fast recent growth makes a peak next week less likely.
-- $(\log m - \log 4)\,\phi_i^\top \beta_m$ lets the effect of the state depend on the offset. For example, a falling series makes a peak in 1–2 weeks unlikely but says less about a second peak 10 weeks away. The centering at $\log 4$ makes $\beta$ the effect at an offset of about a month.
+- $(\log m - \bar c_m)\,\phi_i^\top \beta_m$ lets the effect of the state depend on the offset. For example, a falling series makes a peak in 1–2 weeks unlikely but says less about a second peak 10 weeks away. $\bar c_m$ is the mean of $\log m$ over the training rows' risk sets (the offsets at which a row's peak had not yet happened), so $\beta$ is the effect at a typical offset. Centering reduces the correlation between $\beta$ and $\beta_m$ in the posterior.
+
+**In plain terms.** Think of walking forward week by week from today. At each future week the model asks: "given that the peak hasn't come yet, is this the week?" The answer depends on the calendar (January is peak season), on how far ahead we are looking, on what the season looks like now, and on the season and location adjustments. Multiplying "not this week" answers together gives the chance that the peak is still ahead at any week, which is what the censored update of @sec-hier-current uses.
 
 **Why a hazard instead of a softmax over offsets?** A softmax needs a separate parameter per offset, and offsets far ahead are rare in the data. A hazard with smooth terms in $w$ and $m$ shares strength across offsets and handles the window boundary exactly. It is also the form that makes the censored observations of @sec-hier-current easy to write down.
 
@@ -771,7 +821,13 @@ We use a **tempered** (power) likelihood: every row's log likelihood is multipli
 $$
 \log p(\theta \mid \text{data}) = \text{const} + \log p(\theta) + w_{\text{lik}} \sum_i \bigl[\ell^{\text{timing}}_i(\theta) + \mathbf{1}\{k_i \ge 1\}\,\ell^{\text{size}}_i(\theta)\bigr],
 $$
-where $\theta$ denotes all parameters, $\ell^{\text{timing}}_i = \log \pi_{0,i}$ if $k_i \le 0$ and $\log \Pr(k^+_i = k_i)$ otherwise, and $\ell^{\text{size}}_i$ is the log density of $\log\max(z_i, z_{\min})$. With $w_{\text{lik}} = 0.15$ each series counts as about six observations. This is a pragmatic device, not a model of the dependence (a series-level effect would be the more complete alternative). Its value mainly affects the width of the parameter posterior and the strength of the current-season update, so it is the first setting to tune on the development seasons.
+where $\theta$ denotes all parameters, $\ell^{\text{timing}}_i = \log \pi_{0,i}$ if $k_i \le 0$ and $\log \Pr(k^+_i = k_i)$ otherwise, and $\ell^{\text{size}}_i$ is the log density of $\sqrt{z_i}$. With $w_{\text{lik}} = 0.15$ each series counts as about six observations. This is a pragmatic device, not a model of the dependence (a series-level effect would be the more complete alternative). Its value mainly affects the width of the parameter posterior and the strength of the current-season update.
+
+**In plain terms.** The weight says how many independent observations one season of one state is worth. At 0.15 it is worth about six, at 0.05 about two, and at 0.02 less than one. A smaller weight makes the model less sure of its fitted rule and its random-effect sizes, so the prior and the current-season evidence count for relatively more.
+
+**What development showed.** Weaker tempering was better in both development seasons, and more so with each step down: log score −1.76 at 0.15, −1.68 at 0.05, and −1.66 at 0.02 (with the current-season update restricted to the hazard and size components, which on its own made no difference). The gain is largest in the weeks around the peak (@sec-dev-results). The committed default is still `likelihood_weight = 0.15`. Changing it to 0.02, and testing still smaller values, is pending a decision.
+
+When origins are thinned (`origin_stride` $= 3$, every third origin week), each row's weight is multiplied by 3, so every series keeps the same total weight. Neighboring origins are near-duplicates, so little information is lost.
 
 ### Priors
 
@@ -779,10 +835,10 @@ All features are standardized to mean 0 and standard deviation 1 in the training
 
 - Smooth functions $a_0$, $f_\omega$, $f_m$, $b$: cubic B-splines (6, 8, 5 and 6 basis functions, equally spaced knots) with $\mathcal{N}(0, 2^2)$ priors on the coefficients. $f_m$ drops its first basis function so that it has no intercept of its own.
 - Coefficients: $\beta_0, \beta, \beta_z \sim \mathcal{N}(0, 1)$ elementwise; the offset interactions $\beta_m, \beta_{zm} \sim \mathcal{N}(0, 0.5^2)$; $b_1, b_2, c_0, c_1, c_2 \sim \mathcal{N}(0, 1)$; source effects $\gamma_g \sim \mathcal{N}(0, 1)$ and $c_g \sim \mathcal{N}(0, 0.5^2)$.
-- Random effects: scales $\tau \sim \text{Half-Normal}(0.5)$ elementwise (Gelman 2006), and the Cholesky factor of $\Omega$ has an LKJ(2) prior (Lewandowski, Kurowicka and Joe 2009), which mildly favors small correlations. The effects are parameterized non-centered ($u_l = \operatorname{diag}(\tau)L\,\tilde u_l$, $\tilde u_l \sim \mathcal{N}_3(0, I)$), which usually samples better when the data per group are weak.
-- Degrees of freedom: $\nu - 1 \sim \text{Gamma}(2, 0.1)$, so $\nu > 1$ and the mean exists.
+- Random effects: SDs $\tau \sim \text{Half-Normal}(0.5)$ elementwise (Gelman 2006), for the active components only (the hazard component for locations; all three for seasons). The effects are **centered** ($u_l \sim \mathcal{N}(0, \tau^2)$ directly), which samples well when each group has a lot of data, except the season effect of the already-peaked component, which is **non-centered** ($v_{s,0} = \tau_0 \tilde v_{s,0}$, $\tilde v_{s,0} \sim \mathcal{N}(0, 1)$) because its SD has posterior mass near zero (@sec-hier-compute).
+- With the optional LKJ-correlated effects (`correlated_effects = True`, not used), the Cholesky factor of the correlation matrix has an LKJ(2) prior (Lewandowski, Kurowicka and Joe 2009). With the optional log-scale size model (`size_scale = "log"`, not used), $\nu - 1 \sim \text{Gamma}(2, 0.1)$.
 
-On the logit scale a standard deviation of 0.5 corresponds to shifting a hazard of 0.2 to roughly 0.13–0.29, a moderate between-season or between-location difference.
+On the logit scale a standard deviation of 0.5 corresponds to shifting a hazard of 0.2 to roughly 0.13–0.29, a moderate between-season or between-location difference. The fitted SDs were larger for the season effect on the hazard (posterior median about 1.5) and smaller for the location effect on the hazard (about 0.6).
 
 ### Computation {#sec-hier-compute}
 
@@ -829,7 +885,11 @@ $$
 by damped Newton steps (12 iterations; the step length is capped at 1);
 2. draw $v^{(d)}_{s_0} \sim \mathcal{N}_3\bigl(\hat v^{(d)}, H^{(d)-1}\bigr)$, where $H^{(d)}$ is the negative Hessian at the mode (a **Laplace approximation**).
 
-The same tempering weight is applied, so that each location's censored rows count as a few observations, not dozens. Location effects of the current locations are held at their posterior draws (or drawn from $\mathcal{N}_3(0, \Sigma_{\text{loc}}^{(d)})$ for a location not seen in training) and are not updated by the current season.
+The same tempering weight is applied, so that each location's censored rows count as a few observations, not dozens. The censored rows use every origin week (no thinning), with weight $w_{\text{lik}}$ per row, or a separate weight set by `current_update_weight` (@sec-hier-hybrid).
+
+**A worked illustration.** Take mid-January of a season in which peaks come late. Of 45 states, 30 have been rising steadily for six weeks, with their running maximum set in the current week. For each of those states and each earlier origin $t'$ (say the six origins from mid-December on) we know the peak is at least $A_t - t'$ weeks after $t'$, that is, it had not happened by then. That gives $30 \times 6 = 180$ censored rows, each saying "the peak was still ahead". The historical rule, fitted to other seasons, would have given many of those rows a sizeable probability of peaking within a few weeks. Each row's likelihood term is therefore larger when the hazard is lower, and together they pull the hazard component of $v_{s_0}$ down, toward a later season. With $w_{\text{lik}} = 0.15$ the 180 rows count as about 27 observations, enough to move $v_{s_0}$ by a sizeable fraction of its prior SD. The shift then applies to every state, including those whose own data are not yet informative. The size bounds work the same way: if those states are already far above their mid-December levels, the size component moves up.
+
+**Restricting the update.** One might worry that this evidence is lopsided for the already-peaked component. Every censored row says "not yet peaked at $t'$", which pushes the already-peaked probability down for the whole season, including at the current week. The option `current_update_components = [1, 2]` updates only the hazard and size components (the already-peaked component keeps its prior draw). In development it made no difference (@sec-dev-results), so the default updates all three. Location effects of the current locations are held at their posterior draws (or drawn from $\mathcal{N}_3(0, \Sigma_{\text{loc}}^{(d)})$ for a location not seen in training) and are not updated by the current season.
 
 Two approximations should be kept in mind. First, the conditional posterior of $v_{s_0}$ given $\theta^{(d)}$ is approximated by a normal distribution. It has only three dimensions and draws on hundreds of censored terms, so this should be accurate. Second, $\theta$ is not updated by the current season, which ignores a small amount of information. For NHSN the bounds use the currently reported values, which can still be revised. A downward revision of the current maximum could in principle make a bound slightly wrong, but the effect on a season-level parameter estimated from many locations is small.
 
@@ -838,39 +898,111 @@ Two approximations should be kept in mind. First, the conditional posterior of $
 For a current-season series with features $\phi$ at week $t$, and each of $D = 200$ posterior draws $d$ (with its own $v^{(d)}_{s_0}$ and $u^{(d)}_l$):
 
 - **Timing:** compute $\pi_0$ and the class probabilities $\Pr(k^+ = m)$ for $m \in \mathcal{M}$ from the formulas above. The model's timing output is the average over draws.
-- **Size:** draw five joint samples $(k^+, z)$: $k^+$ from the class probabilities, then $z = 0$ if $k^+ = 0$ and otherwise $\log z \sim \mathrm{St}_\nu(\mu, \sigma)$ evaluated at $k = k^+$. The model's size output is the set of quantiles of the resulting 1,000 values of $z$.
+- **Size:** draw five joint samples $(k^+, z)$: $k^+$ from the class probabilities, then $z = 0$ if $k^+ = 0$ and otherwise $\sqrt{z} \sim \mathcal{N}^{+}(\mu, \sigma)$ evaluated at $k = k^+$ (drawn by inverting the truncated normal CDF). The model's size output is the set of quantiles of the resulting 1,000 values of $z$.
 
 These outputs then pass through the same backfill simulation, floor and formatting as the other models (@sec-backfill, @sec-submission).
 
 ::: {.callout-note title="Implementation"}
 **`PeakHierModel`** (`idmodels/peak/hier.py`; configuration `PeakHierModelConfig`).
 
-- **Features** (`design_features`): `rel_max`, `log1p(min(wks_since_max, 15))`, `g1`, `g3`, `rm3`, `cum_rel`, `hist_rel` (0 if missing) and an indicator that it is missing, `nat_rel_max`, `log1p(min(nat_wks_since_max, 15))`, `nat_g3` (each replaced by the series' own value if there is no national series) and an indicator of that. `season_week` enters only through the splines; `g2` is not used. Features are standardized with the training mean and SD (not the two indicators) and clipped to $\pm 5$.
+- **Features** (`design_features`): `rel_max`, `log1p(min(wks_since_max, 15))`, `g1`, `g3`, `rm3`, `cum_rel`, `hist_rel` (0 if missing) and an indicator that it is missing, `nat_rel_max`, `log1p(min(nat_wks_since_max, 15))`, `nat_g3` (each replaced by the series' own value if there is no national series) and an indicator of that. `season_week` enters only through the splines; `g2` is not used. All 12 are standardized with the training mean and SD (a column with no variation keeps SD 1), clipped to $\pm 5$, and whitened (`whiten_features = True`; directions with near-zero variance are dropped). $\log k$ and $\log m$ are centered at their training means (over size rows and over hazard risk-set entries).
 - **Splines**: `df_t = 6` (for $a_0$ and $b$, knots over season weeks `replay_start_week`..`window_end_week`), `df_week = 8` ($f_\omega$, over the window), `df_offset = 5` ($f_m$, over $\log m \in [0, \log 42]$).
 - **Likelihood**: `likelihood_weight` $= w_{\text{lik}} = 0.15$ per replay row (multiplied by `origin_stride` when origins are thinned); `size_scale = "sqrt"` (the alternative `"log"` uses a Student-$t$ for $\log\max(z, z_{\min})$ if `student_t = True`, with `z_floor` $= z_{\min} = 0.01$); `origin_stride = 3` (every third origin week).
 - **Effects**: `location_effects = True` with `location_components = [1]` (hazard only), `season_effects = True` with `season_components = [0, 1, 2]`, `correlated_effects = False`, `centered_effects = True` except `season_noncentered_components = [0]`, `effect_scale = 0.5` (Half-Normal scale of $\tau$), `current_season_update = True`.
 - **MCMC**: NUTS (NumPyro; Phan, Pradhan and Jankowiak 2019) with `num_chains = 2` chains run sequentially, `num_warmup = 500`, `num_samples = 500`, `target_accept_prob = 0.85`, `max_tree_depth = 8`; `whiten_features = True`; diagonal mass matrix adapted during warm-up. (Options not used by default: `dense_mass`, `init_map_steps`, `laplace_mass`.) The condition number of $H$ is stored as `laplace_condition_`, and timings and step statistics as `mcmc_stats_`. Diagnostics stored after fitting: `max_rhat_`, `min_ess_` (over all parameters except the individual effects $u_l$, $v_s$) and `num_divergences_`. The fit is repeated once per forecast season, as for the other models.
 - **Prediction**: `num_posterior_draws = 200` (evenly spaced over the retained draws), `size_samples_per_draw = 5`, `laplace_iters = 12`. The current-season update and prediction are deterministic given the reference date (seeded random numbers).
+- **Options explored in development, off by default** (@sec-dev-results): `time_varying_coefs` (feature effects on the already-peaked probability and the hazard vary linearly with the current week); `wsm_dummies` (indicators for 0, 1, 2 and 3 weeks since the maximum); `current_update_components` (which components the censored update informs; default `[0, 1, 2]`); `sync_burden_features` (the synchrony and burden features of @sec-features); `correlated_effects` (LKJ-correlated components); `size_scale = "log"` (Student-$t$ for $\log z$); and the sampler options `dense_mass`, `init_map_steps` and `laplace_mass` (MAP start with the inverse Hessian as a fixed metric). The last three did not improve sampling.
+- **Timing**: a full fit (2 chains × 1,000 iterations, `origin_stride = 3`) takes about 20 minutes per season on an 8-core laptop without contention. In the development runs: mean 63–95 leapfrog steps, no divergences, largest $\hat R$ 1.03–1.10, smallest effective sample size 35–108.
 - **Hook**: the current-season update runs in `PeakHierModel._observe_current_season`, which the base class calls with the current season as reported (`CurrentSeason`) just before `_predict`.
 :::
 
-::: {.callout-important title="Open for review before full runs"}
-1. **Tempering weight.** $w_{\text{lik}} = 0.15$ ("about six observations per series") is a judgment call. Plan: compare 0.05, 0.15 and 0.4 on the development seasons.
-2. **Effect structure.** Independent components (no correlation), and location effects on the hazard only (@sec-hier-compute). Also: **location effects shared across sources.** Assumes a state's tendency to peak early or late, and its relative size, carries over from ILINet to NHSN. Alternative: source-specific location effects, or a location effect for timing only.
-3. **Season effects shared across sources.** Natural if the sources track the same epidemic, but a source's relative size ($z$) could differ by season, for example if test positivity or care-seeking changed.
-4. **Size model.** $\sqrt{z}$ given $k$ as a truncated normal, chosen from the skewness and kurtosis of the training data (the first version used $\log z$ with a Student-$t$). Calibration will be checked via the coverage and the PIT of the peak size.
-5. **Current-season update via censoring plus Laplace**, instead of refitting the whole model at each reference date (which would be the exact Bayesian answer but costs roughly an MCMC run per date).
-6. **Compute.** See @sec-hier-compute. The random-effect SDs at the posterior mode (about 0.9–1.8 on the logit scale for timing) are well above the Half-Normal(0.5) prior scale, so `effect_scale` may need to be larger.
-7. **What the model does not have.** No series-level effect, no effects of virus type or subtype, and no dependence between the current-season effect and features beyond the national ones.
+::: {.callout-important title="Decisions and open questions"}
+Decided or learned in development (@sec-dev-results):
+
+1. **Tempering.** $w_{\text{lik}} = 0.15$ was too strong. Values of 0.05 and 0.02 scored better in both development seasons, with 0.02 best. The committed default is still 0.15, pending a decision. Values below 0.02 have not been tried.
+2. **Effect structure.** Correlated (LKJ) effect components were dropped: the correlations could not be sampled. Location effects are on the hazard only. Effects are centered, except the season effect of the already-peaked component.
+3. **Size model.** $\sqrt{z}$ given $k$, a truncated normal, replaced $\log z$ with a Student-$t$.
+4. **The current-season update helps.** Without it (`current_season_update = False`), log scores 5 to 8 weeks before the peak dropped from −2.3 to −3.2.
+5. **What did not help:** time-varying coefficients; indicators for weeks since the maximum; restricting the current-season update to the hazard and size components; and the synchrony and burden features.
+
+Still open:
+
+6. **Weakness around the peak.** Every `peak_hier` variant is weaker than `peak_gbqr` in the weeks around the peak: log score about −2.1 to −2.8, against −1.9 for `peak_gbqr`, one week either side of the peak. The first explanation was the model family: a logit-linear hazard might not separate "the peak is this week" from "next week" as sharply as trees. The hybrid (@sec-hier-hybrid) makes that unlikely. It takes GBQR's timing as an offset and still has the weakness (−2.54 against −1.97 in 2018/19).
+   The evidence instead points to the censored current-season update being too strong:
+   - `hier__nocur` has no weakness at the peak but is much worse earlier;
+   - weaker tempering, which also weakens the update, narrows the gap;
+   - `hybrid__w02` narrows it most (−2.15).
+
+   The `current_update_weight` option tempers the update separately from training (`hybrid__cu01`, `hybrid__cu003`; not yet evaluated, @sec-future).
+7. **Location and season effects shared across sources.** This assumes a state's tendency to peak early or late carries over from ILINet to NHSN, and that sources share a season effect. It is untested on NHSN.
+8. **What the model does not have.** No series-level effect, no effects of virus type or subtype, and no dependence between the current-season effect and features beyond the national ones.
 :::
 
-## Model 5 (planned): ensembles (`peak_ensemble`) {#sec-ensemble}
+### Hybrid: GBQR offsets (`peak_hybrid`) {#sec-hier-hybrid}
 
-::: {.callout-warning title="Planned, not implemented"}
-No ensemble of the peak models has been built yet. This section records the planned combination rules.
+::: {.callout-warning title="Status: uncommitted, partly evaluated"}
+Implemented in `idmodels/peak/hybrid.py` (`PeakHybridModel`, `PeakHybridModelConfig`) and `src/peak_hybrid`, not yet committed. It has been scored on the 2018/19 development season only; the remaining runs are on hold (@sec-future).
 :::
 
-Combining forecasts from different models usually improves accuracy and robustness. The two targets would be combined differently, because they are different types of forecast.
+**In plain terms.** The hierarchical model and GBQR are strong in different phases of the season (@sec-dev-results).
+
+- The hierarchical model is better well before the peak, because it learns the current season's timing from all locations.
+- GBQR is better around and after the peak, because its trees capture sharp combinations of the level, growth and weeks since the maximum.
+
+The hybrid is a single model that uses GBQR's forecasts as a starting point, or **offset**, for each part of the hierarchical model:
+
+- GBQR's probability that the peak has already happened starts the already-peaked part;
+- its implied weekly chances of peaking start the hazard;
+- its median remaining growth starts the size part.
+
+The hierarchical model then learns how far to trust GBQR, and adds what GBQR lacks: season and location adjustments, including the update of the current season's effect from censored observations. Unlike the equal-weight ensemble, how much weight goes to GBQR is estimated from the data.
+
+**Offsets.** For each row, with GBQR's timing-class probabilities $\pi^{\text{G}}_0, \pi^{\text{G}}_1, \dots$ and quantiles $q^{\text{G}}(\tau)$ of $z$:
+$$
+o_0 = \operatorname{logit} \pi^{\text{G}}_0, \qquad
+o_{m} = \operatorname{logit}\frac{\pi^{\text{G}}_m}{\sum_{m' \ge m,\, m' \in \mathcal{M}} \pi^{\text{G}}_{m'}} \;\; (m \in \mathcal{M}), \qquad
+o_z = \sqrt{q^{\text{G}}\bigl(\pi^{\text{G}}_0 + (1 - \pi^{\text{G}}_0)/2\bigr)} .
+$$
+Here $o_m$ is the hazard implied by GBQR's class probabilities over the valid future offsets, and $o_z$ is the square root of GBQR's median of $z$ given that the peak is still to come. These enter the already-peaked logit, the hazard logits and the mean of $\sqrt{z}$ as $c_0 o_0$, $c_1 o_m$ and $c_2 o_z$, with coefficients $c_j \sim \mathcal{N}(1, 0.5^2)$. By default the hierarchical model's own linear feature terms are dropped (`hybrid_keep_features = False`), since GBQR already uses the features. What remains is the splines, source effects, location and season effects and the current-season update.
+
+**Honest offsets for training.** If the training rows' offsets were GBQR's in-sample predictions, GBQR would look far more accurate than it is, and the hybrid would learn to trust it too much. Each of GBQR's bags leaves out about 30% of the training seasons, so every training row is given the **out-of-bag** prediction: the average over the bags that never saw the row's season (`PeakGBQRModel.oob_predict`). At forecast time all bags are used.
+
+**Results so far** (2018/19 only, `@rtrev`, states):
+
+| Model | Log score | Rel. RPS | Rel. log-WIS | 95% cov. | Log score, 1 week either side of the peak |
+|---|---|---|---|---|---|
+| `hybrid__w02` | **−1.836** | 0.885 | 0.642 | 0.94 | −2.15 |
+| `ens_gbqr_hierw05` | −1.849 | 0.894 | **0.640** | 0.94 | −2.15 |
+| `hybrid__feat` | −1.855 | 0.889 | 0.670 | 0.94 | −2.43 |
+| `peak_gbqr` | −1.867 | **0.880** | 0.695 | 0.92 | **−1.97** |
+| `peak_baseline` | −1.871 | 1.000 | 1.000 | 0.94 | −2.01 |
+| `hybrid` | −1.878 | 0.913 | 0.664 | 0.94 | −2.54 |
+| `hier__w02c12` | −1.901 | 0.964 | 0.662 | 0.94 | −2.10 |
+| `hier__w05` | −1.927 | 0.974 | 0.661 | 0.94 | −2.46 |
+
+What these results show:
+
+- **Every hybrid beats the hierarchical variants.** In 2018/19, `hybrid__w02` was the best single model on log score.
+- **Sampling.** The GBQR offsets make the posterior better behaved. `hybrid` mixed very well: largest $\hat R$ 1.01, smallest effective sample size 218. `hybrid__w02` mixed poorly ($\hat R$ 1.29, effective sample size 12), so its scores need a longer run before they can be trusted.
+- **The weakness around the peak remains.** It persists in `hybrid` (−2.54) and shrinks with weaker tempering. This is the evidence, discussed under item 6 above, that the censored update is too strong. It motivated `current_update_weight` (@sec-hier-current).
+
+::: {.callout-note title="Implementation"}
+**`PeakHybridModel`** (`idmodels/peak/hybrid.py`, subclass of `PeakHierModel`; configuration `PeakHybridModelConfig`).
+
+- **Settings.** `likelihood_weight = 0.05`, `offset_prior_sd = 0.5`, `hybrid_keep_features = False`; all other settings as `PeakHierModelConfig`.
+- **Internal GBQR.** `gbqr_num_bags = 25`, `gbqr_bag_frac_samples = 0.7`, `gbqr_max_k = 12`, `gbqr_n_estimators = 100`, `gbqr_learning_rate = 0.05`, `gbqr_min_child_samples = 50`, using the same feature set as the hybrid's `sync_burden_features`. It is fit on every origin; the hierarchical part then thins origins as usual.
+- **Offsets.** Probabilities are clipped to $[10^{-4}, 1 - 10^{-4}]$ before taking logits. Before the window opens, $\pi^{\text{G}}_0$ is set to 0 (so $o_0$ is irrelevant there). The offsets for the censored current-season rows are computed from GBQR predictions on those rows.
+- **`current_update_weight`** (also available in `PeakHierModelConfig`): the likelihood weight of each censored current-season row, if different from `likelihood_weight`.
+- **Cost.** About 40 minutes per season fit (GBQR plus MCMC) under the development machine's load, and GBQR predictions at every reference date.
+:::
+
+## Model 5: ensembles (`peak_ensemble`) {#sec-ensemble}
+
+::: {.callout-warning title="Status: evaluated on development seasons only"}
+Equal-weight ensembles of saved forecasts have been evaluated on the ILINet development seasons (`analysis/peak-models/ensemble_validation.py`; results in @sec-dev-results). There is no `peak_ensemble` model directory or hub submission yet, and no ensemble has been run on the NHSN test seasons.
+:::
+
+Combining forecasts from different models usually improves accuracy and robustness. Here there is also a specific reason: the hierarchical model and GBQR are good at different phases of the season (@sec-dev-results). The hierarchical model is better well before the peak, GBQR at and after it, so an average can be better than either. The two targets are combined differently, because they are different types of forecast.
 
 Let $\mathcal{M}$ be the set of component models, indexed by $\mathfrak{m}$, with weights $\vartheta_{\mathfrak m} \ge 0$ and $\sum_{\mathfrak m \in \mathcal{M}} \vartheta_{\mathfrak m} = 1$.
 
@@ -886,8 +1018,12 @@ q^{\text{ens}}(\tau) = \sum_{\mathfrak m \in \mathcal{M}} \vartheta_{\mathfrak m
 $$
 This is also called **Vincentization**. An average of nondecreasing functions of $\tau$ is nondecreasing, so the result is a valid set of quantiles. Compared with pooling the distributions, quantile averaging keeps the typical spread of the components rather than widening it (Lichtendahl, Grushka-Cockayne and Winkler 2013). This matches the behavior of `hubEnsembles::simple_ensemble()`, used by the `flu_flusion` model, whose default aggregation is the mean: for pmf outputs it averages probabilities (a linear pool) and for quantile outputs it averages quantiles.
 
+**In plain terms.** For the peak week, the ensemble's probability for each week is the average of the members' probabilities. For the peak size, the ensemble's 10% quantile is the average of the members' 10% quantiles, and likewise for every level.
+
+**Development result.** `ens_gbqr_hierw05`, the equal-weight ensemble of `peak_gbqr` and `hier__w05`, was the best forecaster on the development seasons on RPS and peak-size WIS. It beat both members on log score and WIS in each season: overall log score −1.61 against −1.63 (GBQR) and −1.68 (hierarchical), RPS 0.88 and WIS 0.60 relative to the baseline, and 95% coverage 0.94 (@sec-dev-results). Adding the baseline as a third member gave a slightly better log score (−1.60) but clearly worse WIS (0.69).
+
 ::: {.callout-note title="Implementation"}
-**Not implemented.** Planned: equal weights over the component models that beat the baseline in the backtest, with weights learned from the backtest only if the backtest supports it; the floor of @sec-floor re-applied after pooling; quantile averages rounded to integers after averaging (@sec-submission).
+**Development ensembles** (`analysis/peak-models/ensemble_validation.py`): equal weights; only forecasts (reference date, location) made by every member are combined; pmfs are averaged and renormalized, and quantiles averaged level by level. Members' pmfs are already floored (@sec-floor), so the average is too. A `peak_ensemble` model directory producing hub files (with quantile averages rounded to integers after averaging, @sec-submission) and learned weights are listed in @sec-future.
 :::
 
 # Backfill and the probabilities of past weeks {#sec-backfill}
@@ -985,9 +1121,32 @@ The trade-off is a tiny, bounded cost when the model is right against protection
 The mixture $(1 - n_{\mathcal{W}}\delta)\hat p + \delta$ gives the same guarantee.
 :::
 
+## Revisions in other sources: ILINet {#sec-revision-ilinet}
+
+**In plain terms.** Different surveillance systems revise their data differently. NHSN admission counts mostly go *up* after first release, as late hospital reports arrive. ILINet × percent positive can go *either way*: the share of visits for influenza-like illness shifts as more clinics report (the number of patient visits grows after first release), and the percent positive changes as more laboratory specimens are counted (the specimen count often roughly doubles). The block bootstrap of @sec-revision assumes no direction. It resamples whole historical revision vectors of the source being forecast, so it carries over to ILINet unchanged, apart from a few settings.
+
+- **Data.** Delphi Epidata keeps every weekly ILINet release: state-level ILI from the 2017/18 season on, clinical-lab percent positive from October 2018 (`analysis/peak-models/epidata_ilinet.py`). The as-published series at each reference date is rebuilt from values at lags 0–9 weeks; older weeks are taken as final.
+- **Size of revisions** (states, 2018/19–2019/20). At first release the product differs from its final value by a median of about 6–9% on the log scale, with a 90th percentile of 45–65%; by lag 4 the median is below 1%. Up and down revisions are both common, and positivity drives most of the large ones. In 7 of 16 state-seasons checked, the peak week of the first-release series differed from that of the final series.
+- **Effect on forecasts.** Forecasting from provisional ILINet as if it were final lowered the baseline's log score from −1.50 to −1.83 and its 95% peak-size coverage from 0.94 to 0.79. With revision simulation these became −1.66 and 0.92 (@sec-dev-results).
+
+::: {.callout-note title="Implementation"}
+**ILINet revision model** (`validate_ilinet.py --revisions`; `epidata_ilinet.revision_vintages`; `RevisionModel(max_lag=10, strata_bounds=(), offset=0.01, fallback_sd=0.25)`).
+
+- **Vintages known at the reference date only.** Revision vectors come from releases whose latest week is on or before the reference date. Each is measured against the latest value available *at the reference date* (at most lag 9), never against today's final value.
+- **Offset** 0.01 in ILINet units in the log ratios (instead of the $+1$ used for counts). **No strata**: all locations are pooled.
+- **Fallback.** Before about mid-December 2018 fewer than 200 complete revision vectors exist, since clinical-lab vintages start in October 2018. Until then, a symmetric perturbation with lag-0 SD 0.25, decaying as $1/(1 + j)$, is used. That value was chosen with knowledge of the measured revision sizes above.
+- $S = 200$ draws per location, as for NHSN.
+:::
+
+::: {.callout-tip title="Possible extensions"}
+- **Condition revisions on information available at release time.** The bootstrap treats a state's lag-0 value as a draw from all states' revision histories. For ILINet, the size of a positivity revision depends strongly on how many specimens have been reported so far. For NHSN, the analogue is how complete hospital reporting is. A regression of the log revision ratio on lag, specimen count (or number of reporting hospitals) and location, for example a quantile regression in the spirit of Tang et al. (2025), should give sharper, better-targeted revision draws.
+- **Make the hierarchical model's censored update robust to revisions.** The bounds "the peak is no earlier and no lower than the current maximum" (@sec-hier-current) use the reported data. With ILINet's two-way revisions a reported maximum can later be revised down. Computing the bounds on revision draws, rather than on the reported series, would account for this.
+- **Train on real-time features.** An alternative is to train the models on features computed from provisional data, with targets from final data. This needs long vintage histories (ILINet vintages exist only from 2017/18, NHSN from 2022), so it is not practical yet.
+:::
+
 ## Checking the revision probabilities
 
-The backtest should check that the revision probabilities are **calibrated**: across all forecasts, the total probability that was assigned to past non-maximal weeks should roughly match how often a past non-maximal week actually became the final peak. Because such events are rare, this check is coarse, and it should be reported with its (season-blocked) uncertainty. This check is planned; it is not part of `score_peak_forecasts.py`.
+The backtest should check that the revision probabilities are **calibrated**: across all forecasts, the total probability that was assigned to past non-maximal weeks should roughly match how often a past non-maximal week actually became the final peak. Because such events are rare, this check is coarse, and it should be reported with its (season-blocked) uncertainty. This check is not yet part of `score_peak_forecasts.py` (@sec-future).
 
 # From model output to a submission {#sec-submission}
 
@@ -1069,20 +1228,145 @@ NHSN has only a few usable seasons, and all of them have already been looked at 
 - **Real-time data.** ILINet has no vintages in `iddata`, but the Delphi Epidata API keeps every weekly release (unweighted ILI from the 2017/18 season on, clinical-lab positivity from October 2018). `epidata_ilinet.py` reconstructs the ILINet × positivity series of each state and the nation as published by each reference date (`validate_ilinet.py --realtime`). Weeks at least 10 weeks old are taken as final. Revisions are large: at first release the product differs from its final value by a median of 6–9%, with a 90th percentile of 45–65%, mostly because positivity is revised as more specimens are reported. Revisions go in both directions, unlike NHSN's mostly upward ones. Scores always use the final data.
 - **Revision simulation.** With `--revisions`, the same block-bootstrap revision model as for NHSN (@sec-revision) is fit, at each reference date, to the ILINet revision vectors known by then. Revisions are measured against the latest value available at that date, with an offset of 0.01 in ILINet units and no strata. The model is then applied to 200 simulated final versions of the current season. Before about mid-December 2018 fewer than 200 revision vectors exist, and a symmetric perturbation with lag-0 SD 0.25 is used instead. That value was chosen with knowledge of the revision sizes above, a mild use of hindsight that affects only the first reference dates of 2018/19.
 - **Other differences from the NHSN setting.** State ILINet also has about eight earlier seasons per state, whereas NHSN has two or three, so features that use a location's history (`hist_rel`) and location effects are better informed here than they will be for NHSN. Peak size is in ILINet units and is scored with WIS on the $\log(y + 0.01)$ scale; the log score and RPS for the peak week are as defined above.
-- **Test seasons: NHSN 2023/24 and 2024/25.** The few variants that do well on the development seasons are then run as real-time NHSN hindcasts (@sec-dev-design-test) and compared with the existing models. 2025/26 is left for a final check, keeping in mind that the earlier models were already examined on it.
+- **Test seasons: NHSN 2023/24 and 2024/25.** The few variants that do well on the development seasons are then run as real-time NHSN hindcasts (@sec-dev-design-test) and compared with `peak_baseline`, `peak_gbqr` and `peak_kcde`, the models already hindcast on NHSN. No model developed since then has been run on NHSN yet (@sec-future). 2025/26 is left for a final check, keeping in mind that the earlier models were already examined on it.
+
+## Development results {#sec-dev-results}
+
+::: {.callout-warning title="Two development seasons only"}
+State-level ILINet in 2018/19 and 2019/20 (about 45 states, 29 reference dates each; @sec-dev-design). With two seasons, differences of a few hundredths in mean log score are within season-to-season noise. None of these versions has been run on NHSN.
+:::
+
+All numbers are means over states, reference dates and both seasons (`analysis/peak-models/ilinet-validation/scores.csv`, rows with `agg_level == "state"`). Higher log scores are better; RPS and WIS are lower-is-better and are shown relative to the baseline in the same setting (below 1 is better than the baseline).
+
+### Real-time data matter
+
+The same baseline model, scored three ways:
+
+| Setting | Log score | RPS | log-WIS | 50% cov. | 95% cov. |
+|---|---|---|---|---|---|
+| Final data (not real time) | −1.50 | 1.30 | 0.284 | 0.70 | 0.94 |
+| Data as published, taken at face value (`@rt`) | −1.83 | 1.40 | 0.296 | 0.54 | 0.79 |
+| As published, with revision simulation (`@rtrev`) | −1.66 | 1.35 | 0.292 | 0.58 | 0.92 |
+
+In plain terms: forecasting from provisional data as if it were final costs a lot. The log score drops by a third of a unit, and the 95% intervals for peak size cover the truth only 79% of the time. Most of the damage comes from weeks that are later revised into, or out of, being the peak, which a model that trusts the provisional data gives only the floor probability. Simulating revisions (@sec-revision) recovers most of the loss. The remaining gap, compared with final data, is information that is genuinely not available in real time. All comparisons below use the real-time setting with revision simulation.
+
+### Models and variants
+
+| Model (all `@rtrev`) | Log score | Rel. RPS | Rel. log-WIS | 50% cov. | 95% cov. |
+|---|---|---|---|---|---|
+| **`ens_gbqr_hierw05`** | −1.609 | **0.879** | **0.595** | 0.60 | 0.94 |
+| `ens_gbqr_hierw02` | −1.610 | 0.890 | 0.602 | 0.58 | 0.94 |
+| `ens_gbqr_hierw05_base` | **−1.596** | 0.886 | 0.687 | 0.62 | 0.93 |
+| `peak_gbqr` (base) | −1.631 | 0.899 | 0.631 | 0.53 | 0.92 |
+| `peak_gbqr__sb` (SB) | −1.670 | 0.911 | 0.615 | 0.54 | 0.92 |
+| `peak_baseline` | −1.663 | 1.000 | 1.000 | 0.58 | 0.92 |
+| `hier__w02c12` | −1.659 | 0.927 | 0.602 | 0.58 | 0.93 |
+| `hier__w05` | −1.679 | 0.925 | 0.621 | 0.59 | 0.93 |
+| `hier__w05d` | −1.676 | 0.922 | 0.621 | 0.60 | 0.93 |
+| `hier__w05c12` | −1.684 | 0.928 | 0.614 | 0.59 | 0.93 |
+| `hier__w05dtv` | −1.701 | 0.959 | 0.626 | 0.60 | 0.93 |
+| `hier__w05c12sb` | −1.715 | 0.964 | 0.627 | 0.60 | 0.92 |
+| `peak_hier` (defaults) | −1.755 | 1.009 | 0.789 | 0.57 | 0.92 |
+| `hier__tv` | −1.778 | 1.042 | 0.780 | 0.58 | 0.92 |
+| `hier__nocur` | −1.873 | 1.142 | 0.600 | 0.53 | 0.93 |
+
+Version names are defined in @sec-versions. `peak_kcde` scored close to `peak_baseline` in the final and `@rt` settings, and was not run in `@rtrev`. The hybrid versions have results for 2018/19 only, shown in @sec-hier-hybrid.
+
+The conclusions are summarized in @sec-dev-conclusions. Two details not visible in the table: each tempering step from 0.15 to 0.05 to 0.02 improved every score in both seasons; and `ens_gbqr_hierw05` beats both members and the baseline on log score and WIS in each season separately (log score −1.85 and −1.37, against −1.87 and −1.39 for `peak_gbqr`), while on RPS it is second to GBQR in 2018/19 (1.36 against 1.34). Time-varying coefficients, weeks-since-max indicators, restricting the update, and SB features did not help the hierarchical model.
+
+### Why the ensemble works: the models are good at different times
+
+Mean log score by weeks between the forecast's current week and the true peak (negative: before the peak):
+
+| Weeks from peak | `peak_baseline` | `peak_gbqr` | `peak_hier` | `hier__w05` | `hier__w02c12` | `ens_gbqr_hierw05` |
+|---|---|---|---|---|---|---|
+| 9 or more before | −2.69 | −2.80 | −2.98 | −2.91 | −2.85 | −2.79 |
+| 5 to 8 before | −2.66 | −2.82 | **−2.31** | −2.46 | −2.66 | −2.54 |
+| 2 to 4 before | −2.66 | −2.72 | −2.79 | −2.66 | −2.67 | −2.61 |
+| 1 before to 1 after | −2.19 | **−1.86** | −2.81 | −2.44 | −2.12 | −2.06 |
+| 2 to 4 after | −0.92 | **−0.59** | −0.88 | −0.71 | −0.70 | −0.64 |
+| 5 or more after | −0.37 | −0.33 | −0.38 | −0.34 | −0.35 | −0.34 |
+
+In plain terms: 5 to 8 weeks before the peak, the hierarchical model is clearly best. This is the effect of learning the current season's timing from all states. Without the current-season update, the same variant scored −3.2 there. From the peak on, GBQR is best: its trees recognize the turn of the epidemic sharply. The hierarchical model is weakest in the weeks around the peak, though weaker tempering narrows the gap (−2.81 at 0.15, −2.44 at 0.05, −2.12 at 0.02, against −1.86 for GBQR). Averaging the two keeps most of each model's strength. These breakdowns condition on the outcome, so they describe where models differ rather than ranking them (@sec-eval).
+
+### Candidate features {#sec-dev-features}
+
+Besides the model runs above, many candidate feature groups were tested in the exploratory cross-validation harness (`relative_size_predictors.py`; details and figures in `relative-size-eda.html`). The harness fits LightGBM quantile regressions for $z$ and a classifier for "the peak is still ahead" ($z > 0$), holding out one season at a time (22 folds, ILINet and FluSurv-NET, final data, every other origin week). Every feature was checked for look-ahead by corrupting future weeks and later seasons. These are **not** model runs: a group that helps there still has to be confirmed in `peak_gbqr` itself, in real time and on NHSN.
+
+"Pinball" is the quantile loss for $z$ relative to the comparison set (below 1 is better). "Log loss" is the change in the $z > 0$ classifier's log loss (negative is better). "Win" is the share of season-bootstrap resamples in which the group is better.
+
+| Comparison | Peak size (pinball) | Has it peaked? (log loss) | Verdict |
+|---|---|---|---|
+| SB vs base | 0.975 (−2.5%; −7% in weeks 22–26) | +0.003 | Small size gain; adopted as the optional set SB |
+| base without `hist_rel` | 1.63 | +0.058 | `hist_rel` is by far the most important feature |
+| SB + types (B share) | 0.995 | **−0.0074 (6%)**, win 99%, better in 16 of 22 seasons; −0.0087 on ILINet state rows, −0.0072 on FluSurv-NET | **Largest gain for timing**, mostly in weeks 17–26; no size gain |
+| SB + regional (all) | 1.012 | −0.0030 (all rows, win 88%); −0.0047 on ILINet state rows (win 99%) | Small timing gain, mostly from latitude/longitude; slight size loss |
+| SB + latlon | 1.012 | −0.0029 on ILINet state rows (win 70%) | Most of the regional gain |
+| SB + recession / + records | 1.003 / 1.001 | −0.0020 (win 96%) / −0.0015 (win 89%) | Small timing gain |
+| SB + nbr5 / hhs / wave | 1.004–1.005 | −0.0001 to +0.0008 | No gain beyond the national synchrony features |
+| SB + subtype (H3) | 1.033 | +0.0026 | Hurts; season-level values let trees memorize seasons |
+| SB + reflection, severity-in-peaked, deceleration, Bass, cross-source | 1.001–1.016 | no reliable gain | No gain |
+| SB + chain-ladder | 1.050 | — | Hurts |
+| base + trend / onset / timing-vs-history / holiday | 0.996 / 0.999 / 1.036 / 1.005 | about 0 (holiday −0.0024, not reliable) | No gain |
+
+In plain terms: almost nothing improves the forecast of *how big* the peak will be beyond SB; the strongest size predictor is where the season stands relative to the location's typical peak (`hist_rel`). For *has the peak passed?* three groups help a little: the influenza B share, latitude/longitude, and recession/records. The B-share gain is the largest; it mostly works in reverse of the "second B wave" story, because a high or rising B share usually means the A wave is already falling.
+
+### GBQR feature-set runs {#sec-dev-gbqr-runs}
+
+The candidate groups that looked useful above are being tested in `peak_gbqr` itself (`validate_ilinet.py --revisions`, `@rtrev`, both development seasons). Because GBQR's size and timing models are separate (@sec-gbqr), each run tests one size set and one timing set, and the best of each can be combined afterwards without another run. All runs use reported-at-t synchrony. For the type and subtype groups, training uses final WHO/NREVSS counts; the forecast season uses as-published clinical-lab A/B counts from the Delphi releases (for example, Massachusetts A positives were first published as 227 and later revised to 336), but final H1/H3 counts, since no subtype vintages exist. "Offset" is `size_offset = True`; "recession" includes the records features.
+
+| Run | Size features | Timing features | Result |
+|---|---|---|---|
+| `peak_gbqr` (control) | base | base | above |
+| `peak_gbqr__sb` (control, carried-forward) | SB | SB | above |
+| `gbqr__R1` | SB | SB | *pending* |
+| `gbqr__R2` | SB + offset | base + bshare | *pending* |
+| `gbqr__R3` | SB + bshare | base + latlon | *pending* |
+| `gbqr__R4` | SB + trend | base + recession | *pending* |
+| `gbqr__R5` | SB + h3 | base + holiday | *pending* |
+| `gbqr__R6` | SB + recession | base + bshare + latlon + recession + holiday | *pending* |
+| `gbqr__R7` | SB + latlon | SB + bshare | *pending* |
+| `gbqr__R8` | SB + bshare + offset | SB + latlon + recession | *pending* |
+| `gbqr__R9` | SB + trend + bshare | SB + bshare + latlon + recession | *pending* |
+| `gbqr__R10` | base + offset | SB + bshare + latlon + recession + holiday | *pending* |
+
+### Geography and influenza types {#sec-dev-geography}
+
+From `peak-timing-size-eda.html` (ILINet states, final data; descriptive):
+
+- **Timing is mostly a season effect.** Season explains 69% of the variation in peak week and location 6%. The residual SD is 2.7 weeks.
+- **There is a south-to-north delay.**
+  - A state's average peak week relative to the season median correlates 0.71 with latitude, about 0.2 weeks later per degree north. Latitude and longitude explain 60% of the variation in these averages.
+  - Timing is spatially clustered: Moran's I is 0.56 with 5 nearest neighbors, and 0.27 after removing the latitude/longitude trend.
+- **The pattern changes from season to season.** A state's relative timing barely repeats between seasons (correlation 0.11). Of the within-season variation in peak week:
+  - season-specific gradients explain 18% (adjusted);
+  - a persistent state effect, 10%;
+  - one common gradient, 10%;
+  - 69% is explained by none of these.
+- **Influenza types.** B usually peaks about 3 weeks after A (range 7 weeks before to 17 weeks after). Among ILINet states, multi-peaked series (a second hump at least 60% of the peak) are more common where the B share is high: 35% in the top third of B share, against 21% in the bottom third. About 4 in 10 double humps are an A wave followed by a B wave. The target's peak week is within 2 weeks of the local A peak in 87% of location-seasons.
+- **Subtypes.** H3N2-dominant seasons are larger in FluSurv-NET hospitalizations (Spearman 0.55 between the H3 share and relative peak size, 11 seasons), but peak at about the same time as H1N1-dominant seasons.
+
+### Conclusions from development {#sec-dev-conclusions}
+
+1. **Evaluate in real time.** `@rtrev` (as-published data plus revision simulation) is the evaluation setting. Treating provisional data as final costs about a third of a unit of log score.
+2. **Best single model over both seasons: `peak_gbqr`** with feature set base. `peak_gbqr__sb` trades slightly better size forecasts for slightly worse timing.
+3. **Best overall: `ens_gbqr_hierw05`.** It beats both members and `peak_baseline` on log score and peak-size WIS in each season.
+4. **Hierarchical model and hybrid.** Much weaker tempering than the committed default is better (0.02 best). The current-season update helps 5–8 weeks before the peak but appears too strong around it. `hybrid__w02` was the best single model in 2018/19 (one season, poor mixing).
+5. **Features.** For peak size nothing tested beats SB. For the already-peaked probability the B share is the most promising addition, then latitude/longitude and recession/records; these are now being tested in GBQR (@sec-dev-gbqr-runs).
+6. **NHSN.** None of this has been tested on NHSN (@sec-future).
 
 ## Backtest design and comparisons {#sec-dev-design-test}
 
 - **Seasons and origins.** Hindcasts (`run_hindcasts.py`) at every reference date listed for the peak-week task of each season in `hub-config/tasks.json`: 2023/24 (29 dates, 2023-10-21 to 2024-05-04), 2024/25 (23 dates, 2024-11-30 to 2025-05-17), and 2025/26 (28 dates, 2025-11-22 to 2026-05-30). Training is forward chaining (@sec-loso): only seasons strictly before the forecast season. NHSN inputs, including all revision vintages, are those available on each reference date, so the current-season inputs are exactly what was available in real time.
-- **Scores.** Peak week: log score (with the floor applied), RPS, and the probability within $\pm 1$ week. Peak size: WIS on the count and log scales, 50% and 95% coverage, and the relative error of the median. Planned additions: the WIS decomposition, coverage at all 11 levels, and the calibration of past-week revision probabilities (@sec-backfill).
+- **Scores.** Peak week: log score (with the floor applied), RPS, and the probability within $\pm 1$ week. Peak size: WIS on the count and log scales, 50% and 95% coverage, and the relative error of the median. Further summaries (the WIS decomposition, coverage at all 11 levels, and the calibration of past-week revision probabilities) are listed in @sec-future.
 - **Stratification.** Results are reported by the number of weeks before or after the true peak, $r - W^*$, since this is where models differ most. Stratifying by a quantity that depends on the outcome is useful for description but can mislead if used alone to rank models (the "forecaster's dilemma", Lerch et al. 2017), so overall scores are always reported alongside.
 - **Comparisons.** Against `peak_baseline`, and (with `--hub_root`) against the peak forecasts that FluSight models submitted for 2025/26 (including `FluSight-ensemble` and `FluSight-base_seasonal`), read from a local clone of the FluSight hub.
-- **Uncertainty (planned).** With only three evaluation seasons, differences between models are uncertain. Paired score differences will be summarized by season, and their uncertainty assessed by resampling seasons.
+- **Uncertainty.** With only three evaluation seasons, differences between models are uncertain. Summarizing paired score differences by season, with season-resampled uncertainty, is listed in @sec-future.
 - **Plausibility.** Before any real-time submission, each location's pmf and quantiles are plotted against the observed data.
 
 ## Figures from backtest outputs (placeholders) {#sec-figures}
 
-The following chunks are placeholders. They are not evaluated and will be filled in once cached backtest outputs exist. No results are reported in this document.
+The following chunks are placeholders for backtest figures. They are not evaluated. Figures of the development data (peak timing and size, the relative size target, and candidate features) are in the two exploratory documents, `peak-timing-size-eda.html` and `relative-size-eda.html`. The development results are in tables (@sec-dev-results).
 
 ```{python}
 #| label: ph-example-season
@@ -1132,6 +1416,35 @@ scores = pd.read_csv("analysis/peak-models/peak-scores.csv")  # written by score
 # Placeholder: calibration of past-week revision probabilities: assigned probability
 # versus observed frequency with which a past non-maximal week became the peak.
 ```
+
+# Open questions and future work {#sec-future}
+
+Everything below is not yet done. Other sections point here instead of describing plans.
+
+**Evaluation**
+
+- Score `gbqr__R1`–`gbqr__R10` (@sec-dev-gbqr-runs) and combine the best size set with the best timing set.
+- Run 2–3 of those GBQR configurations, including one without the recession features (NHSN's mostly upward revisions make provisional latest weeks look like declines), with `peak_gbqr` and `peak_baseline`, as real-time hindcasts on NHSN 2023/24 and 2024/25, keeping 2025/26 for a final check.
+- On hold while GBQR is locked in: `hybrid` and `hybrid__w02` for 2019/20, `hybrid__cu01` and `hybrid__cu003`, and a longer `hybrid__w02` run.
+- For the backtests: season-blocked uncertainty for paired score differences, the WIS decomposition, coverage at all 11 levels, and the calibration of past-week revision probabilities.
+
+**Models**
+
+- Decide the default tempering for `peak_hier` (development favors 0.02 over the committed 0.15) and, once the `cu` runs finish, the current-update weight.
+- Commit the hybrid (`idmodels/peak/hybrid.py`, `current_update_weight`) and `src/peak_hybrid`.
+- Build a `peak_ensemble` model directory producing hub files. Learning the ensemble weights, for example by phase of the season, needs more than two development seasons.
+- Season-specific spatial gradients in the hierarchical hazard (@sec-dev-geography), and location effects shrunk toward a latitude trend (useful for Florida, which has no ILINet).
+- Modeling influenza A and B separately and combining them, to represent a B-driven second hump directly.
+
+**Features**
+
+- Adopt one synchrony definition as the default (reported-at-t is used by the `gbqr__R` runs).
+- Revision simulation for the clinical-lab A/B counts behind the B-share features, and as-published subtype counts.
+
+**Revisions**
+
+- Condition revision draws on information available at release time, such as specimen counts or the number of reporting hospitals (@sec-revision-ilinet).
+- Compute the hierarchical model's censored bounds on revision draws.
 
 # Glossary and references {#sec-glossary}
 

@@ -1,16 +1,23 @@
 """
-Search for better predictors of the relative size target z (companion to relative_size_eda.py).
+Search for better real-time predictors of the relative size target z (companion to relative_size_eda.py).
 
+Model-side computations only; all figures and descriptive tables are made in R by relative-size-eda.qmd.
 Builds the season-replay rows exactly as the models do (via relative_size_eda.load_rows, which calls
 idmodels.peak.series.build_replay_rows; NHSN excluded, Puerto Rico / Virgin Islands ILINet dropped), adds candidate
-features computed only from data available at season week t, and evaluates them by
-  - within-week-bin Spearman correlations with z and with 1{z > 0}, and
-  - leave-one-season-out LightGBM quantile regression of z and classification of z > 0, comparing feature sets.
-Outputs (figures, markdown tables, predictors_numbers.json, cv_results.parquet) go to analysis/peak-models/eda/.
+features computed only from data available at season week t, runs leakage checks, and runs leave-one-season-out
+LightGBM quantile regression of z and classification of z > 0 for many feature sets. Writes to
+analysis/peak-models/eda/:
+  predictor_rows.parquet     replay rows with all candidate features
+  cv_results.parquet         per-row CV scores (pinball, log loss) for the section 9 feature sets; cv_sets.csv
+  cv_holiday.parquet, cv_holiday_adjust.parquet, holiday_excess.parquet, holiday_calendar.csv   (section 10)
+  cv_lit.parquet, reflection_check.csv                                                          (section 11)
+  cv_bootstrap.csv           season-bootstrap win rates and per-season comparisons for every feature set
+  importance.csv             LightGBM gain importances
+  predictors_numbers.json    leakage / consistency checks, holiday adjustment factors, runtimes
 
-Usage (from the repository root):
-    OMP_NUM_THREADS=4 DYLD_FALLBACK_LIBRARY_PATH=<venv>/lib/python3.12/site-packages/sklearn/.dylibs \
-        python analysis/peak-models/relative_size_predictors.py [--quick]
+Usage (from the repository root; about 10 minutes from scratch, 2-3 minutes with all --reuse_* flags):
+    OMP_NUM_THREADS=1 DYLD_FALLBACK_LIBRARY_PATH=<venv>/lib/python3.12/site-packages/sklearn/.dylibs \
+        python analysis/peak-models/relative_size_predictors.py [--reuse_cv --reuse_holiday_cv --reuse_lit_cv]
 """
 import argparse
 import json
@@ -21,15 +28,12 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-import matplotlib  # noqa: E402
-import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
 
 from idmodels.peak.base import season_week_to_date  # noqa: E402
 from idmodels.peak.series import build_replay_rows, build_season_arrays, running_max, season_peaks  # noqa: E402
-from relative_size_eda import (INK, INK2, MIN_OBS, OUT, REPLAY_START, W0, W1, Z_YLIM, load_rows,  # noqa: E402
-                               md_table, save)
+from relative_size_eda import MIN_OBS, OUT, REPLAY_START, W0, W1, load_rows  # noqa: E402
 
 KEYS = ["source", "agg_level", "location", "season", "season_week"]
 CURRENT = ["season_week", "rel_max", "wks_since_max", "g1", "g2", "g3", "rm3", "cum_rel", "hist_rel", "nat_rel_max",
@@ -65,6 +69,41 @@ LIT_LABELS = {"reflection": "reflection principle", "severity": "severity in pea
               "chain_ladder": "chain ladder", "deceleration": "deceleration", "recession": "recession",
               "records": "record counts", "bass": "Bass implied peak", "cross_source": "cross-source"}
 ALL_LIT = [f for g in GROUPS_LIT.values() for f in g]
+# section 12: regional / neighbour synchrony (state series only; FIPS -> centroid lat, lon and HHS region)
+STATE_CENTROIDS = {"01": (32.59, -86.75), "02": (64.0, -150.0), "04": (34.22, -111.62), "05": (34.73, -92.30), "06": (36.53, -119.77), "08": (38.68, -105.51), "09": (41.59, -72.36), "10": (38.68, -74.98), "11": (38.90, -77.03), "12": (27.87, -81.69), "13": (32.33, -83.37), "15": (20.8, -156.3), "16": (43.56, -113.93), "17": (40.05, -89.38), "18": (40.05, -86.08), "19": (41.94, -93.37), "20": (38.42, -98.12), "21": (37.39, -84.77), "22": (30.62, -92.27), "23": (45.62, -68.98), "24": (39.28, -76.65), "25": (42.36, -71.58), "26": (43.14, -84.69), "27": (46.39, -94.60), "28": (32.68, -89.81), "29": (38.33, -92.51), "30": (46.82, -109.32), "31": (41.34, -99.59), "32": (39.11, -116.85), "33": (43.39, -71.39), "34": (39.96, -74.23), "35": (34.48, -105.94), "36": (43.14, -75.14), "37": (35.42, -78.47), "38": (47.25, -100.10), "39": (40.22, -82.60), "40": (35.51, -97.12), "41": (43.91, -120.07), "42": (40.91, -77.45), "44": (41.59, -71.12), "45": (33.62, -80.51), "46": (44.34, -99.72), "47": (35.68, -86.46), "48": (31.39, -98.79), "49": (39.11, -111.33), "50": (44.25, -72.55), "51": (37.56, -78.20), "53": (47.42, -119.75), "54": (38.42, -80.67), "55": (44.59, -89.99), "56": (43.05, -107.26)}  # noqa: E501
+HHS_REGION = {f: r for r, fs in {
+    1: ["09", "23", "25", "33", "44", "50"], 2: ["34", "36", "72", "78"], 3: ["10", "11", "24", "42", "51", "54"],
+    4: ["01", "12", "13", "21", "28", "37", "45", "47"], 5: ["17", "18", "26", "27", "39", "55"],
+    6: ["05", "22", "35", "40", "48"], 7: ["19", "20", "29", "31"], 8: ["08", "30", "38", "46", "49", "56"],
+    9: ["04", "06", "15", "32"], 10: ["02", "16", "41", "53"]}.items() for f in fs}
+GROUPS_REG = {
+    "nbr5": ["nbr5_frac_past2", "nbr5_med_rel_max", "nbr5_med_wsm", "nbr5_med_g3"],
+    "hhs": ["hhs_frac_past2", "hhs_med_rel_max"],
+    "wave": ["wave_lead"],
+    "latlon": ["lat", "lon"],
+}
+REG_LABELS = {"nbr5": "5 nearest states", "hhs": "HHS region", "wave": "wave position", "latlon": "latitude/longitude"}
+ALL_REG = [f for g in GROUPS_REG.values() for f in g]
+# section 13: influenza type / subtype (WHO/NREVSS, final values from the iddata S3 file cached in eda/strain/)
+STRAIN_PATH = OUT / "strain" / "who-nrevss.csv"
+STRAIN_URL = "https://infectious-disease-data.s3.amazonaws.com/data-raw/influenza-who-nrevss/who-nrevss.csv"
+STATE_FIPS = {"Alabama": "01", "Alaska": "02", "Arizona": "04", "Arkansas": "05", "California": "06", "Colorado": "08",
+              "Connecticut": "09", "Delaware": "10", "District of Columbia": "11", "Florida": "12", "Georgia": "13",
+              "Hawaii": "15", "Idaho": "16", "Illinois": "17", "Indiana": "18", "Iowa": "19", "Kansas": "20",
+              "Kentucky": "21", "Louisiana": "22", "Maine": "23", "Maryland": "24", "Massachusetts": "25",
+              "Michigan": "26", "Minnesota": "27", "Mississippi": "28", "Missouri": "29", "Montana": "30",
+              "Nebraska": "31", "Nevada": "32", "New Hampshire": "33", "New Jersey": "34", "New Mexico": "35",
+              "New York": "36", "North Carolina": "37", "North Dakota": "38", "Ohio": "39", "Oklahoma": "40",
+              "Oregon": "41", "Pennsylvania": "42", "Rhode Island": "44", "South Carolina": "45", "South Dakota": "46",
+              "Tennessee": "47", "Texas": "48", "Utah": "49", "Vermont": "50", "Virginia": "51", "Washington": "53",
+              "West Virginia": "54", "Wisconsin": "55", "Wyoming": "56"}
+MIN_POS = 20  # minimum positives (A + B, or subtyped A) in a window for a share to be computed
+GROUPS_TYPE = {
+    "B": ["b_share_3wk", "b_share_cum", "b_share_trend", "b_rising", "a_rising", "b_minus_a_growth", "b_frac_of_peak"],
+    "H3": ["h3_share_cum", "h3_share_3wk", "h3_share_nat"],
+}
+ALL_TYPE = [f for g in GROUPS_TYPE.values() for f in g]
+N_WORKERS = 3  # overridden by --workers
 SB = CURRENT + ["sync_frac_past2", "sync_frac_half", "sync_med_rel_max", "sync_med_g3", "cum_vs_hist_total",
                 "cum_vs_hist_same_week"]
 GROUP_LABELS = {"trend": "trend (Taylor, rolling means, lags)", "timing": "timing vs history",
@@ -342,6 +381,7 @@ def candidate_features(arrays) -> pd.DataFrame:
                     on=["source", "location", "season"], how="left", suffixes=("", "_p"))
     partner = part["index_p"].fillna(-1).astype(int).to_numpy()
     sev_groups = [np.flatnonzero((sync_group == g) & not_nat) for g in np.unique(sync_group)]
+    st_lat, st_lon, is_state, nbr_idx, hhs_idx, inv_w = regional_structure(keys)
 
     frames = []
     for t in range(REPLAY_START, W1 + 1):
@@ -509,6 +549,30 @@ def candidate_features(arrays) -> pd.DataFrame:
         f["xs_rel_max"] = np.where(hp, rel[pi] - rel, np.nan)
         f["xs_wsm"] = np.where(hp, wsm[pi] - wsm, np.nan)
         f["xs_g3"] = np.where(hp, g3[pi] - g3, np.nan)
+        # section 12: neighbour / regional synchrony among state series of the same source and season observed at t
+        past2 = ((wsm >= 2) & (t >= W0)).astype(float)
+        g3v = lx - L[:, t - 4] if t >= 4 else np.full(n, np.nan)
+        cols = {c: np.full(n, np.nan) for c in ALL_REG}
+        state_share = {}
+        for i in np.flatnonzero(is_state):
+            nb = nbr_idx[i][obs[nbr_idx[i]]]
+            if len(nb):
+                cols["nbr5_frac_past2"][i] = past2[nb].mean()
+                cols["nbr5_med_rel_max"][i] = np.median(rel[nb])
+                cols["nbr5_med_wsm"][i] = np.median(wsm[nb])
+                cols["nbr5_med_g3"][i] = np.nanmedian(g3v[nb]) if np.any(~np.isnan(g3v[nb])) else np.nan
+            rg = hhs_idx[i][obs[hhs_idx[i]]]
+            if len(rg):
+                cols["hhs_frac_past2"][i] = past2[rg].mean()
+                cols["hhs_med_rel_max"][i] = np.median(rel[rg])
+            oi, w = inv_w[i]
+            ok = obs[oi]
+            if ok.any():
+                # distance-weighted share of other states past their max, minus the unweighted share of all of them
+                cols["wave_lead"][i] = np.sum(w[ok] * past2[oi[ok]]) / np.sum(w[ok]) - past2[oi[ok]].mean()
+            cols["lat"][i] = st_lat[i]
+            cols["lon"][i] = st_lon[i]
+        f.update(cols)
         fr = pd.concat([keys, pd.DataFrame(f)], axis=1)
         frames.append(fr.loc[obs])
     return pd.concat(frames, ignore_index=True)
@@ -554,8 +618,112 @@ def load_rows_adjusted(hol_adjust: dict | str | None = None):
     return arrays, rows
 
 
+def load_strain():
+    """Weekly A, B, H1, H3 positives by geography ('US', 'Region k', state FIPS) and season, season weeks 1..53."""
+    if not STRAIN_PATH.exists():
+        STRAIN_PATH.parent.mkdir(parents=True, exist_ok=True)
+        import urllib.request
+        urllib.request.urlretrieve(STRAIN_URL, STRAIN_PATH)
+    x = pd.read_csv(STRAIN_PATH)
+    x["geo"] = np.where(x["region_type"] == "National", "US",
+                        np.where(x["region_type"] == "HHS Regions", x["region"], x["region"].map(STATE_FIPS)))
+    x = x.dropna(subset=["geo"])
+    out = {}
+    for (geo, season), g in x.groupby(["geo", "season"]):
+        arr = np.full((4, N_SEASON_WEEKS_T), np.nan)
+        wk = g["season_week"].to_numpy().astype(int) - 1
+        for r, c in enumerate(["a", "b", "a_h1", "a_h3"]):
+            arr[r, wk] = g[c].to_numpy(dtype=float)
+        out[(geo, season)] = arr
+    return out
+
+
+N_SEASON_WEEKS_T = 53
+
+
+def type_arrays(keys: pd.DataFrame, strain: dict) -> dict:
+    """For each series: A and B arrays of its own geography (state / HHS region / nation; FluSurv-NET sites use their
+    state), and H1, H3 arrays of its HHS region (the nation for national series), plus the national H1, H3."""
+    n = len(keys)
+    out = {k: np.full((n, N_SEASON_WEEKS_T), np.nan) for k in ["A", "B", "H1", "H3", "H1n", "H3n"]}
+    for i, (loc, agg, ssn) in enumerate(zip(keys["location"], keys["agg_level"], keys["season"])):
+        own = "US" if loc == "US" else (loc if agg == "hhs region" else loc)
+        reg = "US" if loc == "US" else (loc if agg == "hhs region" else
+                                        (f"Region {HHS_REGION[loc]}" if loc in HHS_REGION else None))
+        if (own, ssn) in strain:
+            out["A"][i], out["B"][i] = strain[(own, ssn)][0], strain[(own, ssn)][1]
+        if reg is not None and (reg, ssn) in strain:
+            out["H1"][i], out["H3"][i] = strain[(reg, ssn)][2], strain[(reg, ssn)][3]
+        if ("US", ssn) in strain:
+            out["H1n"][i], out["H3n"][i] = strain[("US", ssn)][2], strain[("US", ssn)][3]
+    return out
+
+
+def type_features(keys: pd.DataFrame, T: dict) -> pd.DataFrame:
+    """Type / subtype features for every series and season week t = REPLAY_START..W1, from weeks <= t only."""
+    n = len(keys)
+    frames = []
+
+    def wsum(x, lo, hi):  # sum over season weeks lo..hi (1-based, inclusive), NaN if all missing
+        lo = max(lo, 1)
+        if hi < lo:
+            return np.full(n, np.nan)
+        v = x[:, lo - 1:hi]
+        return np.where(np.all(np.isnan(v), axis=1), np.nan, np.nansum(v, axis=1))
+
+    def share(num, den):
+        with np.errstate(invalid="ignore", divide="ignore"):
+            return np.where(den >= MIN_POS, num / den, np.nan)
+
+    for t in range(REPLAY_START, W1 + 1):
+        Tt = {k: v.copy() for k, v in T.items()}
+        for v in Tt.values():
+            v[:, t:] = np.nan  # nothing after week t
+        A, B = Tt["A"], Tt["B"]
+        A3, B3 = wsum(A, t - 2, t), wsum(B, t - 2, t)
+        A3p, B3p = wsum(A, t - 5, t - 3), wsum(B, t - 5, t - 3)
+        f = {"season_week": np.full(n, float(t))}
+        f["b_share_3wk"] = share(B3, A3 + B3)
+        f["b_share_cum"] = share(wsum(B, 5, t), wsum(A, 5, t) + wsum(B, 5, t))
+        f["b_share_trend"] = f["b_share_3wk"] - share(B3p, A3p + B3p)
+        f["b_rising"] = np.log((B3 + 1) / (B3p + 1))
+        f["a_rising"] = np.log((A3 + 1) / (A3p + 1))
+        f["b_minus_a_growth"] = f["b_rising"] - f["a_rising"]
+        roll = np.column_stack([wsum(B, s - 2, s) for s in range(3, t + 1)]) if t >= 3 else np.full((n, 1), np.nan)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", category=RuntimeWarning)
+            bmax = np.nanmax(roll, axis=1)
+        with np.errstate(invalid="ignore", divide="ignore"):
+            f["b_frac_of_peak"] = np.where(bmax > 0, B3 / bmax, np.nan)
+        H1c, H3c = wsum(Tt["H1"], 5, t), wsum(Tt["H3"], 5, t)
+        f["h3_share_cum"] = share(H3c, H1c + H3c)
+        f["h3_share_3wk"] = share(wsum(Tt["H3"], t - 2, t), wsum(Tt["H1"], t - 2, t) + wsum(Tt["H3"], t - 2, t))
+        H1n, H3n = wsum(Tt["H1n"], 5, t), wsum(Tt["H3n"], 5, t)
+        f["h3_share_nat"] = share(H3n, H1n + H3n)
+        frames.append(pd.concat([keys, pd.DataFrame(f)], axis=1))
+    return pd.concat(frames, ignore_index=True)
+
+
+def type_leakage_check(arrays, weeks=(14, 22, 30)) -> dict:
+    """Corrupt the type / subtype series after week t (x 100 + 5): type features at t must not change."""
+    n_obs = np.sum(~np.isnan(arrays.y[:, W0 - 1:W1]), axis=1)
+    keys = arrays.subset(n_obs >= MIN_OBS).keys
+    T = type_arrays(keys, load_strain())
+    base = type_features(keys, T).set_index(KEYS)
+    out = {}
+    for t in weeks:
+        T2 = {k: v.copy() for k, v in T.items()}
+        for v in T2.values():
+            v[:, t:] = v[:, t:] * 100 + 5
+        f2 = type_features(keys, T2)
+        f2 = f2[f2["season_week"] == t].set_index(KEYS)
+        b = base.loc[f2.index, ALL_TYPE]
+        out[f"type_future_weeks_t{t}"] = float(np.nanmax(np.abs((b - f2[ALL_TYPE]).to_numpy())))
+    return out
+
+
 def build_dataset(hol_adjust=None):
-    arrays, rows = load_rows_adjusted(hol_adjust) if hol_adjust else load_rows()
+    arrays, rows = load_rows_adjusted(hol_adjust) if hol_adjust else load_rows(keep_extra=True)
     feats = candidate_features(arrays)
     # newer idmodels versions compute some of these features themselves: keep ours, and record the agreement
     overlap = [c for c in feats.columns if c in rows.columns and c not in KEYS]
@@ -569,6 +737,9 @@ def build_dataset(hol_adjust=None):
     chk_wsm = np.nanmax(np.abs(d["wks_since_max"] - d["wsm_chk"]))
     assert chk_rel < 1e-9 and chk_wsm < 1e-9, (chk_rel, chk_wsm)
     assert d[ALL_NEW[0]].notna().any() and len(d) == len(rows)
+    n_obs = np.sum(~np.isnan(arrays.y[:, W0 - 1:W1]), axis=1)
+    keys_c = arrays.subset(n_obs >= MIN_OBS).keys
+    d = d.merge(type_features(keys_c, type_arrays(keys_c, load_strain())), on=KEYS, how="left", validate="one_to_one")
     d["pos"] = (~d["at_zero"]).astype(int)
     return d.drop(columns=["rel_max_chk", "wsm_chk"]), {"max_abs_diff_rel_max": float(chk_rel),
                                                         "idmodels_feature_max_abs_diff": idm_diff,
@@ -583,7 +754,7 @@ def leakage_check(d: pd.DataFrame, arrays, weeks=(14, 22, 30), season="2015/16")
          change (history uses strictly earlier seasons only).
     """
     out = {}
-    cur_only = (GROUPS_NEW["trend"] + GROUPS_NEW["onset"] + GROUPS_NEW["synchrony"] + HOLIDAY
+    cur_only = (GROUPS_NEW["trend"] + GROUPS_NEW["onset"] + GROUPS_NEW["synchrony"] + HOLIDAY + ALL_REG
                 + ["r_max", "gfrac", "wks_since_gmax", "g_decel", "z_par", "rec_rate", "rec_consist", "n_rec4",
                    "rec_frac", "bass_rel", "xs_rel_max", "xs_wsm", "xs_g3"])
     base = d.set_index(KEYS)
@@ -604,7 +775,7 @@ def leakage_check(d: pd.DataFrame, arrays, weeks=(14, 22, 30), season="2015/16")
     pure_hist = GROUPS_NEW["timing"] + ["cl_z", "p0_hist"]  # purely historical features
     out["later_seasons_hist_features"] = float(np.nanmax((b.loc[idx, pure_hist] - f2.loc[idx, pure_hist]).abs().to_numpy()))
     # 3. corrupt only the weeks after t of one season: every feature of that season at t must be unchanged
-    allf = ALL_NEW + HOLIDAY + ALL_LIT
+    allf = ALL_NEW + HOLIDAY + ALL_LIT + ALL_REG
     for t in weeks:
         a2 = type(arrays)(keys=arrays.keys, y=arrays.y.copy())
         rows_s = (arrays.keys["season"] == season).to_numpy()
@@ -625,6 +796,31 @@ def pinball(y, q, tau):
     return np.maximum(tau * d, (tau - 1) * d)
 
 
+def regional_structure(keys: pd.DataFrame):
+    """For each state series: indices of its 5 nearest other state series (same source and season), of the other
+    state series in its HHS region, and inverse-squared-distance weights over all other state series of the source-season."""
+    n = len(keys)
+    lat = np.array([STATE_CENTROIDS.get(l, (np.nan, np.nan))[0] for l in keys["location"]])
+    lon = np.array([STATE_CENTROIDS.get(l, (np.nan, np.nan))[1] for l in keys["location"]])
+    is_state = (keys["agg_level"] == "state").to_numpy() & ~np.isnan(lat)
+    hhs = np.array([HHS_REGION.get(l, -1) for l in keys["location"]])
+    grp = (keys["source"] + "|" + keys["season"]).to_numpy()
+    nbr, reg, inv = [np.array([], int)] * n, [np.array([], int)] * n, [(np.array([], int), np.array([]))] * n
+    r = np.pi / 180
+    for g in np.unique(grp[is_state]):
+        idx = np.flatnonzero((grp == g) & is_state)
+        la, lo = lat[idx] * r, lon[idx] * r
+        D = 6371 * np.arccos(np.clip(np.sin(la)[:, None] * np.sin(la)[None, :] +
+                                     np.cos(la)[:, None] * np.cos(la)[None, :] * np.cos(lo[:, None] - lo[None, :]), -1, 1))
+        for a, i in enumerate(idx):
+            order = [b for b in np.argsort(D[a]) if b != a]
+            nbr[i] = idx[order[:5]]
+            reg[i] = idx[[b for b in range(len(idx)) if b != a and hhs[idx[b]] == hhs[i]]]
+            others = np.array([b for b in range(len(idx)) if b != a], dtype=int)
+            inv[i] = (idx[others], 1.0 / np.maximum(D[a, others], 50.0) ** 2)  # inverse squared distance (km)
+    return lat, lon, is_state, nbr, reg, inv
+
+
 def _fit_fold(tr_X, tr_z, tr_pos, te_X):
     import lightgbm as lgb
 
@@ -640,7 +836,7 @@ def _fit_fold(tr_X, tr_z, tr_pos, te_X):
     return out
 
 
-def cv_feature_sets(d: pd.DataFrame, sets: dict, quick=False, n_jobs=3) -> pd.DataFrame:
+def cv_feature_sets(d: pd.DataFrame, sets: dict, quick=False, n_jobs=None) -> pd.DataFrame:
     """Leave-one-season-out: each season (all sources and locations) is held out in turn."""
     from joblib import Parallel, delayed
 
@@ -649,7 +845,7 @@ def cv_feature_sets(d: pd.DataFrame, sets: dict, quick=False, n_jobs=3) -> pd.Da
         seasons = seasons[::4]
     jobs = [(name, s) for name in sets for s in seasons]
     t0 = time.time()
-    res = Parallel(n_jobs=n_jobs)(
+    res = Parallel(n_jobs=n_jobs or N_WORKERS)(
         delayed(_fit_fold)(d.loc[d["season"] != s, sets[name]], d.loc[d["season"] != s, "z"],
                            d.loc[d["season"] != s, "pos"], d.loc[d["season"] == s, sets[name]])
         for name, s in jobs)
@@ -664,18 +860,6 @@ def cv_feature_sets(d: pd.DataFrame, sets: dict, quick=False, n_jobs=3) -> pd.Da
         p["set"] = name
         out.append(p[KEYS + ["z", "pos", "pinball", "logloss", "set"]])
     return pd.concat(out, ignore_index=True)
-
-
-def summarize_cv(cv: pd.DataFrame, ref="current") -> tuple[pd.DataFrame, pd.DataFrame]:
-    cv = cv.assign(bin=week_bin(cv["season_week"]))
-    by = cv.groupby(["set", "bin"])[["pinball", "logloss"]].mean().unstack("bin")
-    tot = cv.groupby("set")[["pinball", "logloss"]].mean()
-    for m in ["pinball", "logloss"]:
-        by[(m, "all")] = tot[m]
-    rel_pin = by["pinball"].div(by["pinball"].loc[ref], axis=1)
-    d_ll = by["logloss"].sub(by["logloss"].loc[ref], axis=1)
-    order = [bin_label(*b) for b in BINS] + ["all"]
-    return rel_pin[order], d_ll[order], by
 
 
 def season_bootstrap(cv, a, b, metric="pinball", n_boot=2000, seed=0):
@@ -693,136 +877,16 @@ def season_bootstrap(cv, a, b, metric="pinball", n_boot=2000, seed=0):
     return wins / n_boot
 
 
-def per_season_rel(cv, a, b):
+def per_season_rel(cv, a, b, metric="pinball"):
+    """Per held-out season (weeks 12-31): mean loss of set a divided by that of set b."""
     x = cv[(cv["season_week"] >= 12) & (cv["season_week"] <= 31)]
-    g = x.groupby(["set", "season"])["pinball"].mean().unstack("set")
+    g = x.groupby(["set", "season"])[metric].mean().unstack("set")
     return (g[a] / g[b])
 
 
-# ---------------------------------------------------------------------------------------------------------------
-# figures
-
-def fig_corr_heatmap(d, groups=None, name="fig11_predictor_correlations", first=None):
-    groups = GROUPS_NEW if groups is None else groups
-    first = CURRENT[1:-1] if first is None else first  # drop season_week and src_code
-    feats = first + [f for g in groups.values() for f in g]
-    d = d.assign(bin=week_bin(d["season_week"], CORR_BINS))
-    labels = [bin_label(*b) for b in CORR_BINS]
-    res = {}
-    for target in ["z", "pos"]:
-        mat = pd.DataFrame(index=feats, columns=labels, dtype=float)
-        for lab in labels:
-            x = d[d["bin"] == lab]
-            for f in feats:
-                mat.loc[f, lab] = x[[f, target]].corr(method="spearman").iloc[0, 1]
-        res[target] = mat
-    fig, axes = plt.subplots(1, 2, figsize=(10, 0.28 * len(feats) + 1.5), sharey=True)
-    cmap = matplotlib.colormaps["RdBu_r"]
-    for ax, (target, title) in zip(axes, [("z", "Spearman with z"), ("pos", "Spearman with 1{z > 0}")]):
-        mat = res[target]
-        im = ax.imshow(mat.to_numpy(dtype=float), cmap=cmap, vmin=-1, vmax=1, aspect="auto")
-        for i in range(mat.shape[0]):
-            for j in range(mat.shape[1]):
-                v = mat.iat[i, j]
-                if np.isfinite(v):
-                    ax.text(j, i, f"{v:.2f}", ha="center", va="center", fontsize=7,
-                            color="white" if abs(v) > 0.6 else INK)
-        ax.set_xticks(range(len(labels)))
-        ax.set_xticklabels([f"wk {lab}" for lab in labels], fontsize=8.5)
-        ax.xaxis.tick_top()
-        ax.set_title(title, loc="left", pad=22)
-        ax.grid(False)
-        # separators between feature groups
-        edges = np.cumsum([len(first)] + [len(v) for v in groups.values()])[:-1]
-        for e in edges:
-            ax.axhline(e - 0.5, color="white", lw=3)
-    axes[0].set_yticks(range(len(feats)))
-    axes[0].set_yticklabels(feats, fontsize=8)
-    # group labels on the right
-    starts = np.concatenate([[0], np.cumsum([len(first)] + [len(v) for v in groups.values()])])
-    labels_g = {**GROUP_LABELS, **LIT_LABELS}
-    names = ["current" if first == CURRENT[1:-1] else "reference"] + [labels_g[g] for g in groups]
-    for s0, s1, nm in zip(starts[:-1], starts[1:], names):
-        axes[1].text(len(labels) - 0.35, (s0 + s1 - 1) / 2, nm, ha="left", va="center", fontsize=8.5, color=INK2)
-    cb = fig.colorbar(im, ax=axes, orientation="horizontal", fraction=0.02, pad=0.02, aspect=50)
-    cb.set_label("Spearman correlation within the week bin (same scale in both panels)")
-    save(fig, name)
-    return res
-
-
-def fig_cv(rel_pin, d_ll, sets_order, name="fig12_cv_feature_sets", ref_label="current features"):
-    labels = [c for c in rel_pin.columns]
-    fig, axes = plt.subplots(1, 2, figsize=(12, 5.2), sharey=True)
-    y = np.arange(len(sets_order))
-    blues = matplotlib.colormaps["Blues"]
-    cols = {lab: blues(0.35 + 0.6 * i / (len(labels) - 2)) for i, lab in enumerate(labels[:-1])}
-    cols["all"] = INK
-    for ax, (tab, xlab, ref) in zip(axes, [(rel_pin, f"pinball loss relative to {ref_label}", 1.0),
-                                          (d_ll, f"change in log loss for z > 0 vs {ref_label}", 0.0)]):
-        ax.axvline(ref, color=INK2, lw=1)
-        for k, lab in enumerate(labels):
-            off = (k - (len(labels) - 1) / 2) * 0.1
-            ax.scatter(tab.loc[sets_order, lab], y + off, s=22 if lab != "all" else 46, color=cols[lab],
-                       marker="o" if lab != "all" else "D", label=f"weeks {lab}" if lab != "all" else "all weeks",
-                       zorder=3, edgecolor="white", linewidth=0.6)
-        ax.set_xlabel(xlab)
-        ax.grid(axis="y", visible=False)
-    axes[0].set_yticks(y)
-    axes[0].set_yticklabels(sets_order)
-    axes[0].invert_yaxis()
-    h, lab = axes[0].get_legend_handles_labels()
-    fig.legend(h, lab, loc="lower center", ncol=len(lab), fontsize=8.5, bbox_to_anchor=(0.55, -0.04))
-    axes[0].set_title("Quantile forecasts of z (lower is better)", loc="left")
-    axes[1].set_title("Probability that the peak is still ahead (lower is better)", loc="left")
-    fig.tight_layout()
-    save(fig, name)
-
-
-def fig_importance(imp):
-    top = imp.head(25)[::-1]
-    fig, ax = plt.subplots(figsize=(7, 6.5))
-    cols = ["#b7b6b0" if f in CURRENT else "#2a78d6" for f in top.index]
-    ax.barh(range(len(top)), top.values, color=cols, height=0.7)
-    ax.set_yticks(range(len(top)))
-    ax.set_yticklabels(top.index, fontsize=8.5)
-    ax.xaxis.set_major_formatter(matplotlib.ticker.PercentFormatter(1.0))
-    ax.set_xlabel("share of total gain (median quantile model, all features)")
-    ax.grid(axis="y", visible=False)
-    ax.text(0.98, 0.04, "grey: current features\nblue: new candidates", transform=ax.transAxes, ha="right",
-            fontsize=8.5, color=INK2)
-    fig.tight_layout()
-    save(fig, "fig13_importance")
-
-
-def fig_binned(d, feats, name, title_extra=None):
-    bins = [(12, 16), (17, 21), (22, 26)]
-    shades = [matplotlib.colormaps["Blues"](v) for v in (0.45, 0.7, 0.95)]
-    ncol = 3
-    nrow = int(np.ceil(len(feats) / ncol))
-    fig, axes = plt.subplots(nrow, ncol, figsize=(11.5, 3.3 * nrow), sharey=True)
-    axes = np.atleast_2d(axes)
-    for ax, f in zip(axes.flat, feats):
-        for (lo, hi), c in zip(bins, shades):
-            x = d[(d["season_week"] >= lo) & (d["season_week"] <= hi)].dropna(subset=[f])
-            if x[f].nunique() < 5:
-                continue
-            q = pd.qcut(x[f].rank(method="first"), 10, labels=False)
-            g = x.groupby(q)
-            mid, med = g[f].median(), g["z"].median()
-            ax.fill_between(mid, g["z"].quantile(0.25), g["z"].quantile(0.75), color=c, alpha=0.18, lw=0)
-            ax.plot(mid, med, color=c, lw=2, marker="o", ms=3.5, label=f"weeks {lo}–{hi}")
-        ax.set_title(f + (" (current feature)" if f in CURRENT else ""), loc="left")
-        ax.set_ylim(*Z_YLIM)
-    for ax in axes.flat[len(feats):]:
-        ax.set_visible(False)
-    for ax in axes[:, 0]:
-        ax.set_ylabel("eventual z (median, 25–75%)")
-    axes.flat[0].legend(fontsize=8, loc="upper right")
-    fig.tight_layout()
-    save(fig, name)
-
 
 # ---------------------------------------------------------------------------------------------------------------
+# holiday weeks (section 10)
 
 def holiday_excess(arrays) -> pd.DataFrame:
     """
@@ -853,151 +917,7 @@ def holiday_excess(arrays) -> pd.DataFrame:
     return df
 
 
-def cluster_ci(v: pd.Series, clusters: pd.Series, n_boot=2000, seed=0):
-    """Mean and 95% bootstrap interval, resampling seasons."""
-    g = pd.DataFrame({"v": v.to_numpy(), "c": clusters.to_numpy()}).groupby("c")["v"].agg(["sum", "count"])
-    rng = np.random.default_rng(seed)
-    idx = rng.integers(0, len(g), size=(n_boot, len(g)))
-    bs = g["sum"].to_numpy()[idx].sum(axis=1) / g["count"].to_numpy()[idx].sum(axis=1)
-    return float(v.mean()), float(np.quantile(bs, 0.025)), float(np.quantile(bs, 0.975))
-
-
-def fig_holiday_excess(ex):
-    from relative_size_eda import COLORS, GROUPS
-
-    blocks = ["placebo −6 wk", "holiday", "placebo +6 wk"]
-    fig, axes = plt.subplots(1, 2, figsize=(11.5, 4), gridspec_kw={"width_ratios": [1.3, 1]})
-    ax = axes[0]
-    res = {}
-    for gi, g in enumerate(GROUPS):
-        for bi, b in enumerate(blocks):
-            v = ex[(ex["group"] == g) & (ex["block"] == b)]
-            mu, lo, hi = cluster_ci(v["excess"], v["season"])
-            res[(g, b)] = (mu, lo, hi, len(v))
-            x = bi + (gi - 1) * 0.22
-            ax.plot([x, x], [lo, hi], color=COLORS[g], lw=2)
-            ax.plot([x], [mu], marker="o", ms=7, color=COLORS[g], mec="white",
-                    label=g if bi == 0 else None)
-    ax.axhline(0, color=INK2, lw=1)
-    ax.set_xticks(range(3))
-    ax.set_xticklabels(["6 weeks earlier\n(placebo)", "holiday weeks\n(Dec 22 – Jan 7)", "6 weeks later\n(placebo)"])
-    ax.set_ylabel("mean log excess vs 2 weeks before + 2 after")
-    ax.set_title("Holiday excess by source (mean, 95% season-bootstrap CI)", loc="left")
-    ax.legend(fontsize=8.5, loc="upper left")
-    ax.grid(axis="x", visible=False)
-    # paired: ILINet minus FluSurv-NET, same location and season
-    ax = axes[1]
-    h = ex[ex["block"] == "holiday"]
-    pair = h[h["source"] == "ilinet"].merge(h[h["source"] == "flusurvnet"], on=["location", "season"],
-                                           suffixes=("_ili", "_fsn"))
-    diffs = {}
-    for k in range(3):
-        dk = (pair[f"excess_k{k}_ili"] - pair[f"excess_k{k}_fsn"]).dropna()
-        if len(dk) < 10:
-            continue
-        mu, lo, hi = cluster_ci(dk, pair.loc[dk.index, "season"])
-        diffs[k] = (mu, lo, hi, len(dk))
-        ax.plot([k, k], [lo, hi], color=INK, lw=2)
-        ax.plot([k], [mu], marker="D", ms=7, color=INK, mec="white")
-    dall = pair["excess_ili"] - pair["excess_fsn"]
-    mu, lo, hi = cluster_ci(dall, pair["season"])
-    diffs["block"] = (mu, lo, hi, len(dall))
-    ax.plot([3, 3], [lo, hi], color=COLORS["ILINet states"], lw=2.5)
-    ax.plot([3], [mu], marker="D", ms=8, color=COLORS["ILINet states"], mec="white")
-    ax.axhline(0, color=INK2, lw=1)
-    ax.set_xticks(range(4))
-    ax.set_xticklabels(["1st holiday\nweek", "2nd", "3rd", "block\nmean"])
-    ax.set_ylabel("ILINet excess − FluSurv-NET excess")
-    ax.set_title(f"Same location & season ({len(pair)} pairs)", loc="left")
-    ax.grid(axis="x", visible=False)
-    fig.tight_layout()
-    save(fig, "fig15_holiday_excess")
-    return res, diffs
-
-
-def fig_holiday_max(d):
-    """P(eventual z = 0) given the lag since the running max was set, split by whether that max week was a holiday
-    week; rows at season weeks 20-30."""
-    from relative_size_eda import COLORS, GROUPS
-
-    x = d[(d["season_week"] >= 20) & (d["season_week"] <= 30) & (d["wks_since_max"] >= 1) &
-          (d["wks_since_max"] <= 5)]
-    fig, axes = plt.subplots(1, 3, figsize=(12, 3.8), sharey=True)
-    res = {}
-    for ax, g in zip(axes, GROUPS):
-        v = x[x["group"] == g]
-        for flag, ls, lab in [(1.0, "-", "max set in a holiday week"), (0.0, "--", "max set in another week")]:
-            u = v[v["max_in_holiday"] == flag]
-            p = u.groupby("wks_since_max")["at_zero"].agg(["mean", "size"])
-            ax.plot(p.index, p["mean"], color=COLORS[g], lw=2, ls=ls, marker="o", ms=4, label=lab)
-            for w, r in p.iterrows():
-                res[(g, int(flag), int(w))] = (round(float(r["mean"]), 3), int(r["size"]))
-        ax.set_title(g, loc="left")
-        ax.set_xticks(range(1, 6))
-        ax.set_xlabel("weeks since the running max was set")
-        ax.set_ylim(0, 1)
-        ax.yaxis.set_major_formatter(matplotlib.ticker.PercentFormatter(1.0))
-    axes[0].set_ylabel("share whose max was the final peak\n(eventual z = 0)")
-    axes[0].legend(fontsize=8, loc="lower right")
-    fig.tight_layout()
-    save(fig, "fig16_holiday_max_final")
-    return res
-
-
-def post_holiday_table(d):
-    """Rows 1-4 weeks after the last holiday week: how often the running max is a holiday week and what happens."""
-    from relative_size_eda import GROUPS
-
-    x = d[(d["weeks_since_holiday_end"] >= 1) & (d["weeks_since_holiday_end"] <= 4)]
-    rows = []
-    for g in GROUPS:
-        for j in range(1, 5):
-            v = x[(x["group"] == g) & (x["weeks_since_holiday_end"] == j)]
-            hmax = v[v["max_in_holiday"] == 1]
-            other = v[v["max_in_holiday"] == 0]
-            rows.append({"source": g, "weeks after holidays": j, "rows": len(v),
-                         "max in holiday week": f"{len(hmax) / max(len(v), 1):.0%}",
-                         "P(z=0) holiday max": f"{hmax['at_zero'].mean():.0%}" if len(hmax) else "–",
-                         "P(z=0) other max": f"{other['at_zero'].mean():.0%}" if len(other) else "–",
-                         "median z holiday max": round(float(hmax["z"].median()), 2) if len(hmax) else np.nan,
-                         "median z other max": round(float(other["z"].median()), 2) if len(other) else np.nan,
-                         "q90 z holiday max": round(float(hmax["z"].quantile(0.9)), 2) if len(hmax) else np.nan,
-                         "q90 z other max": round(float(other["z"].quantile(0.9)), 2) if len(other) else np.nan})
-    tab = pd.DataFrame(rows)
-    md_table(tab, OUT / "table_holiday_post.md")
-    return tab
-
-
-def hol_bin(w_after: pd.Series, hol_now: pd.Series) -> pd.Series:
-    out = pd.Series("other weeks", index=w_after.index, dtype="object")
-    out[hol_now == 1] = "holiday weeks"
-    out[(w_after >= 1) & (w_after <= 3)] = "1–3 wk after"
-    out[(w_after >= 4) & (w_after <= 6)] = "4–6 wk after"
-    return out
-
-
-def summarize_holiday_cv(cv, dmeta, sets, ref="current"):
-    x = cv.merge(dmeta, on=KEYS, how="left")
-    x["hbin"] = hol_bin(x["weeks_since_holiday_end"], x["hol_now"])
-    x["src"] = np.where(x["source"] == "ilinet", "ILINet", "FluSurv-NET")
-    out = []
-    for src in ["all", "ILINet", "FluSurv-NET"]:
-        v = x if src == "all" else x[x["src"] == src]
-        for bin_name, sel in [("all weeks", slice(None)), ("weeks 17–31", (v["season_week"] >= 17) & (v["season_week"] <= 31))] + \
-                [(b, v["hbin"] == b) for b in ["holiday weeks", "1–3 wk after", "4–6 wk after"]]:
-            u = v.loc[sel] if not isinstance(sel, slice) else v
-            g = u.groupby("set")[["pinball", "logloss"]].mean()
-            for s in sets:
-                if s == ref or s not in g.index:
-                    continue
-                out.append({"rows": src, "weeks": bin_name, "feature set": s,
-                            "pinball ratio": g.loc[s, "pinball"] / g.loc[ref, "pinball"],
-                            "Δ log loss": g.loc[s, "logloss"] - g.loc[ref, "logloss"],
-                            "n": int((u["set"] == ref).sum())})
-    return pd.DataFrame(out)
-
-
-def cv_fsn_target(dtrain: pd.DataFrame, sets: dict, n_jobs=3) -> pd.DataFrame:
+def cv_fsn_target(dtrain: pd.DataFrame, sets: dict, n_jobs=None) -> pd.DataFrame:
     """Leave-one-season-out, but score only the FluSurv-NET rows of the held-out season (targets unaffected by any
     ILINet adjustment)."""
     from joblib import Parallel, delayed
@@ -1005,7 +925,7 @@ def cv_fsn_target(dtrain: pd.DataFrame, sets: dict, n_jobs=3) -> pd.DataFrame:
     seasons = sorted(dtrain.loc[dtrain["source"] == "flusurvnet", "season"].unique())
     jobs = [(name, s) for name in sets for s in seasons]
     te_mask = {s: (dtrain["season"] == s) & (dtrain["source"] == "flusurvnet") for s in seasons}
-    res = Parallel(n_jobs=n_jobs)(
+    res = Parallel(n_jobs=n_jobs or N_WORKERS)(
         delayed(_fit_fold)(dtrain.loc[dtrain["season"] != s, sets[name]], dtrain.loc[dtrain["season"] != s, "z"],
                            dtrain.loc[dtrain["season"] != s, "pos"], dtrain.loc[te_mask[s], sets[name]])
         for name, s in jobs)
@@ -1021,99 +941,51 @@ def cv_fsn_target(dtrain: pd.DataFrame, sets: dict, n_jobs=3) -> pd.DataFrame:
     return pd.concat(out, ignore_index=True)
 
 
-def holiday_section(d, dcv, cv_main, nums, reuse=False):
-    """Section 10: holiday weeks."""
-    from relative_size_eda import GROUPS
-
+def holiday_outputs(d, dcv, cv_main, nums, reuse=False):
+    """Calendar, per-series holiday excess, holiday-feature CV and the ILINet-adjustment CV."""
     hn = {}
-    # calendar
-    seasons = sorted(d["season"].unique())
     cal = []
-    for s in seasons:
-        hw = holiday_weeks(s)
-        cal.append({"season": s, "season weeks": ", ".join(str(w) for w in hw),
-                    "week-ending dates": ", ".join(f"{season_week_to_date(s, w):%b %d}" for w in hw),
-                    "MMWR weeks": ", ".join(str(mmwr_week(season_week_to_date(s, w))) for w in hw)})
-    cal = pd.DataFrame(cal)
-    md_table(cal, OUT / "table_holiday_calendar.md")
-    hn["calendar"] = cal.set_index("season").to_dict(orient="index")
-
+    for s in sorted(d["season"].unique()):
+        for k, w in enumerate(holiday_weeks(s)):
+            dt = season_week_to_date(s, w)
+            cal.append({"season": s, "position": k, "season_week": w, "date": str(dt), "mmwr_week": mmwr_week(dt)})
+    pd.DataFrame(cal).to_csv(OUT / "holiday_calendar.csv", index=False)
     arrays, _ = load_rows()
     ex = holiday_excess(arrays)
-    res, diffs = fig_holiday_excess(ex)
-    hn["excess"] = {f"{g} | {b}": [round(v, 3) for v in r[:3]] + [r[3]] for (g, b), r in res.items()}
-    hn["excess_paired_ili_minus_fsn"] = {str(k): [round(v, 3) for v in r[:3]] + [r[3]] for k, r in diffs.items()}
-    h = ex[ex["block"] == "holiday"]
-    hn["excess_by_position"] = {g: {k: round(float(h.loc[h["group"] == g, f"excess_k{k}"].mean()), 3)
-                                    for k in range(3)} for g in GROUPS}
-    # how often the peak itself falls in a holiday week, per week, vs the 3 weeks either side
-    ser = d.drop_duplicates(["source", "agg_level", "location", "season"])
-    pk_share = {}
-    for g in GROUPS:
-        v = ser[ser["group"] == g]
-        hol_rate, near_rate = [], []
-        for _, r in v.iterrows():
-            hw = holiday_weeks(r["season"])
-            hol_rate.append(r["peak_week"] in hw)
-            near = list(range(hw[0] - 3, hw[0])) + list(range(hw[-1] + 1, hw[-1] + 4))
-            near_rate.append(r["peak_week"] in near)
-        nh = np.mean([len(holiday_weeks(s)) for s in v["season"]])
-        pk_share[g] = {"share_peaks_in_holiday": round(float(np.mean(hol_rate)), 3),
-                       "per_week_holiday": round(float(np.mean(hol_rate) / nh), 3),
-                       "per_week_adjacent6": round(float(np.mean(near_rate) / 6), 3), "n_series": len(v)}
-    hn["peak_in_holiday"] = pk_share
-    hn["holiday_max_final"] = {f"{g} | {'holiday' if f else 'other'} | wsm {w}": v
-                               for (g, f, w), v in fig_holiday_max(d).items()}
-    post = post_holiday_table(d)
-    hn["post_holiday_table"] = post.to_dict(orient="records")
+    ex.to_parquet(OUT / "holiday_excess.parquet")
 
-    # correlations of the holiday features with z in weeks 20-30, by source group
-    x = d[(d["season_week"] >= 20) & (d["season_week"] <= 30)]
-    hn["spearman_20_30"] = {g: {f: round(float(x.loc[x["group"] == g, [f, "z"]].corr(method="spearman").iloc[0, 1]), 2)
-                                for f in HOLIDAY} for g in GROUPS}
-
-    # CV: holiday features
     sets = {"current": CURRENT, "+ holiday": CURRENT + HOLIDAY, "+ holiday flags": CURRENT + HOL_FLAGS,
             "+ holiday-adjusted max": CURRENT + HOL_ADJ,
             "+ synchrony + burden": CURRENT + GROUPS_NEW["synchrony"] + GROUPS_NEW["burden"],
             "+ synchrony + burden + holiday": CURRENT + GROUPS_NEW["synchrony"] + GROUPS_NEW["burden"] + HOLIDAY}
     path = OUT / "cv_holiday.parquet"
-    t0 = time.time()
     if reuse and path.exists():
         cvh = pd.read_parquet(path)
     else:
         new = {k: v for k, v in sets.items() if k not in cv_main["set"].unique()}
         cvh = pd.concat([cv_main[cv_main["set"].isin(list(sets))], cv_feature_sets(dcv, new)], ignore_index=True)
         cvh.to_parquet(path)
-    hn["runtime_cv_s"] = round(time.time() - t0)
-    meta = dcv[KEYS + ["weeks_since_holiday_end", "hol_now"]]
-    tab = summarize_holiday_cv(cvh, meta, list(sets))
-    hn["cv"] = tab.round(4).to_dict(orient="records")
-    wide = tab.pivot_table(index=["rows", "feature set"], columns="weeks", values="pinball ratio")
-    wide = wide[["all weeks", "weeks 17–31", "holiday weeks", "1–3 wk after", "4–6 wk after"]].reset_index()
-    md_table(wide, OUT / "table_holiday_cv_pinball.md", floatfmt=3)
-    wide = tab.pivot_table(index=["rows", "feature set"], columns="weeks", values="Δ log loss")
-    wide = wide[["all weeks", "weeks 17–31", "holiday weeks", "1–3 wk after", "4–6 wk after"]].reset_index()
-    md_table(wide, OUT / "table_holiday_cv_logloss.md", floatfmt=4)
-    fig_holiday_cv(tab)
-    comp = {}
+    boot = []
     for a_, b_ in [("+ holiday", "current"), ("+ holiday flags", "current"), ("+ holiday-adjusted max", "current"),
                    ("+ synchrony + burden + holiday", "+ synchrony + burden")]:
         for metric in ["pinball", "logloss"]:
-            comp[f"{a_} vs {b_} | {metric}"] = {"boot_win": round(season_bootstrap(cvh, a_, b_, metric), 3),
-                                                "seasons_better": int((cvh[cvh["season_week"].between(12, 31)]
-                                                                       .groupby(["set", "season"])[metric].mean()
-                                                                       .unstack("set").eval(f"`{a_}` < `{b_}`")).sum())}
-    hn["cv_season_comparisons"] = comp
+            boot.append({"family": "holiday", "set": a_, "reference": b_, "metric": metric,
+                         "boot_win": season_bootstrap(cvh, a_, b_, metric),
+                         "seasons_better": int((per_season_rel(cvh, a_, b_, metric) < 1).sum())})
 
-    # adjusting the ILINet training series: score FluSurv-NET rows only
-    shift = {k: max(diffs[k][0], 0.0) for k in range(3) if k in diffs}
-    hn["adjust_shift"] = {str(k): round(v, 3) for k, v in shift.items()}
+    # adjusting the ILINet training series: score FluSurv-NET rows only. Scale = mean paired ILINet - FluSurv-NET
+    # holiday excess by position in the holiday block (0 if negative)
+    h = ex[ex["block"] == "holiday"]
+    pair = h[h["source"] == "ilinet"].merge(h[h["source"] == "flusurvnet"], on=["location", "season"],
+                                           suffixes=("_ili", "_fsn"))
+    shift = {}
+    for k in range(3):
+        dk = (pair[f"excess_k{k}_ili"] - pair[f"excess_k{k}_fsn"]).dropna()
+        if len(dk) >= 10:
+            shift[k] = max(float(dk.mean()), 0.0)
+    hn["adjust_shift"] = {str(k): v for k, v in shift.items()}
     path = OUT / "cv_holiday_adjust.parquet"
-    t0 = time.time()
-    if reuse and path.exists():
-        cva = pd.read_parquet(path)
-    else:
+    if not (reuse and path.exists()):
         base_sets = {"current": CURRENT, "+ synchrony + burden": CURRENT + GROUPS_NEW["synchrony"] + GROUPS_NEW["burden"]}
         parts = []
         r = cv_fsn_target(dcv, dict(base_sets, **{"+ holiday": CURRENT + HOLIDAY}))
@@ -1125,139 +997,109 @@ def holiday_section(d, dcv, cv_main, nums, reuse=False):
             r = cv_fsn_target(dca, base_sets)
             r["data"] = lab
             parts.append(r)
-        cva = pd.concat(parts, ignore_index=True)
-        cva.to_parquet(path)
-    hn["runtime_adjust_s"] = round(time.time() - t0)
-    cva = cva.merge(meta, on=KEYS, how="left")
-    cva["hbin"] = hol_bin(cva["weeks_since_holiday_end"], cva["hol_now"])
-    ref = cva[(cva["data"] == "ILINet as reported") & (cva["set"] == "current")]
-    rows = []
-    for (dat, st), v in cva.groupby(["data", "set"]):
-        r = {"training data": dat, "feature set": st}
-        for b, sel_v, sel_r in [("all weeks", slice(None), slice(None))] + \
-                [(hb, v["hbin"] == hb, ref["hbin"] == hb) for hb in ["holiday weeks", "1–3 wk after", "4–6 wk after"]]:
-            vv = v if isinstance(sel_v, slice) else v[sel_v]
-            rr = ref if isinstance(sel_r, slice) else ref[sel_r]
-            r[b] = vv["pinball"].mean() / rr["pinball"].mean()
-        r["Δ log loss (all)"] = v["logloss"].mean() - ref["logloss"].mean()
-        rows.append(r)
-    adj_tab = pd.DataFrame(rows)
-    md_table(adj_tab, OUT / "table_holiday_adjust.md", floatfmt=3)
-    hn["adjust"] = adj_tab.round(4).to_dict(orient="records")
+        pd.concat(parts, ignore_index=True).to_parquet(path)
     nums["holiday"] = hn
+    return boot
 
 
-def fig_holiday_cv(tab):
-    bins = ["all weeks", "holiday weeks", "1–3 wk after", "4–6 wk after"]
-    sets = ["+ holiday", "+ holiday flags", "+ holiday-adjusted max", "+ synchrony + burden",
-            "+ synchrony + burden + holiday"]
-    shades = [INK] + [matplotlib.colormaps["Blues"](v) for v in (0.45, 0.7, 0.95)]
-    fig, axes = plt.subplots(1, 2, figsize=(12, 4.2), sharey=True, sharex=True)
-    for ax, src in zip(axes, ["ILINet", "FluSurv-NET"]):
-        v = tab[tab["rows"] == src]
-        for k, (b, c) in enumerate(zip(bins, shades)):
-            u = v[v["weeks"] == b].set_index("feature set").reindex(sets)
-            ax.scatter(u["pinball ratio"], np.arange(len(sets)) + (k - 1.5) * 0.14, color=c, s=30 if k else 44,
-                       marker="D" if k == 0 else "o", edgecolor="white", linewidth=0.6, label=b, zorder=3)
-        ax.axvline(1, color=INK2, lw=1)
-        ax.set_title(f"{src} rows", loc="left")
-        ax.set_xlabel("pinball loss relative to current features")
-        ax.grid(axis="y", visible=False)
-    axes[0].set_yticks(range(len(sets)))
-    axes[0].set_yticklabels(sets)
-    axes[0].invert_yaxis()
-    h, lab = axes[0].get_legend_handles_labels()
-    fig.legend(h, lab, loc="lower center", ncol=4, fontsize=8.5, bbox_to_anchor=(0.55, -0.05))
-    fig.tight_layout()
-    save(fig, "fig17_holiday_cv")
+# ---------------------------------------------------------------------------------------------------------------
+# ideas from other fields (section 11)
 
-
-def lit_section(d, dcv, cv_main, nums, reuse=False):
-    """Section 11: features suggested by analogous problems (reflection principle, chain ladder, ...)."""
-    from relative_size_eda import GROUPS
-
-    ln = {}
-    ver = verify_reflection()
-    md_table(ver.round(3), OUT / "table_reflection_check.md", floatfmt=3)
-    ln["reflection_check"] = ver.round(4).to_dict(orient="records")
-    corr = fig_corr_heatmap(d, GROUPS_LIT, "fig18_lit_correlations", first=["hist_rel", "cum_vs_hist_total", "rel_max"])
-    ln["spearman_z"] = corr["z"].round(2).to_dict()
-    ln["spearman_pos"] = corr["pos"].round(2).to_dict()
-    ln["coverage"] = {f: round(float(d[f].notna().mean()), 3) for f in ALL_LIT}
-    ln["bf_check"] = {"min": float(np.nanmin(d["z_bf"])), "max": float(np.nanmax(d["z_bf"])),
-                      "spearman_with_z": round(float(d[["z_bf", "z"]].corr(method="spearman").iloc[0, 1]), 3),
-                      "spearman_cl_with_z": round(float(d[["cl_z", "z"]].corr(method="spearman").iloc[0, 1]), 3)}
-
+def literature_outputs(d, dcv, cv_main, nums, reuse=False):
+    verify_reflection().to_csv(OUT / "reflection_check.csv", index=False)
     sets = {"SB": SB}
     for g, fs in GROUPS_LIT.items():
         sets[f"SB + {LIT_LABELS[g]}"] = SB + fs
     sets["SB + all"] = SB + ALL_LIT
     sets["SB + recession + records"] = SB + GROUPS_LIT["recession"] + GROUPS_LIT["records"]
     path = OUT / "cv_lit.parquet"
-    t0 = time.time()
     if reuse and path.exists():
         cvl = pd.read_parquet(path)
         missing = {k: v for k, v in sets.items() if k not in cvl["set"].unique()}
         if missing:
-            cvl = pd.concat([cvl, cv_feature_sets(dcv, missing, n_jobs=3)], ignore_index=True)
+            cvl = pd.concat([cvl, cv_feature_sets(dcv, missing)], ignore_index=True)
             cvl.to_parquet(path)
     else:
         base = cv_main[cv_main["set"] == "+ synchrony + burden"].assign(set="SB")
-        cvl = pd.concat([base, cv_feature_sets(dcv, {k: v for k, v in sets.items() if k != "SB"}, n_jobs=3)],
+        cvl = pd.concat([base, cv_feature_sets(dcv, {k: v for k, v in sets.items() if k != "SB"})],
                         ignore_index=True)
         cvl.to_parquet(path)
-    ln["runtime_cv_s"] = round(time.time() - t0)
-    rel_pin, d_ll, raw = summarize_cv(cvl, ref="SB")
-    order = list(sets)
-    fig_cv(rel_pin, d_ll, order, name="fig19_lit_cv", ref_label="SB")
-    for tabname, tab, fmt in [("table_lit_cv_pinball.md", rel_pin, 3), ("table_lit_cv_logloss.md", d_ll, 4)]:
-        t = tab.loc[order].copy()
-        t.insert(0, "feature set", t.index)
-        md_table(t.reset_index(drop=True), OUT / tabname, floatfmt=fmt)
-    ln["rel_pinball"] = rel_pin.round(4).to_dict(orient="index")
-    ln["delta_logloss"] = d_ll.round(4).to_dict(orient="index")
-    ln["abs_SB"] = {f"{k[0]} {k[1]}": v for k, v in raw.loc["SB"].round(4).to_dict().items()}
-    # by source of the held-out rows
-    x = cvl.merge(d[KEYS + ["group"]], on=KEYS, how="left")
-    src_rows = []
-    for g in GROUPS:
-        rp, dl, _ = summarize_cv(x[x["group"] == g].drop(columns="group"), ref="SB")
-        for st in order[1:]:
-            src_rows.append({"rows": g, "feature set": st, "pinball all": rp.loc[st, "all"],
-                             "pinball 17–21": rp.loc[st, "17–21"], "pinball 22–26": rp.loc[st, "22–26"],
-                             "Δ log loss all": dl.loc[st, "all"]})
-    # rows that have a cross-source partner
-    haspart = d.loc[d["xs_rel_max"].notna(), KEYS]
-    rp, dl, _ = summarize_cv(x.merge(haspart, on=KEYS).drop(columns="group"), ref="SB")
-    for st in order[1:]:
-        src_rows.append({"rows": "rows with a partner source", "feature set": st, "pinball all": rp.loc[st, "all"],
-                         "pinball 17–21": rp.loc[st, "17–21"], "pinball 22–26": rp.loc[st, "22–26"],
-                         "Δ log loss all": dl.loc[st, "all"]})
-    src_tab = pd.DataFrame(src_rows)
-    md_table(src_tab, OUT / "table_lit_cv_by_source.md", floatfmt=3)
-    ln["by_source"] = src_tab.round(4).to_dict(orient="records")
-    ln["n_partner_rows_cv"] = int(len(x.merge(haspart, on=KEYS)) // len(order))
-    boot = {}
-    for st in order[1:]:
-        boot[st] = {"pinball_win": round(season_bootstrap(cvl, st, "SB"), 3),
-                    "logloss_win": round(season_bootstrap(cvl, st, "SB", metric="logloss"), 3),
-                    "seasons_better_pinball": int((per_season_rel(cvl, st, "SB") < 1).sum())}
-    ln["bootstrap_vs_SB"] = boot
-    bt = pd.DataFrame(boot).T.reset_index().rename(columns={"index": "feature set"})
-    md_table(bt, OUT / "table_lit_bootstrap.md", floatfmt=3)
+    boot = []
+    for st in list(sets)[1:]:
+        for metric in ["pinball", "logloss"]:
+            boot.append({"family": "literature", "set": st, "reference": "SB", "metric": metric,
+                         "boot_win": season_bootstrap(cvl, st, "SB", metric),
+                         "seasons_better": int((per_season_rel(cvl, st, "SB", metric) < 1).sum())})
+    return boot
 
+
+def regional_outputs(d, dcv, cv_main, reuse=False):
+    """Section 12: neighbour / HHS-region synchrony and lat/lon, added to SB."""
+    sets = {"SB": SB}
+    for g, fs in GROUPS_REG.items():
+        sets[f"SB + {REG_LABELS[g]}"] = SB + fs
+    sets["SB + all regional"] = SB + ALL_REG
+    path = OUT / "cv_regional.parquet"
+    if reuse and path.exists():
+        cvr = pd.read_parquet(path)
+        missing = {k: v for k, v in sets.items() if k not in cvr["set"].unique()}
+        if missing:
+            cvr = pd.concat([cvr, cv_feature_sets(dcv, missing)], ignore_index=True)
+            cvr.to_parquet(path)
+    else:
+        base = cv_main[cv_main["set"] == "+ synchrony + burden"].assign(set="SB")
+        cvr = pd.concat([base, cv_feature_sets(dcv, {k: v for k, v in sets.items() if k != "SB"})], ignore_index=True)
+        cvr.to_parquet(path)
+    ili_state = cvr[(cvr["source"] == "ilinet") & (cvr["agg_level"] == "state")]
+    boot = []
+    for st in list(sets)[1:]:
+        for fam, x in [("regional", cvr), ("regional, ILINet states", ili_state)]:
+            for metric in ["pinball", "logloss"]:
+                boot.append({"family": fam, "set": st, "reference": "SB", "metric": metric,
+                             "boot_win": season_bootstrap(x, st, "SB", metric),
+                             "seasons_better": int((per_season_rel(x, st, "SB", metric) < 1).sum())})
+    return boot
+
+
+def type_outputs(d, dcv, cv_main, reuse=False):
+    """Section 13: B share / B rising and H3 share features added to SB."""
+    sets = {"SB": SB, "SB + B share / B rising": SB + GROUPS_TYPE["B"], "SB + H3 share": SB + GROUPS_TYPE["H3"],
+            "SB + both": SB + ALL_TYPE}
+    path = OUT / "cv_types.parquet"
+    if reuse and path.exists():
+        cvt = pd.read_parquet(path)
+    else:
+        base = cv_main[cv_main["set"] == "+ synchrony + burden"].assign(set="SB")
+        cvt = pd.concat([base, cv_feature_sets(dcv, {k: v for k, v in sets.items() if k != "SB"})], ignore_index=True)
+        cvt.to_parquet(path)
+    subsets = [("types", cvt), ("types, ILINet states", cvt[(cvt["source"] == "ilinet") & (cvt["agg_level"] == "state")]),
+               ("types, FluSurv-NET", cvt[cvt["source"] == "flusurvnet"])]
+    boot = []
+    for st in list(sets)[1:]:
+        for fam, x in subsets:
+            for metric in ["pinball", "logloss"]:
+                boot.append({"family": fam, "set": st, "reference": "SB", "metric": metric,
+                             "boot_win": season_bootstrap(x, st, "SB", metric),
+                             "seasons_better": int((per_season_rel(x, st, "SB", metric) < 1).sum())})
+    return boot
+
+
+def gain_importance(dcv, feats, label):
     import lightgbm as lgb
 
-    m = lgb.LGBMRegressor(objective="quantile", alpha=0.5, importance_type="gain", **dict(LGB_PARAMS, n_jobs=3))
-    m.fit(dcv[SB + ALL_LIT], dcv["z"])
-    imp = pd.Series(m.feature_importances_, index=SB + ALL_LIT).sort_values(ascending=False)
-    imp = imp / imp.sum()
-    ln["importance_SB_all"] = imp.head(20).round(3).to_dict()
-    top = [f for f in imp.index if f in ALL_LIT][:6]
-    ln["top_lit"] = top
-    fig_binned(d, top, "fig20_lit_top_features")
-    nums["literature"] = ln
+    out = []
+    for kind, model in [("median quantile model", lgb.LGBMRegressor(objective="quantile", alpha=0.5,
+                                                                       importance_type="gain", **dict(LGB_PARAMS, n_jobs=N_WORKERS))),
+                        ("z > 0 classifier", lgb.LGBMClassifier(objective="binary", importance_type="gain",
+                                                                 **dict(LGB_PARAMS, n_jobs=N_WORKERS)))]:
+        model.fit(dcv[feats], dcv["z"] if kind.startswith("median") else dcv["pos"])
+        imp = pd.Series(model.feature_importances_, index=feats)
+        out.append(pd.DataFrame({"feature set": label, "model": kind, "feature": feats,
+                                 "gain_share": (imp / imp.sum()).to_numpy()}))
+    return pd.concat(out, ignore_index=True)
 
+
+# ---------------------------------------------------------------------------------------------------------------
 
 def main():
     parser = argparse.ArgumentParser()
@@ -1265,29 +1107,29 @@ def main():
     parser.add_argument("--reuse_cv", action="store_true", help="reuse eda/cv_results.parquet")
     parser.add_argument("--reuse_holiday_cv", action="store_true", help="reuse eda/cv_holiday*.parquet")
     parser.add_argument("--reuse_lit_cv", action="store_true", help="reuse eda/cv_lit.parquet")
+    parser.add_argument("--reuse_regional_cv", action="store_true", help="reuse eda/cv_regional.parquet")
+    parser.add_argument("--reuse_types_cv", action="store_true", help="reuse eda/cv_types.parquet")
+    parser.add_argument("--workers", type=int, default=3, help="parallel single-threaded LightGBM fits")
     args = parser.parse_args()
+    global N_WORKERS
+    N_WORKERS = args.workers
     t_start = time.time()
     OUT.mkdir(exist_ok=True)
 
     d, chk = build_dataset()
     nums = {"consistency": chk, "n_rows": len(d)}
-    t_feat = time.time() - t_start
     arrays, _ = load_rows()
     nums["leakage_check_max_abs_change"] = leakage_check(d, arrays)
+    nums["leakage_check_max_abs_change"].update(type_leakage_check(arrays))
     d.to_parquet(OUT / "predictor_rows.parquet")
-
-    # decomposition z = (log peak - hist mean log peak) - hist_rel: the first term does not depend on t
-    ser = d.dropna(subset=["hist_rel"]).drop_duplicates(["source", "agg_level", "location", "season"])
-    anom = ser["log_peak"] - (ser["lm"] - ser["hist_rel"])
-    nums["size_anomaly_sd"] = {g: round(float(v), 2) for g, v in anom.groupby(ser["group"]).std().items()}
-    nums["size_anomaly_sd_all"] = round(float(anom.std()), 2)
-    nums["size_anomaly_q10_q90"] = [round(float(anom.quantile(0.1)), 2), round(float(anom.quantile(0.9)), 2)]
-    nums["share_rows_hist_rel_missing"] = round(float(d["hist_rel"].isna().mean()), 3)
-    zb = d[(d["season_week"] >= 17) & (d["season_week"] <= 26)]
-    nums["sd_z_weeks17_26"] = round(float(zb["z"].std()), 2)
-    corr = fig_corr_heatmap(d)
-    nums["spearman_z"] = corr["z"].round(2).to_dict()
-    nums["spearman_pos"] = corr["pos"].round(2).to_dict()
+    t_feat = time.time() - t_start
+    groups = ([("current", "current", f) for f in CURRENT]
+              + [("section 9", GROUP_LABELS[g], f) for g, fs in GROUPS_NEW.items() for f in fs]
+              + [("section 10", "holiday", f) for f in HOLIDAY]
+              + [("section 11", LIT_LABELS[g], f) for g, fs in GROUPS_LIT.items() for f in fs]
+              + [("section 12", REG_LABELS[g], f) for g, fs in GROUPS_REG.items() for f in fs]
+              + [("section 13", g, f) for g, fs in GROUPS_TYPE.items() for f in fs])
+    pd.DataFrame(groups, columns=["section", "group", "feature"]).to_csv(OUT / "feature_groups.csv", index=False)
 
     # CV on every other origin week (even weeks) to keep the runtime down
     dcv = d[d["season_week"] % 2 == 0].reset_index(drop=True)
@@ -1301,6 +1143,8 @@ def main():
     sets["+ synchrony + burden + level"] = (CURRENT + GROUPS_NEW["synchrony"] + GROUPS_NEW["burden"]
                                             + GROUPS_NEW["level_hist"])
     sets["current − hist_rel"] = [f for f in CURRENT if f != "hist_rel"]
+    pd.DataFrame([{"set": k, "order": i, "n_features": len(v), "features": " ".join(v)}
+                  for i, (k, v) in enumerate(sets.items())]).to_csv(OUT / "cv_sets.csv", index=False)
     cv_path = OUT / "cv_results.parquet"
     t0 = time.time()
     if args.reuse_cv and cv_path.exists():
@@ -1308,51 +1152,29 @@ def main():
     else:
         cv = cv_feature_sets(dcv, sets, quick=args.quick)
         cv.to_parquet(cv_path)
+    boot = []
+    for a in [k for k in sets if k != "current"]:
+        for metric in ["pinball", "logloss"]:
+            boot.append({"family": "main", "set": a, "reference": "current", "metric": metric,
+                         "boot_win": season_bootstrap(cv, a, "current", metric),
+                         "seasons_better": int((per_season_rel(cv, a, "current", metric) < 1).sum())})
     t_cv = time.time() - t0
-    rel_pin, d_ll, raw = summarize_cv(cv)
-    order = [k for k in sets if k in rel_pin.index] if args.reuse_cv else list(sets)
-    fig_cv(rel_pin, d_ll, [k for k in order if k != "current − hist_rel"])  # hist_rel ablation is off scale
-    tab = rel_pin.loc[order].copy()
-    tab.insert(0, "feature set", tab.index)
-    md_table(tab.reset_index(drop=True), OUT / "table_cv_pinball.md", floatfmt=3)
-    tab = d_ll.loc[order].copy()
-    tab.insert(0, "feature set", tab.index)
-    md_table(tab.reset_index(drop=True), OUT / "table_cv_logloss.md", floatfmt=3)
-    nums["rel_pinball"] = rel_pin.round(3).to_dict(orient="index")
-    nums["delta_logloss"] = d_ll.round(4).to_dict(orient="index")
-    nums["abs_pinball_current"] = raw["pinball"].loc["current"].round(4).to_dict()
-    nums["abs_logloss_current"] = raw["logloss"].loc["current"].round(4).to_dict()
-    for a in ["+ all new", "+ synchrony + burden", "+ synchrony + burden + level", "current − hist_rel",
-              "all − timing vs history"] + [f"+ {GROUP_LABELS[g]}" for g in GROUPS_NEW]:
-        nums.setdefault("boot_win_vs_current", {})[a] = round(season_bootstrap(cv, a, "current"), 3)
-        nums.setdefault("seasons_better_than_current", {})[a] = int((per_season_rel(cv, a, "current") < 1).sum())
-    nums["n_seasons"] = int(cv["season"].nunique())
-
-    # gain importance for the all-features median model fitted to all rows
-    import lightgbm as lgb
-
-    m = lgb.LGBMRegressor(objective="quantile", alpha=0.5, importance_type="gain", **LGB_PARAMS)
-    m.fit(dcv[CURRENT + ALL_NEW], dcv["z"])
-    imp = pd.Series(m.feature_importances_, index=CURRENT + ALL_NEW).sort_values(ascending=False)
-    imp = imp / imp.sum()
-    c = lgb.LGBMClassifier(objective="binary", importance_type="gain", **LGB_PARAMS)
-    c.fit(dcv[CURRENT + ALL_NEW], dcv["pos"])
-    imp_c = pd.Series(c.feature_importances_, index=CURRENT + ALL_NEW).sort_values(ascending=False)
-    imp_c = imp_c / imp_c.sum()
-    fig_importance(imp)
-    nums["importance_median_model"] = imp.head(20).round(3).to_dict()
-    nums["importance_classifier"] = imp_c.head(20).round(3).to_dict()
-    top_new = [f for f in imp.index if f in ALL_NEW][:5]
-    nums["top_new_features"] = top_new
-    fig_binned(d, ["hist_rel"] + top_new, "fig14_top_new_features")
-    holiday_section(d, dcv, cv, nums, reuse=args.reuse_holiday_cv)
-    lit_section(d, dcv, cv, nums, reuse=args.reuse_lit_cv)
+    boot += holiday_outputs(d, dcv, cv, nums, reuse=args.reuse_holiday_cv)
+    boot += literature_outputs(d, dcv, cv, nums, reuse=args.reuse_lit_cv)
+    t_reg = time.time()
+    boot += regional_outputs(d, dcv, cv, reuse=args.reuse_regional_cv)
+    nums["runtime_regional_cv_s"] = round(time.time() - t_reg)
+    t_typ = time.time()
+    boot += type_outputs(d, dcv, cv, reuse=args.reuse_types_cv)
+    nums["runtime_types_cv_s"] = round(time.time() - t_typ)
+    pd.DataFrame(boot).to_csv(OUT / "cv_bootstrap.csv", index=False)
+    pd.concat([gain_importance(dcv, CURRENT + ALL_NEW, "current + all new"),
+               gain_importance(dcv, SB + ALL_LIT, "SB + all literature"),
+               gain_importance(dcv, SB + ALL_TYPE, "SB + types")], ignore_index=True
+              ).to_csv(OUT / "importance.csv", index=False)
     nums["runtime_s"] = {"features": round(t_feat), "cv": round(t_cv), "total": round(time.time() - t_start)}
     (OUT / "predictors_numbers.json").write_text(json.dumps(nums, indent=1, default=str))
-    print(json.dumps({k: nums[k] for k in ["rel_pinball", "delta_logloss", "boot_win_vs_current",
-                                           "seasons_better_than_current", "top_new_features", "runtime_s",
-                                           "leakage_check_max_abs_change"]}, indent=1, default=str))
-    print(json.dumps({k: v for k, v in nums["literature"].items() if k not in ("spearman_z", "spearman_pos")},
+    print(json.dumps({k: nums[k] for k in ["consistency", "leakage_check_max_abs_change", "runtime_s"]},
                      indent=1, default=str))
 
 

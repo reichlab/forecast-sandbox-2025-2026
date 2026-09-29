@@ -97,7 +97,8 @@ def epiweek_to_saturday(ew: int) -> datetime.date:
 
 
 def lag_table() -> pd.DataFrame:
-    """Long table: location (FIPS), wk_end_date, lag, ili (unweighted for states, weighted for US), percent_positive."""
+    """Long table: location (FIPS), wk_end_date, lag, ili (unweighted for states, weighted for US), percent_positive,
+    and clinical-lab influenza A and B positives (total_a, total_b)."""
     frames = []
     for lag in range(MAX_LAG):
         ili = pd.DataFrame(_get("fluview", lag))
@@ -106,7 +107,7 @@ def lag_table() -> pd.DataFrame:
             ili = ili[["region", "epiweek", "ili_value"]]
         clin = pd.DataFrame(_get("fluview_clinical", lag))
         if len(clin):
-            clin = clin[["region", "epiweek", "percent_positive"]]
+            clin = clin[["region", "epiweek", "percent_positive", "total_a", "total_b"]]
         df = ili.merge(clin, on=["region", "epiweek"], how="outer").assign(lag=lag)
         frames.append(df)
     out = pd.concat(frames, ignore_index=True)
@@ -135,6 +136,35 @@ def as_of_values(table: pd.DataFrame, ref_date: datetime.date, final: pd.DataFra
     rt = rt[["location", "wk_end_date", "inc"]]
     old = final.loc[(final["wk_end_date"] <= last - pd.Timedelta(weeks=MAX_LAG)), ["location", "wk_end_date", "inc"]]
     return pd.concat([old, rt], ignore_index=True).sort_values(["location", "wk_end_date"]).reset_index(drop=True)
+
+
+def strain_as_of(table: pd.DataFrame, ref_date: datetime.date, season: str, week_map: pd.DataFrame,
+                 final: dict) -> dict:
+    """
+    Type/subtype counts for `season` as known at ref_date, in the format of idmodels.peak.extra_features.type_arrays
+    ({(geography, season): array (4, 53) of A, B, A(H1), A(H3) by season week}), starting from `final` (final counts
+    for all seasons). For states and the nation, A and B for weeks published by ref_date are replaced by their
+    as-published clinical-lab values (largest lag available, weeks at least MAX_LAG old keep final values) and
+    later weeks are removed; A(H1) and A(H3) keep their final values (no subtype vintages are available), which
+    uses revisions to subtype counts that were not yet known.
+    """
+    last = pd.Timestamp(ref_date - datetime.timedelta(days=7))
+    t = table.loc[(table["wk_end_date"] <= last) & table["total_a"].notna()].copy()
+    t["age"] = ((last - t["wk_end_date"]).dt.days // 7).astype(int)
+    t = t.loc[(t["age"] < MAX_LAG) & (t["lag"] <= t["age"])]
+    t = t.sort_values("lag").groupby(["location", "wk_end_date"])[["total_a", "total_b"]].last().reset_index()
+    t = t.merge(week_map, on="wk_end_date")
+    out = dict(final)
+    last_sw = int(week_map.loc[week_map["wk_end_date"] == last, "season_week"].iloc[0])
+    for geo in {g for g, s in final if s == season} | set(t["location"].dropna()):
+        arr = final.get((geo, season), np.full((4, 53), np.nan)).copy()
+        arr[:, last_sw:] = np.nan  # nothing after the last published week
+        rows = t.loc[t["location"] == geo]
+        if len(rows):
+            wk = rows["season_week"].to_numpy().astype(int) - 1
+            arr[0, wk], arr[1, wk] = rows["total_a"].to_numpy(float), rows["total_b"].to_numpy(float)
+        out[(geo, season)] = arr
+    return out
 
 
 def revision_vintages(table: pd.DataFrame, ref_date: datetime.date) -> pd.DataFrame:

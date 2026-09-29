@@ -1,0 +1,821 @@
+---
+title: "Peak timing and peak size: exploratory analysis"
+subtitle: "How the season peak varies across locations and seasons in ILINet and FluSurv-NET"
+author: "Reich Lab, UMass Amherst (working draft)"
+date: last-modified
+format:
+  html:
+    toc: true
+    toc-depth: 2
+    number-sections: true
+    code-fold: true
+    code-summary: "R code"
+    fig-cap-location: bottom
+    embed-resources: true
+execute:
+  cache: true
+  warning: false
+  message: false
+knitr:
+  opts_chunk:
+    fig.width: 10
+    autodep: true
+    dev: "png"
+    dpi: 144
+---
+
+::: {.callout-note title="Names of models and feature sets"}
+This document describes the data only; it fits no models. Where it refers to models or feature sets (for example base, SB, `peak_gbqr`, `peak_hier`), the names are those defined in the section *Versions and names used in this document* of the methods document (`peak-models-methods.html`). Candidate features suggested here were tested in `relative-size-eda.html`.
+:::
+
+::: {.callout-note title="How to run this document"}
+Everything here is computed in R from one data file, so you can change the definitions and re-render. From the repository root:
+
+```bash
+/Applications/quarto/bin/quarto render analysis/peak-models/peak-timing-size-eda.qmd
+```
+
+Rendering takes well under a minute (results are cached in `peak-timing-size-eda_cache/`; delete that folder to force a full rerun). To explore interactively, open the file in RStudio/Positron and run the chunks in order; the setup chunk sets the working directory assumptions (paths are relative to `analysis/peak-models/`). Shared plotting helpers (palette, theme, season-week axis, FIPS codes) are in `R/eda_helpers.R`.
+
+**Data.** ILINet (weighted ILI × percent positive; states, HHS regions and national) and FluSurv-NET (13 sites and the national series), final data, from `ilinet-validation/data-ilinet-flusurvnet.parquet` (written by `validate_ilinet.py`). **NHSN is excluded on purpose**: its seasons are the held-out test data for the peak models. ILINet Puerto Rico and US Virgin Islands are dropped (their ILINet × % positive series are all zeros).
+:::
+
+```{r setup}
+#| cache: false
+source("R/eda_helpers.R")
+library(maps)
+```
+
+# Data and definitions
+
+The **season** runs from August to July; season week 1 is MMWR week 31 (early August), week 10 is about the first week of October and week 43 is late May. The **peak** of a series (one location, one source, one season) is its largest weekly value in the **window** of season weeks 10–43, and the **peak week** is the first week attaining it. We keep **complete** series: at least 25 observed weeks in the window and a peak above zero. These are the same rules the peak models use (they additionally fill interior gaps of up to two weeks by linear interpolation, which cannot change a peak).
+
+```{r data}
+# ---- edit here to change the data or the definitions ------------------------------------------------------
+data_path <- "ilinet-validation/data-ilinet-flusurvnet.parquet"
+window <- WINDOW          # c(10, 43)
+min_obs <- 25             # minimum observed in-window weeks
+
+d <- load_surveillance(data_path)
+
+in_window <- d |> filter(season_week >= window[1], season_week <= window[2], !is.na(inc))
+peaks <- in_window |>
+  group_by(source, agg_level, group, location, season) |>
+  summarise(n_obs = n(), peak = max(inc), peak_week = season_week[which.max(inc)], .groups = "drop") |>
+  filter(n_obs >= min_obs, peak > 0) |>
+  mutate(peak_date = season_week_date(season, peak_week),
+         loc = loc_label(location))
+# ------------------------------------------------------------------------------------------------------------
+```
+
+```{r coverage}
+peaks |>
+  group_by(Source = group) |>
+  summarise(Seasons = paste(min(season), max(season), sep = "–"), `N seasons` = n_distinct(season),
+            Locations = n_distinct(location), Series = n(),
+            `Median peak week` = median(peak_week)) |>
+  kable(caption = "Complete series used in this document.")
+```
+
+Before 2010/11 only the national and HHS-region ILINet series are available. The pandemic seasons 2008/09–2009/10 and 2020/21–2021/22 are not in the data, and 2023/24 ILINet is incomplete in this file.
+
+# Peak timing
+
+## When do peaks happen?
+
+```{r fig-week-hist}
+#| fig-height: 6.5
+#| fig-cap: "Distribution of peak weeks, by source. Each bar is the share of that source's series whose peak fell in that season week; same axes in all panels. The dashed line is the median."
+meds <- peaks |> group_by(group) |> summarise(med = median(peak_week))
+peaks |>
+  count(group, peak_week) |>
+  group_by(group) |> mutate(share = n / sum(n)) |> ungroup() |>
+  ggplot(aes(peak_week, share, fill = group)) +
+  geom_col(width = 0.85) +
+  geom_vline(data = meds, aes(xintercept = med), linetype = "dashed", color = INK) +
+  facet_wrap(~group, ncol = 1) +
+  scale_fill_manual(values = SOURCE_COLORS, guide = "none") +
+  scale_x_season_week(limits = c(window[1] - 0.5, window[2] + 0.5)) +
+  scale_y_continuous("share of series", labels = percent_format(1))
+```
+
+```{r week-summary}
+wk <- peaks |> group_by(group) |>
+  summarise(med = median(peak_week), q10 = quantile(peak_week, 0.1), q90 = quantile(peak_week, 0.9),
+            dec_jan = mean(peak_week >= 18 & peak_week <= 26), after_feb = mean(peak_week >= 31))
+wk_s <- wk |> filter(group == "ILINet states")
+```
+
+Peaks cluster between late December and late February: for ILINet states the median peak week is `r wk_s$med` (about `r format(season_week_date("2017/18", wk_s$med), "%B %d")`) and 80% of peaks fall between weeks `r wk_s$q10` and `r wk_s$q90`. The three sources have similar distributions (medians `r paste(wk$med, collapse = ", ")` for ILINet states, ILINet national/regions and FluSurv-NET), with a right tail of late (March–April) peaks. For a timing forecast, this is the "climatology" a model has to beat: a forecaster who knows nothing about the current season would spread probability over roughly two and a half months.
+
+## Season-to-season shifts
+
+```{r fig-week-season}
+#| fig-height: 7.5
+#| fig-cap: "Peak week of every location in every season (dots; jittered vertically), by source. Black bars: the season's median peak week. Same x-axis in all panels."
+season_med <- peaks |> group_by(group, season) |> summarise(med = median(peak_week), n = n(), .groups = "drop")
+ggplot(peaks, aes(peak_week, season)) +
+  geom_jitter(aes(color = group), height = 0.18, width = 0, size = 1, alpha = 0.55) +
+  geom_point(data = season_med, aes(med, season), shape = "|", size = 6, color = INK) +
+  facet_wrap(~group, nrow = 1) +
+  scale_color_manual(values = SOURCE_COLORS, guide = "none") +
+  scale_x_season_week(limits = c(window[1] - 0.5, window[2] + 0.5), breaks = c(10, 20, 30, 40)) +
+  scale_y_discrete(NULL, limits = rev) +
+  theme(panel.grid.major.y = element_blank())
+```
+
+```{r season-shift}
+st_med <- season_med |> filter(group == "ILINet states")
+nat_med <- season_med |> filter(group == "ILINet national + regions")
+st_iqr <- peaks |> filter(group == "ILINet states") |> group_by(season) |>
+  summarise(iqr = IQR(peak_week), sd = sd(peak_week)) |> arrange(sd)
+```
+
+The season is the dominant source of variation in timing. Across the `r nrow(st_med)` ILINet-state seasons the median peak week ranges from `r min(st_med$med)` (`r st_med$season[which.min(st_med$med)]`) to `r max(st_med$med)` (`r st_med$season[which.max(st_med$med)]`), and in the longer national/regional record from `r min(nat_med$med)` to `r max(nat_med$med)`. Within a season, states are spread over several weeks, more in some seasons than in others: the within-season standard deviation of ILINet state peak weeks ranges from `r f2(min(st_iqr$sd), 1)` weeks (`r st_iqr$season[1]`) to `r f2(max(st_iqr$sd), 1)` weeks (`r st_iqr$season[nrow(st_iqr)]`), and a few states can peak far from the rest (e.g. the early outliers in 2013/14 and 2014/15). Because locations within a season move together, rows from the same season are strongly dependent, and the effective number of independent "timing experiences" is closer to the number of seasons than to the number of series.
+
+## Which locations peak early or late?
+
+```{r fig-week-heat}
+#| fig-height: 9
+#| fig-cap: "ILINet states: peak week minus that season's median peak week (blue = earlier than the season's median, red = later). Locations are ordered by their average deviation (earliest at the top). Blank = no complete series."
+dev <- peaks |> filter(group == "ILINet states") |>
+  group_by(season) |> mutate(dev = peak_week - median(peak_week)) |> ungroup()
+loc_order <- dev |> group_by(loc) |> summarise(m = mean(dev), n = n()) |> arrange(desc(m))
+ggplot(dev, aes(season, factor(loc, levels = loc_order$loc), fill = pmax(pmin(dev, 8), -8))) +
+  geom_tile(color = "white", linewidth = 0.4) +
+  scale_fill_gradient2("weeks vs season median", low = "#2166ac", mid = "#f2f1ee", high = "#b2182b",
+                       midpoint = 0, limits = c(-8, 8), breaks = c(-8, -4, 0, 4, 8), labels = c("≤ −8", "−4", "0", "4", "≥ 8")) +
+  labs(x = NULL, y = NULL) +
+  theme(panel.grid.major = element_blank(), legend.position = "top",
+        axis.text.x = element_text(angle = 45, hjust = 1)) +
+  guides(fill = guide_colorbar(barwidth = 12, barheight = 0.6, title.position = "left"))
+```
+
+```{r loc-effect}
+loc_sd <- loc_order |> filter(n >= 5)
+early <- head(loc_sd |> arrange(m), 3)
+late <- head(loc_sd |> arrange(desc(m)), 3)
+```
+
+Some locations are consistently early or late relative to the national pattern: the earliest on average (at least 5 seasons) are `r paste0(early$loc, " (", f2(early$m, 1), " wk)", collapse = ", ")`, the latest `r paste0(late$loc, " (+", f2(late$m, 1), " wk)", collapse = ", ")`. But the heatmap is mostly a patchwork: a location that is early in one season is often late in the next. The next section puts numbers on this.
+
+## Is timing geographic?
+
+The heatmap above shows *relative timing*: a state's peak week minus that season's median peak week across states (negative = earlier than the typical state that season). Here we map it and ask how much of it follows geography.
+
+```{r geo-data}
+ALBERS <- 5070  # CONUS Albers equal-area projection
+st_info <- tibble(abb = c(state.abb, "DC"), name = c(tolower(state.name), "district of columbia"),
+                  lon = c(state.center$x, -77.03), lat = c(state.center$y, 38.90))
+rel <- dev |> select(loc, season, dev) |> inner_join(st_info, by = c("loc" = "abb")) |>
+  filter(!loc %in% c("AK", "HI"))
+avg_rel <- rel |> group_by(loc, name, lon, lat) |> summarise(avg = mean(dev), n = n(), .groups = "drop")
+us <- sf::st_as_sf(maps::map("state", fill = TRUE, plot = FALSE)) |> rename(name = ID) |>  # contiguous states + DC
+  sf::st_transform(ALBERS)
+min_seasons <- 4
+lab_pts <- avg_rel |> mutate(lab = n)
+map_fill <- function(values, limits, name) {
+  scale_fill_gradient2(name, low = "#2166ac", mid = "#f2f1ee", high = "#b2182b", midpoint = 0, limits = limits,
+                       oob = scales::squish, na.value = "grey80")
+}
+theme_map <- theme_void(base_family = "Helvetica") +
+  theme(legend.position = "bottom", plot.title = element_text(face = "bold"),
+        plot.background = element_rect(fill = "white", color = NA))
+```
+
+```{r fig-map-avg}
+#| fig-height: 5.5
+#| fig-cap: "**Average relative timing of each state's ILINet peak** (mean over seasons of the state's peak week minus the season's median peak week; blue = typically early, red = typically late). The number on each state is how many seasons it has a complete series; states with fewer than 4 are grey. Alaska, Hawaii and Puerto Rico are not shown (Puerto Rico is excluded from the data); DC is the small area between Maryland and Virginia."
+md <- us |> left_join(avg_rel |> transmute(name, avg = ifelse(n < min_seasons, NA, avg)), by = "name")
+pts <- sf::st_as_sf(lab_pts, coords = c("lon", "lat"), crs = 4326)
+ggplot() +
+  geom_sf(data = md, aes(fill = avg), color = "white", linewidth = 0.25) +
+  geom_sf_text(data = pts, aes(label = lab), size = 2.6, color = INK) +
+  map_fill(limits = c(-4, 4), name = "average weeks vs season median") +
+  coord_sf(crs = ALBERS) +
+  labs(title = "Average relative peak timing, ILINet states") +
+  theme_map + guides(fill = guide_colorbar(barwidth = 14, barheight = 0.6, title.position = "top"))
+```
+
+```{r map-anim}
+#| results: asis
+anim_path <- "eda/relative_timing_by_season.gif"
+# every state in every season (NA = no complete series that season, drawn grey)
+ma <- tidyr::expand_grid(name = us$name, season = sort(unique(rel$season))) |>
+  left_join(rel |> select(name, season, dev), by = c("name", "season")) |>
+  left_join(us, by = "name") |> sf::st_as_sf()
+frame_plot <- function(ssn) {
+  ggplot(ma |> filter(season == ssn), aes(fill = dev)) +
+    geom_sf(color = "white", linewidth = 0.2) +
+    map_fill(limits = c(-8, 8), name = "weeks vs season median (clipped at ±8)") +
+    coord_sf(crs = ALBERS) +
+    labs(title = paste("ILINet relative peak timing, season", ssn)) +
+    theme_map + guides(fill = guide_colorbar(barwidth = 14, barheight = 0.6, title.position = "top"))
+}
+# one PNG per season, then a GIF with one second per frame (gifski); the same fixed colour scale in every frame
+dir.create("eda/anim", recursive = TRUE, showWarnings = FALSE)
+frames <- sapply(sort(unique(rel$season)), function(ssn) {
+  f <- file.path("eda/anim", paste0(sub("/", "-", ssn), ".png"))
+  ggsave(f, frame_plot(ssn), width = 7.5, height = 5, dpi = 110, bg = "white")
+  f
+})
+invisible(gifski::gifski(frames, anim_path, width = 825, height = 550, delay = 1, progress = FALSE))
+cat(sprintf("![**Relative timing by season** (animated, one frame per second; same colour scale in every frame; grey = no complete series that season).](%s){#fig-map-anim}\n", anim_path))
+```
+
+The GIF is assembled frame by frame with `gifski`, because `gganimate::animate()` hangs when run inside a knitr render here (it works in an interactive session). The equivalent `gganimate` code, for interactive use:
+
+```{r gganimate-version}
+#| eval: false
+#| code-fold: false
+p_anim <- ggplot(ma, aes(fill = dev)) +
+  geom_sf(color = "white", linewidth = 0.2) +
+  map_fill(limits = c(-8, 8), name = "weeks vs season median (clipped at ±8)") +
+  coord_sf(crs = ALBERS) +
+  labs(title = "ILINet relative peak timing, season {current_frame}") +
+  theme_map + gganimate::transition_manual(season)
+gganimate::animate(p_anim, nframes = n_distinct(ma$season), fps = 1, renderer = gganimate::gifski_renderer())
+```
+
+```{r fig-map-facets}
+#| fig-height: 7.5
+#| fig-cap: "**Relative timing by season**, static version of the animation (grey = no complete series that season)."
+ggplot(ma, aes(fill = dev)) +
+  geom_sf(color = "white", linewidth = 0.1) +
+  facet_wrap(~season, ncol = 4) +
+  map_fill(limits = c(-8, 8), name = "weeks vs season median (clipped at ±8)") +
+  coord_sf(crs = ALBERS) +
+  theme_map + theme(strip.text = element_text(face = "bold")) +
+  guides(fill = guide_colorbar(barwidth = 14, barheight = 0.6, title.position = "top"))
+```
+
+```{r geo-stats}
+# (a) average relative timing vs latitude / longitude (states with >= min_seasons seasons)
+a4 <- avg_rel |> filter(n >= min_seasons)
+fit_ll <- lm(avg ~ lat + lon, data = a4)
+cor_lat <- cor(a4$avg, a4$lat)
+cor_lon <- cor(a4$avg, a4$lon)
+r2_ll <- summary(fit_ll)$r.squared
+co_ll <- coef(summary(fit_ll))
+
+# (b) Moran's I with k-nearest-neighbour weights (k = 5, row-standardised) and permutation p-value
+dist_km <- function(lat1, lon1, lat2, lon2) {
+  r <- pi / 180
+  6371 * acos(pmin(1, sin(lat1 * r) * sin(lat2 * r) + cos(lat1 * r) * cos(lat2 * r) * cos((lon1 - lon2) * r)))
+}
+D <- outer(seq_len(nrow(a4)), seq_len(nrow(a4)), function(i, j) dist_km(a4$lat[i], a4$lon[i], a4$lat[j], a4$lon[j]))
+knn_w <- function(D, k = 5) {
+  W <- matrix(0, nrow(D), ncol(D))
+  for (i in seq_len(nrow(D))) W[i, order(D[i, ])[2:(k + 1)]] <- 1
+  W / rowSums(W)
+}
+morans_i <- function(x, W) {
+  z <- x - mean(x)
+  length(x) / sum(W) * sum(W * outer(z, z)) / sum(z^2)
+}
+moran_test <- function(x, W, n_perm = 9999, seed = 1) {
+  set.seed(seed)
+  obs <- morans_i(x, W)
+  perm <- replicate(n_perm, morans_i(sample(x), W))
+  c(I = obs, p = (1 + sum(perm >= obs)) / (n_perm + 1), expected = -1 / (length(x) - 1))
+}
+W5 <- knn_w(D, 5)
+Winv <- 1 / D; diag(Winv) <- 0; Winv <- Winv / rowSums(Winv)
+mi_knn <- moran_test(a4$avg, W5)
+mi_inv <- moran_test(a4$avg, Winv)
+mi_knn_resid <- moran_test(residuals(fit_ll), W5)
+
+# (c) per-season gradients and season-to-season stability
+per_season <- rel |> group_by(season) |> filter(n() >= 20) |>
+  group_modify(~ {
+    f <- lm(dev ~ lat + lon, data = .x)
+    ci <- confint(f)
+    tibble(term = c("latitude (weeks per degree north)", "longitude (weeks per degree east)"),
+           est = coef(f)[c("lat", "lon")], lo = ci[c("lat", "lon"), 1], hi = ci[c("lat", "lon"), 2],
+           r2 = summary(f)$r.squared, n = nrow(.x))
+  }) |> ungroup()
+wide_rel <- rel |> select(loc, season, dev) |> pivot_wider(names_from = season, values_from = dev)
+cm <- cor(as.matrix(wide_rel[, -1]), use = "pairwise.complete.obs")
+pair_r <- cm[upper.tri(cm)]
+# interaction test: do the lat/lon slopes differ between seasons?
+rel_f <- rel |> mutate(season = factor(season), loc = factor(loc))
+f_common <- lm(dev ~ season + lat + lon, data = rel_f)
+f_varying <- lm(dev ~ season * (lat + lon), data = rel_f)
+p_vary <- anova(f_common, f_varying)[2, "Pr(>F)"]
+
+# (d) within-season variance explained by a persistent state effect vs season-specific gradients
+f0 <- lm(dev ~ season, data = rel_f)
+fits <- list(`persistent state effect (state means)` = lm(dev ~ season + loc, data = rel_f),
+             `one lat/lon gradient for all seasons` = f_common,
+             `season-specific lat/lon gradients` = f_varying,
+             `state effect + season-specific gradients` = lm(dev ~ season * (lat + lon) + loc, data = rel_f))
+rss0 <- sum(residuals(f0)^2)
+vshare <- tibble(model = names(fits),
+                 `extra parameters` = sapply(fits, function(f) length(coef(f)) - length(coef(f0))),
+                 `share of within-season variance explained` = sapply(fits, function(f) 1 - sum(residuals(f)^2) / rss0),
+                 `adjusted` = sapply(fits, function(f) {
+                   n <- nrow(rel_f); p <- length(coef(f)); p0 <- length(coef(f0))
+                   1 - (sum(residuals(f)^2) / (n - p)) / (rss0 / (n - p0))
+                 }))
+vs_get <- function(m, col = "share of within-season variance explained") vshare[[col]][vshare$model == m]
+
+# FluSurv-NET sites: only a simple correlation (13 sites is too few for spatial statistics)
+fs_rel <- peaks |> filter(group == "FluSurv-NET", location != "US") |> group_by(season) |>
+  mutate(dev = peak_week - median(peak_week)) |> ungroup() |>
+  inner_join(st_info, by = c("loc" = "abb")) |> group_by(loc, lat, lon) |> summarise(avg = mean(dev), n = n(), .groups = "drop")
+fs_cor_lat <- cor(fs_rel$avg, fs_rel$lat)
+fs_cor_lon <- cor(fs_rel$avg, fs_rel$lon)
+ili_same <- a4 |> filter(loc %in% fs_rel$loc) |> select(loc, avg_ili = avg) |> inner_join(fs_rel |> select(loc, avg_fs = avg), by = "loc")
+fs_ili_cor <- cor(ili_same$avg_ili, ili_same$avg_fs)
+```
+
+```{r fig-geo-scatter}
+#| fig-height: 3.6
+#| fig-cap: "**Average relative timing against latitude and longitude of the state's centre** (states with at least 4 seasons; line: least-squares fit)."
+a4 |> pivot_longer(c(lat, lon), names_to = "coord", values_to = "deg") |>
+  mutate(coord = ifelse(coord == "lat", "latitude (°N)", "longitude (°E)")) |>
+  ggplot(aes(deg, avg)) +
+  geom_hline(yintercept = 0, color = INK2, linewidth = 0.3) +
+  geom_smooth(method = "lm", se = FALSE, color = INK, linewidth = 0.7) +
+  geom_text(aes(label = loc), size = 2.6, color = BLUE) +
+  facet_wrap(~coord, scales = "free_x") +
+  labs(x = NULL, y = "average weeks vs season median")
+```
+
+```{r fig-geo-slopes}
+#| fig-height: 3.6
+#| fig-cap: "**Per-season geographic gradients.** For each season, relative timing regressed on latitude and longitude across states; points are slopes, lines 95% confidence intervals. Positive latitude slope = northern states peak later that season."
+ggplot(per_season, aes(est, season)) +
+  geom_vline(xintercept = 0, color = INK2) +
+  geom_pointrange(aes(xmin = lo, xmax = hi), color = BLUE, size = 0.3) +
+  facet_wrap(~term, scales = "free_x") +
+  scale_y_discrete(limits = rev) +
+  labs(x = "slope (weeks per degree)", y = NULL)
+lat_s <- per_season |> filter(startsWith(term, "latitude"))
+lon_s <- per_season |> filter(startsWith(term, "longitude"))
+```
+
+```{r tbl-geo-var}
+#| tbl-cap: "Share of the within-season variation in ILINet state peak weeks explained by a persistent state effect and by geographic gradients (relative to a model with season means only). \"Adjusted\" penalises the number of extra parameters."
+vshare |> mutate(across(c(`share of within-season variance explained`, adjusted), ~ percent(.x, 1))) |> kable()
+```
+
+**How geographic is it?**
+
+- **The average pattern is clearly geographic.** Across the `r nrow(a4)` states with at least `r min_seasons` seasons, average relative timing correlates `r f2(cor_lat)` with latitude and `r f2(cor_lon)` with longitude; latitude and longitude together explain R² = `r percent(r2_ll, 1)` of the variation in average timing (`r f2(co_ll["lat", "Estimate"])` weeks per degree north, `r f2(co_ll["lon", "Estimate"])` weeks per degree east). In words: the South and South-East tend to peak first and the North-East and upper Midwest last.
+- **Neighbouring states are alike.** Moran's I for average relative timing is `r f2(mi_knn["I"])` with 5-nearest-neighbour weights (permutation p `r ifelse(mi_knn["p"] < 0.001, "< 0.001", paste("=", f2(mi_knn["p"], 3)))`; expected value under no spatial pattern `r f2(mi_knn["expected"])`) and `r f2(mi_inv["I"])` with inverse-distance weights (p `r ifelse(mi_inv["p"] < 0.001, "< 0.001", paste("=", f2(mi_inv["p"], 3)))`). After removing the linear latitude/longitude trend, the residual Moran's I is `r f2(mi_knn_resid["I"])` (p `r ifelse(mi_knn_resid["p"] < 0.001, "< 0.001", paste("=", f2(mi_knn_resid["p"], 3)))`), so a smooth south-to-north(-east) gradient accounts for `r ifelse(mi_knn_resid["p"] > 0.05, "most", "part")` of the spatial clustering.
+- **The north-later tilt recurs; the rest changes from season to season.** The latitude slope is positive in `r sum(lat_s$est > 0)` of `r nrow(lat_s)` seasons (its 95% interval excludes 0 in `r sum(lat_s$lo > 0)`), ranging from `r f2(min(lat_s$est))` to `r f2(max(lat_s$est))` weeks per degree; `r lat_s$season[which.min(lat_s$est)]` is the exception. The east–west slope flips sign between seasons (from `r f2(min(lon_s$est))` to `r f2(max(lon_s$est))` weeks per degree), and a test that both gradients are the same in every season is rejected (p `r ifelse(p_vary < 0.001, "< 0.001", paste("=", f2(p_vary, 3)))`). Beyond the gradient, a state's position is not repeatable: the season-to-season correlation of a state's relative timing averages only `r f2(mean(pair_r, na.rm = TRUE))` (range `r f2(min(pair_r, na.rm = TRUE))` to `r f2(max(pair_r, na.rm = TRUE))` over pairs of seasons).
+- **Season-specific gradients explain more than a persistent state effect.** Within seasons, fixed state effects explain `r percent(vs_get("persistent state effect (state means)"), 1)` of the variation in peak week (adjusted `r percent(vs_get("persistent state effect (state means)", "adjusted"), 1)`), one common latitude/longitude gradient `r percent(vs_get("one lat/lon gradient for all seasons"), 1)`, season-specific gradients `r percent(vs_get("season-specific lat/lon gradients"), 1)` (adjusted `r percent(vs_get("season-specific lat/lon gradients", "adjusted"), 1)`), and both together `r percent(vs_get("state effect + season-specific gradients"), 1)`. Most of the within-season spread (`r percent(1 - vs_get("state effect + season-specific gradients"), 1)`) is neither.
+- **FluSurv-NET** has only `r nrow(fs_rel)` state sites, too few for spatial statistics; there the average relative timing correlates `r f2(fs_cor_lat)` with latitude and `r f2(fs_cor_lon)` with longitude, and `r f2(fs_ili_cor)` with the same states' ILINet average.
+
+**What this means for the peak models.** A modest, fairly consistent south-to-north delay could be encoded, for example with latitude or with a state offset shrunk toward a latitude trend. But most of the within-season spread is season-specific.
+
+Two follow-ups were tested in the cross-validation harness of `relative-size-eda.html` (section *Regional and neighbour synchrony*):
+
+- Features describing the 5 nearest states, the HHS region and the "wave position" added nothing beyond SB's country-wide synchrony features.
+- Latitude and longitude gave a small gain for the probability that the peak has passed, and none for size.
+
+`peak_hier` already has a location effect on the timing hazard, which captures the persistent part. Season-specific spatial gradients in the hierarchical model, which would let the current-season update learn this season's direction of travel, have not been tried. They are listed as future work in the methods document.
+
+## How much of the variation in timing is season, location, or neither?
+
+```{r variance}
+decomp <- function(df, y) {
+  df <- df |> mutate(season = factor(season), location = factor(location))
+  fit <- lm(reformulate(c("season", "location"), y), data = df)
+  a <- anova(fit)
+  ss <- setNames(a[["Sum Sq"]], rownames(a))
+  tot <- sum(ss)
+  tibble(`season` = ss["season"] / tot, `location (given season)` = ss["location"] / tot,
+         `neither (residual)` = ss["Residuals"] / tot, `residual SD` = sqrt(a["Residuals", "Mean Sq"]),
+         `total SD` = sd(df[[y]]), n = nrow(df))
+}
+peaks <- peaks |> group_by(source, location) |> mutate(rel_size = log(peak) - median(log(peak))) |> ungroup()
+vd <- bind_rows(
+  lapply(SOURCE_GROUPS, function(g) {
+    x <- peaks |> filter(group == g)
+    bind_rows(decomp(x, "peak_week") |> mutate(quantity = "peak week (weeks)"),
+              decomp(x, "rel_size") |> mutate(quantity = "log peak size"))  |> mutate(source = g)
+  })
+) |> select(source, quantity, everything())
+vd |>
+  mutate(across(c(season, `location (given season)`, `neither (residual)`), ~ percent(.x, 1)),
+         across(c(`residual SD`, `total SD`), ~ f2(.x))) |>
+  kable(caption = "Share of the variation (sums of squares from a two-way additive model: season + location) in peak week and in log peak size explained by the season, by the location once the season is known, and by neither. Log peak size is centred on each location's median, so between-location differences in units and population do not count.")
+vw <- vd |> filter(source == "ILINet states", quantity == "peak week (weeks)")
+vs <- vd |> filter(source == "ILINet states", quantity == "log peak size")
+```
+
+For ILINet states, the season explains `r pct(vw$season)` of the variation in peak week and the location (once the season is known) only `r pct(vw[["location (given season)"]])`; the remaining `r pct(vw[["neither (residual)"]])` is location-season-specific (residual SD `r f2(vw[["residual SD"]], 1)` weeks). In other words, knowing *which season* it is tells us much more about when a state will peak than knowing *which state* it is. This is the empirical case for a season-level effect in the timing model (and for learning the current season's timing from other locations' progress, as the synchrony features do), and a warning that location-specific timing history (e.g. "this state usually peaks late") carries little information. For size (centred on each location's median, so the location's typical scale is already removed) the season again matters far more than any remaining location effect, but more is location-season-specific: season `r pct(vs$season)`, location `r pct(vs[["location (given season)"]])`, residual `r pct(vs[["neither (residual)"]])`. National/regional and FluSurv-NET series are smoother, so the season share is larger for them (see table).
+
+# Peak size
+
+## Raw peak size, each source on its own scale
+
+```{r fig-size-raw}
+#| fig-height: 5.5
+#| fig-cap: "Peak size of every series by season (log scale), each source on its own axis because units differ: ILINet in weighted ILI × % positive (percentage points × fraction), FluSurv-NET in hospitalizations per 100,000. Box: 25–75%; line: median."
+p_size <- function(g, ylab) {
+  peaks |> filter(group == g) |>
+    ggplot(aes(season, peak)) +
+    geom_boxplot(fill = SOURCE_COLORS[g], alpha = 0.35, color = SOURCE_COLORS[g], outlier.size = 0.6, width = 0.7) +
+    scale_y_log10(ylab) + labs(x = NULL, title = g) +
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, size = 7), panel.grid.major.x = element_blank())
+}
+(p_size("ILINet states", "peak (ILI × % pos.)") | p_size("ILINet national + regions", "peak (ILI × % pos.)") |
+   p_size("FluSurv-NET", "peak (per 100k)")) + plot_layout(widths = c(1, 1.8, 1))
+```
+
+```{r size-summary}
+ss <- peaks |> filter(group == "ILINet states") |> group_by(season) |> summarise(m = median(peak))
+fs <- peaks |> filter(group == "FluSurv-NET") |> group_by(season) |> summarise(m = median(peak))
+sp_within <- peaks |> filter(group == "ILINet states") |> group_by(season) |>
+  summarise(r = quantile(peak, 0.9) / quantile(peak, 0.1))
+```
+
+Season size varies a lot: the median ILINet-state peak ranges from `r f2(min(ss$m))` (`r ss$season[which.min(ss$m)]`) to `r f2(max(ss$m))` (`r ss$season[which.max(ss$m)]`), a factor of `r f2(max(ss$m) / min(ss$m), 1)`; the median FluSurv-NET site peak from `r f2(min(fs$m), 1)` (`r fs$season[which.min(fs$m)]`) to `r f2(max(fs$m), 1)` per 100k (`r fs$season[which.max(fs$m)]`; factor `r f2(max(fs$m) / min(fs$m), 1)`). 2011/12 and 2015/16 were small, late seasons in every source. Within a season, ILINet state peaks span a factor of about `r f2(median(sp_within$r), 0)` between the 10th and 90th percentiles, partly real and partly because ILINet's units depend on each state's reporting practices.
+
+## Size relative to the location's own typical peak
+
+```{r fig-size-heat}
+#| fig-height: 9
+#| fig-cap: "ILINet states: log of the season's peak relative to the location's median peak over all its seasons (0 = a typical season for that location; +0.7 ≈ twice as large; −0.7 ≈ half). Locations ordered by name; seasons in columns; blank = no complete series."
+peaks |> filter(group == "ILINet states") |>
+  ggplot(aes(season, factor(loc, levels = sort(unique(loc), decreasing = TRUE)), fill = pmax(pmin(rel_size, 1.5), -1.5))) +
+  geom_tile(color = "white", linewidth = 0.4) +
+  scale_fill_gradient2("log(peak / location median)", low = "#2166ac", mid = "#f2f1ee", high = "#b2182b",
+                       midpoint = 0, limits = c(-1.5, 1.5)) +
+  labs(x = NULL, y = NULL) +
+  theme(panel.grid.major = element_blank(), axis.text.x = element_text(angle = 45, hjust = 1)) +
+  guides(fill = guide_colorbar(barwidth = 12, barheight = 0.6, title.position = "left"))
+```
+
+Relative to each state's own history, big and small seasons show up as whole columns: 2011/12 and 2015/16 are blue almost everywhere, while 2012/13, 2017/18, 2019/20 and 2022/23 lean red. The column structure is what the variance decomposition measured (season `r pct(vs$season)` of the variation in log size). Unlike timing, then, size has both a strong season component and a stable location scale (removed here by centring), which is why the models express the current record relative to the location's typical peak (`hist_rel`).
+
+## Are late seasons smaller?
+
+```{r fig-timing-size}
+#| fig-height: 4.2
+#| fig-cap: "Peak size relative to the location's median (log scale) against peak week, one dot per series; line: LOESS smooth. Same axes in all panels."
+rho_ts <- peaks |> group_by(group) |>
+  summarise(rho = cor(peak_week, rel_size, method = "spearman"), n = n())
+ggplot(peaks, aes(peak_week, rel_size)) +
+  geom_hline(yintercept = 0, color = INK2, linewidth = 0.3) +
+  geom_point(aes(color = group), size = 0.8, alpha = 0.4) +
+  geom_smooth(method = "loess", se = FALSE, color = INK, linewidth = 0.8, span = 0.8) +
+  geom_text(data = rho_ts, aes(x = 41, y = 1.8, label = paste0("Spearman ", f2(rho))), hjust = 1, size = 3.2) +
+  facet_wrap(~group) +
+  scale_color_manual(values = SOURCE_COLORS, guide = "none") +
+  scale_x_season_week(limits = c(window[1] - 0.5, window[2] + 0.5), breaks = c(10, 20, 30, 40)) +
+  scale_y_continuous("log(peak / location median)", limits = c(-2.5, 2))
+season_ts <- peaks |> filter(group == "ILINet states") |> group_by(season) |>
+  summarise(week = median(peak_week), size = median(rel_size))
+rho_season <- cor(season_ts$week, season_ts$size, method = "spearman")
+```
+
+Within each source, later peaks are clearly smaller relative to the location's typical peak (Spearman `r paste(f2(rho_ts$rho), collapse = ", ")` for ILINet states, national/regions and FluSurv-NET), with the late (March–April) peaks mostly below the location's median. At the season level (median over ILINet states, `r nrow(season_ts)` seasons) the rank correlation between timing and size is `r f2(rho_season)`. A joint model of timing and size can exploit this: conditioning size on timing (or vice versa) narrows the forecast.
+
+# ILINet and FluSurv-NET in the same place and season
+
+```{r pairs}
+pairs <- peaks |> filter(source %in% c("ilinet", "flusurvnet")) |>
+  select(source, location, season, peak_week, rel_size) |>
+  pivot_wider(names_from = source, values_from = c(peak_week, rel_size)) |>
+  filter(!is.na(peak_week_ilinet), !is.na(peak_week_flusurvnet)) |>
+  mutate(diff = peak_week_ilinet - peak_week_flusurvnet)
+rho_pair <- cor(pairs$rel_size_ilinet, pairs$rel_size_flusurvnet, method = "spearman")
+```
+
+```{r fig-pairs}
+#| fig-height: 4
+#| fig-cap: "The same location and season in both sources (FluSurv-NET sites and the US). Left: ILINet peak week minus FluSurv-NET peak week. Right: relative peak sizes (each relative to the location's median in its own source)."
+p1 <- ggplot(pairs, aes(diff)) +
+  geom_histogram(binwidth = 1, fill = BLUE, color = "white") +
+  geom_vline(xintercept = 0, color = INK) +
+  labs(x = "ILINet peak week − FluSurv-NET peak week", y = "series pairs")
+p2 <- ggplot(pairs, aes(rel_size_flusurvnet, rel_size_ilinet)) +
+  geom_abline(color = INK2, linewidth = 0.3) +
+  geom_point(color = BLUE, alpha = 0.6, size = 1.3) +
+  coord_equal(xlim = c(-2, 1.6), ylim = c(-2, 1.6)) +
+  labs(x = "FluSurv-NET: log(peak / location median)", y = "ILINet: log(peak / location median)")
+p1 | p2
+```
+
+For the `r nrow(pairs)` location-seasons covered by both sources, the peak weeks agree closely: the median difference is `r median(pairs$diff)` weeks, `r pct(mean(pairs$diff == 0))` of pairs peak in the same week and `r pct(mean(abs(pairs$diff) <= 2))` within two weeks; ILINet peaks earlier than FluSurv-NET in `r pct(mean(pairs$diff < 0))` of pairs and later in `r pct(mean(pairs$diff > 0))`. Relative sizes agree moderately (Spearman `r f2(rho_pair)`): a big season in outpatient ILI tends to be a big season in hospitalizations, but far from always. This supports pooling the two sources in training, as long as each is measured relative to its own scale.
+
+# Seasons with more than one peak
+
+A season with two similar-sized humps is hard to forecast: the peak week can jump by weeks depending on which hump ends up slightly higher. We call a week a **competing peak** if it is a local maximum (higher than the week before and at least as high as the week after), at least 3 weeks away from the peak week, at least a given fraction of the peak's height, and separated from the peak by a dip (the lowest week between them is at most 80% of the competing peak's height).
+
+```{r multipeak}
+competing <- function(x, weeks, pk_week, pk, frac, min_sep = 3, dip = 0.8) {
+  n <- length(x)
+  if (n < 3) return(NA_real_)
+  best <- NA_real_
+  for (i in 2:(n - 1)) {
+    if (is.na(x[i]) || is.na(x[i - 1]) || is.na(x[i + 1])) next
+    if (!(x[i] > x[i - 1] && x[i] >= x[i + 1])) next
+    if (abs(weeks[i] - pk_week) < min_sep || x[i] < frac * pk) next
+    between <- x[weeks > min(weeks[i], pk_week) & weeks < max(weeks[i], pk_week)]
+    if (length(between) && min(between, na.rm = TRUE) <= dip * x[i]) best <- max(best, x[i] / pk, na.rm = TRUE)
+  }
+  best
+}
+series <- in_window |> semi_join(peaks, by = c("source", "location", "season")) |>
+  arrange(season_week) |>
+  group_by(source, agg_level, group, location, season) |>
+  summarise(x = list(inc), w = list(season_week), .groups = "drop") |>
+  left_join(peaks |> select(source, location, season, peak, peak_week), by = c("source", "location", "season"))
+series$second <- mapply(function(x, w, pw, pk) competing(x, w, pw, pk, frac = 0.5), series$x, series$w,
+                        series$peak_week, series$peak)
+thr <- c(0.5, 0.7, 0.8, 0.9)
+mp <- expand_grid(frac = thr, group = SOURCE_GROUPS)
+mp$share <- sapply(seq_len(nrow(mp)), function(i) {
+  s <- series$second[series$group == mp$group[i]]
+  mean(!is.na(s) & s >= mp$frac[i])
+})
+```
+
+```{r fig-multipeak}
+#| fig-height: 3.8
+#| fig-cap: "Share of series with a competing peak at least 50%, 70%, 80% or 90% as high as the season's peak, by source."
+ggplot(mp, aes(factor(percent(frac)), share, fill = factor(group, levels = SOURCE_GROUPS))) +
+  geom_col(position = position_dodge(width = 0.8), width = 0.75) +
+  geom_text(aes(label = percent(share, 1)), position = position_dodge(width = 0.8), vjust = -0.4, size = 3) +
+  scale_fill_manual(values = SOURCE_COLORS) +
+  scale_y_continuous("share of series", labels = percent_format(1), expand = expansion(c(0, 0.1))) +
+  labs(x = "competing peak at least this high, relative to the peak")
+mp_w <- mp |> filter(group == "ILINet states")
+mp_n <- mp |> filter(group == "ILINet national + regions")
+mp_f <- mp |> filter(group == "FluSurv-NET")
+```
+
+Competing peaks are common in state-level ILINet: `r pct(mp_w$share[mp_w$frac == 0.8])` of ILINet state series have a second hump at least 80% as high as the peak, and `r pct(mp_w$share[mp_w$frac == 0.9])` one at least 90% as high. They are rarer in the smoother national/regional series (`r pct(mp_n$share[mp_n$frac == 0.8])` at 80%) and in FluSurv-NET (`r pct(mp_f$share[mp_f$frac == 0.8])`). Some of this is noise in small states, and some is genuinely double-humped seasons (see the examples below). For the timing target, these are the cases where the peak week distribution should be bimodal; for the size target, they are the cases where the running maximum can sit at a near-final value for many weeks before being narrowly exceeded.
+
+```{r fig-multipeak-examples}
+#| fig-height: 5
+#| fig-cap: "Six ILINet state series with a competing peak at least 90% as high as the peak (chosen at random with a fixed seed). Star: the peak."
+set.seed(3)
+ex <- series |> filter(group == "ILINet states", !is.na(second), second >= 0.9) |> slice_sample(n = 6)
+ex_long <- ex |> select(location, season, x, w, peak_week, peak) |> unnest(c(x, w)) |>
+  mutate(label = paste(loc_label(location), season))
+ggplot(ex_long, aes(w, x)) +
+  geom_line(color = INK2) + geom_point(size = 0.8, color = INK2) +
+  geom_point(data = ex_long |> filter(w == peak_week), shape = 8, color = BLUE, size = 2.5) +
+  facet_wrap(~label, scales = "free_y") +
+  scale_x_season_week(limits = c(window[1] - 0.5, window[2] + 0.5), breaks = c(10, 20, 30, 40)) +
+  labs(y = "ILI × % positive")
+```
+
+# Influenza types and subtypes {#sec-types}
+
+Our peak target mixes all influenza viruses: ILINet × (percent of specimens positive for *any* influenza), or all lab-confirmed influenza hospitalizations in FluSurv-NET. A season can have an influenza A wave followed by a later influenza B wave, which would show up in the target as a second hump. This section asks what type/subtype data exist and whether type and subtype are related to multi-peaked seasons, to peak timing and to peak size. It is descriptive only.
+
+## What data exist
+
+```{r strain-load}
+source("R/strain_data.R")
+if (!dir.exists(file.path(STRAIN_DIR, "cdc_state"))) download_strain()   # ~1 MB; cached in eda/strain/
+sw <- load_strain_weekly()
+phl_state <- load_strain_state_phl()
+cov_strain <- sw |> filter(!is.na(A)) |> group_by(level) |>
+  summarise(first = min(season), last = max(season), locations = n_distinct(location),
+            subtypes_weekly = paste(range(season[!is.na(H1)]), collapse = "–"))
+```
+
+| Source | Geography | Seasons | Fields | Access |
+|---|---|---|---|---|
+| CDC FluView Interactive, WHO/NREVSS "combined prior to 2015/16" | national, HHS regions (1997/98–2014/15); states (2010/11–2014/15) | weekly | specimens, A (2009 H1N1), A (H1), A (H3), A not subtyped, A unable to subtype, B, H3N2v | `POST https://gis.cdc.gov/flu2/PostPhase02DataDownload` (the portal's own backend; works without a session; `download_strain()` in `R/strain_data.R`) |
+| CDC FluView, clinical labs | national, HHS regions, states, 2015/16 on | weekly | specimens, total A, total B, percent positive | same endpoint |
+| CDC FluView, public health labs | national, HHS regions, 2015/16 on (weekly); **states: season totals only** | weekly / seasonal | A (2009 H1N1), A (H3), A not subtyped, B, B/Victoria, B/Yamagata, H3N2v | same endpoint |
+| Delphi Epidata `fluview_clinical` | national, HHS regions, states | epiweeks from 2016w40; **versioned (issues) from 2018w39** | total specimens, total A, total B, percent A/B | `https://api.delphi.cmu.edu/epidata/fluview_clinical/`; no subtypes |
+| iddata S3 `who-nrevss.csv` | national, HHS regions, states (2010/11 on) | 1997/98–2023/24, downloaded Sept 2023 | A, B, A H1, A H3, proportions | `https://infectious-disease-data.s3.amazonaws.com/data-raw/influenza-who-nrevss/who-nrevss.csv` (built with `cdcfluview`; same numbers as the CDC files) |
+
+: Sources checked (all fetched programmatically on 2026-09-28). Delphi's `fluview` (ILINet) endpoint has no type information, and no Delphi endpoint carries subtypes. {#tbl-strain-sources}
+
+The analysis below uses the CDC files directly. A and B counts come from the combined file before 2015/16 and from the clinical labs from 2015/16 on (the clinical labs test far more specimens); H1/H3 counts come from the combined file before 2015/16 and from the public health labs from 2015/16 on. Weekly subtype data therefore exist nationally and for HHS regions throughout, but for states only up to 2014/15 (afterwards, only season totals). **Real-time use:** the clinical-lab A/B counts are published every Friday in FluView with the same one-week lag as ILINet, and Delphi keeps weekly vintages from October 2018, so a "current B share" feature could be built for real-time forecasting (and its revision behaviour studied); weekly subtype data are available in real time only for the nation and HHS regions.
+
+```{r strain-season}
+# peak weeks of A and B: weeks 10-43, 3-week centred moving average of weekly positives, first week attaining the max
+ma3 <- function(x) stats::filter(x, rep(1 / 3, 3), sides = 2) |> as.numeric()
+peak_of <- function(v, w) { v2 <- ma3(v); if (all(is.na(v2))) return(NA_real_); w[which.max(v2)] }
+type_ls <- sw |> filter(season_week >= window[1], season_week <= window[2]) |> arrange(season_week) |>
+  group_by(level, location, season) |>
+  summarise(A_tot = sum(A, na.rm = TRUE), B_tot = sum(B, na.rm = TRUE),
+            H1_tot = sum(H1, na.rm = TRUE), H3_tot = sum(H3, na.rm = TRUE),
+            A_peak = ifelse(A_tot >= 30, peak_of(coalesce(A, 0), season_week), NA),
+            B_peak = ifelse(B_tot >= 30, peak_of(coalesce(B, 0), season_week), NA), .groups = "drop") |>
+  mutate(B_share = B_tot / (A_tot + B_tot), H3_share = ifelse(H1_tot + H3_tot >= 30, H3_tot / (H1_tot + H3_tot), NA),
+         B_lag = B_peak - A_peak)
+analysis_seasons <- sort(unique(peaks$season))
+nat_types <- type_ls |> filter(level == "national", season %in% analysis_seasons) |>
+  mutate(dominant_A = case_when(H3_share >= 0.6 ~ "H3N2", H3_share <= 0.4 ~ "H1N1pdm09 / H1", TRUE ~ "mixed"))
+```
+
+## The seasons, by type
+
+```{r fig-type-curves}
+#| fig-height: 10
+#| fig-cap: "**National weekly positives for influenza A (orange) and B (green), and the ILINet national target (grey, rescaled to the same maximum), by season.** Vertical lines: A peak (orange), B peak (green), target peak (black)."
+nat_w <- sw |> filter(level == "national", season %in% analysis_seasons, season_week >= window[1], season_week <= window[2]) |>
+  group_by(season) |> mutate(mx = max(c(A, B), na.rm = TRUE)) |> ungroup()
+tgt <- d |> filter(source == "ilinet", location == "US", season %in% analysis_seasons, season_week >= window[1], season_week <= window[2]) |>
+  select(season, season_week, inc) |> left_join(nat_w |> distinct(season, mx), by = "season") |>
+  group_by(season) |> mutate(y = inc / max(inc, na.rm = TRUE) * mx) |> ungroup()
+tpk <- peaks |> filter(source == "ilinet", location == "US") |> select(season, peak_week)
+ggplot(nat_w, aes(season_week)) +
+  geom_line(data = tgt, aes(y = y), color = "#9a9993", linewidth = 0.6) +
+  geom_line(aes(y = A), color = ACCENT, linewidth = 0.7) + geom_line(aes(y = B), color = SOURCE_COLORS[["FluSurv-NET"]], linewidth = 0.7) +
+  geom_vline(data = nat_types, aes(xintercept = A_peak), color = ACCENT, linetype = "dashed", linewidth = 0.3) +
+  geom_vline(data = nat_types, aes(xintercept = B_peak), color = SOURCE_COLORS[["FluSurv-NET"]], linetype = "dashed", linewidth = 0.3) +
+  geom_vline(data = tpk, aes(xintercept = peak_week), color = INK, linewidth = 0.3) +
+  geom_text(data = nat_types, aes(x = 42, y = Inf, label = paste0("B ", percent(B_share, 1), "\nH3 ", percent(H3_share, 1))),
+            hjust = 1, vjust = 1.2, size = 2.4, color = INK2) +
+  facet_wrap(~season, scales = "free_y", ncol = 5) +
+  scale_x_season_week(limits = c(window[1] - 0.5, window[2] + 0.5), breaks = c(10, 20, 30, 40)) +
+  scale_y_continuous("weekly positives", labels = label_number(scale_cut = cut_short_scale())) +
+  theme(strip.text = element_text(size = 8))
+```
+
+```{r tbl-type-seasons}
+#| tbl-cap: "National season summary (season weeks 10–43): share of positives that were B, H3 share of subtyped A, A and B peak weeks (3-week moving average of positives) and the lag of the B peak after the A peak."
+nat_types |> transmute(season, `B share` = percent(B_share, 1), `H3 share of subtyped A` = percent(H3_share, 1), `dominant A` = dominant_A,
+                       `A peak wk` = A_peak, `B peak wk` = B_peak, `B lag (wk)` = B_lag) |> kable()
+```
+
+```{r type-season-numbers}
+blag_med <- median(nat_types$B_lag, na.rm = TRUE)
+blag_rng <- range(nat_types$B_lag, na.rm = TRUE)
+bshare_rng <- range(nat_types$B_share)
+```
+
+B usually peaks after A, by a median of `r blag_med` weeks (range `r blag_rng[1]` to `r blag_rng[2]`), and makes up between `r percent(bshare_rng[1], 1)` and `r percent(bshare_rng[2], 1)` of positives in a season. Because the target adds A and B together, a late B wave can either extend the A peak into a long plateau or, when A has already fallen, form a second hump.
+
+## Are multi-peaked seasons B-heavy?
+
+```{r multipeak-types}
+competing_hump <- function(x, weeks, pk_week, pk, min_sep = 3, dip = 0.8) {
+  best <- c(ratio = 0, week = NA_real_)
+  n <- length(x)
+  for (i in 2:(n - 1)) {
+    if (anyNA(x[(i - 1):(i + 1)]) || !(x[i] > x[i - 1] && x[i] >= x[i + 1]) || abs(weeks[i] - pk_week) < min_sep) next
+    between <- x[weeks > min(weeks[i], pk_week) & weeks < max(weeks[i], pk_week)]
+    if (length(between) && min(between, na.rm = TRUE) <= dip * x[i] && x[i] / pk > best["ratio"])
+      best <- c(ratio = x[i] / pk, week = weeks[i])
+  }
+  best
+}
+hump <- t(mapply(competing_hump, series$x, series$w, series$peak_week, series$peak))
+series$hump_ratio <- hump[, "ratio"]
+series$hump_week <- hump[, "week"]
+ls <- series |> select(source, agg_level, group, location, season, peak_week, hump_ratio, hump_week) |>
+  mutate(multi80 = hump_ratio >= 0.8, multi60 = hump_ratio >= 0.6, loc = loc_label(location))
+season_mp <- ls |> group_by(season) |>
+  summarise(multi80 = mean(multi80), multi60 = mean(multi60), hump = mean(hump_ratio), n = n()) |>
+  inner_join(nat_types, by = "season")
+rho_s <- function(x, y) cor(x, y, method = "spearman", use = "complete.obs")
+mp_rho <- tibble(
+  measure = c("share multi-peaked (≥ 80%)", "share multi-peaked (≥ 60%)", "mean second-hump height"),
+  `vs B share` = c(rho_s(season_mp$multi80, season_mp$B_share), rho_s(season_mp$multi60, season_mp$B_share), rho_s(season_mp$hump, season_mp$B_share)),
+  `vs B lag after A` = c(rho_s(season_mp$multi80, season_mp$B_lag), rho_s(season_mp$multi60, season_mp$B_lag), rho_s(season_mp$hump, season_mp$B_lag)),
+  `vs H3 share` = c(rho_s(season_mp$multi80, season_mp$H3_share), rho_s(season_mp$multi60, season_mp$H3_share), rho_s(season_mp$hump, season_mp$H3_share)))
+```
+
+For each location-season (all ILINet and FluSurv-NET series) we find the highest **competing hump**: a local maximum at least 3 weeks from the peak, separated from it by a dip (the lowest week between them is at most 80% of the hump's height). Its height relative to the peak (0 if there is none) is a continuous measure of bimodality; a series is "multi-peaked" if that height is at least 80% (the definition used above) or, more loosely, 60%.
+
+```{r fig-mp-types}
+#| fig-height: 4
+#| fig-cap: "**Season level (national type data; all ILINet and FluSurv-NET series of the season): share of multi-peaked series (hump ≥ 60% of the peak) against the season's B share, the lag of the B peak after the A peak, and the H3 share of subtyped A.** Labels: season. With about 20 seasons this is descriptive."
+season_mp |> select(season, multi60, B_share, B_lag, H3_share) |>
+  pivot_longer(c(B_share, B_lag, H3_share)) |>
+  mutate(name = factor(name, levels = c("B_share", "B_lag", "H3_share"),
+                       labels = c("B share of positives", "B peak lag after A peak (weeks)", "H3 share of subtyped A"))) |>
+  ggplot(aes(value, multi60)) +
+  geom_smooth(method = "lm", se = FALSE, color = "#b7b6b0", linewidth = 0.6) +
+  geom_text(aes(label = substr(season, 3, 7)), size = 2.6, color = BLUE) +
+  facet_wrap(~name, scales = "free_x") +
+  scale_y_continuous("share of series multi-peaked (≥ 60%)", labels = percent_format(1)) + labs(x = NULL)
+```
+
+```{r tbl-mp-rho}
+#| tbl-cap: "Spearman rank correlations across seasons between multi-peakedness and national type/subtype measures."
+mp_rho |> mutate(across(-measure, f2)) |> kable()
+```
+
+```{r type-location}
+# location-season level: ILINet states and HHS regions (and FluSurv-NET sites via their state) joined to the same
+# location's type data
+lsd <- ls |> mutate(tloc = case_when(location == "US" ~ "US", agg_level == "hhs region" ~ location, TRUE ~ loc)) |>
+  inner_join(type_ls |> select(location, season, B_share, H3_share, A_peak, B_peak, B_tot, A_tot),
+             by = c("tloc" = "location", "season")) |>
+  filter(!is.na(A_peak))
+lsd <- lsd |> mutate(B_tercile = cut(B_share, quantile(B_share, c(0, 1/3, 2/3, 1)), include.lowest = TRUE,
+                                     labels = c("low B share", "middle", "high B share")))
+tab_bt <- lsd |> group_by(group, B_tercile) |>
+  summarise(`series` = n(), `multi-peaked (≥ 80%)` = mean(multi80), `multi-peaked (≥ 60%)` = mean(multi60),
+            `mean hump height` = mean(hump_ratio), .groups = "drop")
+# for multi-peaked series: is the later hump the B wave?
+mp2 <- lsd |> filter(multi60, !is.na(B_peak)) |>
+  mutate(early = pmin(peak_week, hump_week), late = pmax(peak_week, hump_week),
+         late_near_B = abs(late - B_peak) <= 2, early_near_A = abs(early - A_peak) <= 2,
+         late_closer_to_B = abs(late - B_peak) < abs(late - A_peak),
+         peak_is_late = peak_week > hump_week)
+mp2_far <- mp2 |> filter(abs(B_peak - A_peak) >= 4)  # seasons where the A and B peaks are clearly separated
+peak_near <- lsd |> filter(!is.na(B_peak)) |> summarise(A = mean(abs(peak_week - A_peak) <= 2), B = mean(abs(peak_week - B_peak) <= 2))
+```
+
+```{r tbl-mp-location}
+#| tbl-cap: "Location-season level: share of multi-peaked series by tercile of the location's own B share that season (type data from the same state or HHS region; FluSurv-NET sites use their state's lab data)."
+tab_bt |> mutate(across(c(`multi-peaked (≥ 80%)`, `multi-peaked (≥ 60%)`), ~ percent(.x, 1)), `mean hump height` = f2(`mean hump height`)) |>
+  rename(source = group, `B share (own location)` = B_tercile) |> kable()
+lo_hi <- function(g, col) tab_bt[[col]][tab_bt$group == g]
+```
+
+```{r fig-humps}
+#| fig-height: 4
+#| fig-cap: "**Multi-peaked series (competing hump ≥ 60% of the peak): timing of the earlier and later hump relative to the location's A and B peaks.** Grey band: within 2 weeks of the virus peak."
+mp2 |> transmute(group, `earlier hump vs A peak` = early - A_peak, `later hump vs B peak` = late - B_peak, `later hump vs A peak` = late - A_peak) |>
+  pivot_longer(-group) |>
+  mutate(name = factor(name, levels = c("earlier hump vs A peak", "later hump vs A peak", "later hump vs B peak"))) |>
+  ggplot(aes(value)) +
+  annotate("rect", xmin = -2.5, xmax = 2.5, ymin = -Inf, ymax = Inf, fill = "#f1f0ec") +
+  geom_histogram(binwidth = 1, fill = BLUE, color = "white") +
+  facet_wrap(~name) + labs(x = "weeks (hump week minus virus peak week)", y = "series")
+```
+
+At the **season level** the association is weak: the rank correlation between the share of multi-peaked series (≥ 60% hump) and the national B share is `r f2(mp_rho[[2]][2])`, and with the lag of the B peak after the A peak `r f2(mp_rho[[3]][2])`; the H3 share of subtyped A is `r ifelse(abs(mp_rho[[4]][2]) < 0.2, "essentially unrelated", "related")` (`r f2(mp_rho[[4]][2])`). With `r nrow(season_mp)` seasons these correlations are rough (a single unusual season moves them by 0.1–0.2).
+
+At the **location-season level** it is clearer for ILINet states and FluSurv-NET (@tbl-mp-location), though not for the smoother national/regional ILINet series: for ILINet states, `r percent(lo_hi("ILINet states", "multi-peaked (≥ 60%)")[1], 1)` of series in the lowest B-share tercile are multi-peaked (≥ 60%) versus `r percent(lo_hi("ILINet states", "multi-peaked (≥ 60%)")[3], 1)` in the highest. Among the `r nrow(mp2)` multi-peaked series with type data, the **later hump lies within 2 weeks of the local B peak in `r pct(mean(mp2$late_near_B))`** of cases and is closer to the B peak than to the A peak in `r pct(mean(mp2$late_closer_to_B))`, while the earlier hump lies within 2 weeks of the A peak in `r pct(mean(mp2$early_near_A))`. Where the local A and B peaks are at least 4 weeks apart (`r nrow(mp2_far)` of these series), the later hump coincides with the B peak (within 2 weeks) in `r pct(mean(mp2_far$late_near_B))`. So roughly 4 in 10 double-humped series are an A wave followed by a B wave; the rest are A waves with two humps, or noise. The later hump is the higher of the two in `r pct(mean(mp2$peak_is_late))` of the multi-peaked series. For all series, the target's peak week is within 2 weeks of the local A peak in `r pct(peak_near$A)` of location-seasons and within 2 weeks of the B peak in `r pct(peak_near$B)`.
+
+## Do subtype and B share shift the peak week or the peak size?
+
+```{r type-timing-size}
+st_season <- peaks |> filter(group == "ILINet states") |> group_by(season) |> summarise(med_week = median(peak_week))
+nr_season <- peaks |> filter(group == "ILINet national + regions") |> group_by(season) |> summarise(med_week = median(peak_week))
+fs_season <- peaks |> filter(group == "FluSurv-NET") |> group_by(season) |> summarise(med_week = median(peak_week), med_size = median(rel_size))
+ils_size <- peaks |> filter(group == "ILINet national + regions") |> group_by(season) |> summarise(med_size = median(rel_size))
+tsz <- nat_types |> select(season, B_share, H3_share, dominant_A) |>
+  left_join(nr_season |> rename(week_ili = med_week), by = "season") |>
+  left_join(ils_size |> rename(size_ili = med_size), by = "season") |>
+  left_join(fs_season |> rename(week_fsn = med_week, size_fsn = med_size), by = "season")
+rho_tab <- tibble(
+  outcome = c("median peak week, ILINet national + regions", "median peak week, FluSurv-NET",
+              "median relative peak size, ILINet national + regions", "median relative peak size, FluSurv-NET"),
+  seasons = c(sum(!is.na(tsz$week_ili)), sum(!is.na(tsz$week_fsn)), sum(!is.na(tsz$size_ili)), sum(!is.na(tsz$size_fsn))),
+  `vs H3 share` = c(rho_s(tsz$week_ili, tsz$H3_share), rho_s(tsz$week_fsn, tsz$H3_share), rho_s(tsz$size_ili, tsz$H3_share), rho_s(tsz$size_fsn, tsz$H3_share)),
+  `vs B share` = c(rho_s(tsz$week_ili, tsz$B_share), rho_s(tsz$week_fsn, tsz$B_share), rho_s(tsz$size_ili, tsz$B_share), rho_s(tsz$size_fsn, tsz$B_share)))
+dom_tab <- tsz |> group_by(`dominant A` = dominant_A) |>
+  summarise(seasons = n(), `median peak week (ILINet nat./regions)` = median(week_ili, na.rm = TRUE),
+            `median rel. size (ILINet nat./regions)` = f2(median(size_ili, na.rm = TRUE)),
+            `FluSurv-NET seasons` = sum(!is.na(size_fsn)),
+            `median rel. size (FluSurv-NET)` = f2(median(size_fsn, na.rm = TRUE)))
+```
+
+```{r fig-type-timing-size}
+#| fig-height: 4
+#| fig-cap: "**Season medians of peak week and relative peak size against the H3 share of subtyped A (national).** Relative size = log of the peak relative to the location's median peak. Labels: season."
+tsz |> select(season, H3_share, `peak week, ILINet national + regions` = week_ili, `relative size, ILINet national + regions` = size_ili,
+              `relative size, FluSurv-NET` = size_fsn) |>
+  pivot_longer(-c(season, H3_share)) |> filter(!is.na(value)) |>
+  ggplot(aes(H3_share, value)) +
+  geom_smooth(method = "lm", se = FALSE, color = "#b7b6b0", linewidth = 0.6) +
+  geom_text(aes(label = substr(season, 3, 7)), size = 2.6, color = BLUE) +
+  facet_wrap(~name, scales = "free_y") +
+  scale_x_continuous("H3 share of subtyped influenza A (national)", labels = percent_format(1)) + labs(y = NULL)
+```
+
+```{r tbl-type-rho}
+#| tbl-cap: "Spearman rank correlations across seasons between season medians of peak week / relative peak size and national H3 and B shares."
+rho_tab |> mutate(across(c(`vs H3 share`, `vs B share`), f2)) |> kable()
+```
+
+```{r tbl-type-dominant}
+#| tbl-cap: "Season medians by dominant influenza A subtype (national; H3N2 = H3 share ≥ 60% of subtyped A, H1 = ≤ 40%)."
+kable(dom_tab)
+rt <- function(o, col) rho_tab[[col]][rho_tab$outcome == o]
+```
+
+Peak **timing** is only loosely related to subtype: the rank correlation of the season's median peak week (ILINet national/regions, `r rho_tab$seasons[1]` seasons) with the H3 share is `r f2(rt("median peak week, ILINet national + regions", "vs H3 share"))`, and with the B share `r f2(rt("median peak week, ILINet national + regions", "vs B share"))` (B-heavy seasons tend to peak later, consistent with late B waves carrying some peaks). For peak **size**, H3N2-dominant seasons are larger in FluSurv-NET hospitalizations (rank correlation of median relative size with the H3 share `r f2(rt("median relative peak size, FluSurv-NET", "vs H3 share"))` over `r rho_tab$seasons[4]` seasons), consistent with the known severity of H3N2 seasons in older adults; in ILINet the relation is `r f2(rt("median relative peak size, ILINet national + regions", "vs H3 share"))`.
+
+**Caveats.** Type and subtype are measured nationally or regionally from convenience samples of specimens (clinical and public health labs), subtyping covers only part of the A positives, the lab system changed in 2015/16, and there are only about 20 seasons, so everything here is descriptive and season-level correlations are fragile.
+
+**What this means for the peak models.** A substantial minority of multi-peaked series, the hard cases for peak-timing forecasts, are A-then-B seasons in which the second hump is the B wave, and state-level series with a high B share are more often multi-peaked. Two ways to use this were considered.
+
+1. **Real-time B-share features** ("current B share", "B still rising"). Clinical-lab A/B counts are published weekly with the same lag as ILINet, and Delphi has vintages. These were tested in `relative-size-eda.html` (section *Influenza type and subtype*) as the group SB + types.
+   - They gave the largest and most consistent gain of any candidate group for the probability that the peak has passed, and none for size.
+   - The gain came mostly in season weeks 17–26, not in the late weeks where a B wave could overtake the A peak. It came mainly because a high or rising B share signals that the A wave is already falling.
+   - The H3 subtype share, tested the same way, made forecasts worse.
+2. **Modeling the A and B components separately** (for example ILINet × % positive for A and for B), forecasting each one's peak and combining them. This would represent a B-driven second hump directly. It has not been tried.
+
+Neither is in the models. Both are listed as future work in the methods document, the first with the requirement to rebuild the features from as-published lab counts.
+
+# Summary
+
+- **Timing is mostly a season effect.** For ILINet states the season explains `r pct(vw$season)` of the variation in peak week and the location only `r pct(vw[["location (given season)"]])`; season median peak weeks range from `r min(st_med$med)` to `r max(st_med$med)`.
+- **Size has a strong season component on top of a stable location scale** (`r pct(vs$season)` of the variation in location-centred log size is season).
+- **Later peaks tend to be smaller** relative to the location's typical peak (Spearman `r f2(rho_ts$rho[rho_ts$group == "ILINet states"])` for ILINet states).
+- **ILINet and FluSurv-NET agree** on timing (median difference `r median(pairs$diff)` weeks, `r pct(mean(abs(pairs$diff) <= 2))` within two weeks) and moderately on relative size (Spearman `r f2(rho_pair)`).
+- **Competing peaks are common in state-level ILINet** (`r pct(mp_w$share[mp_w$frac == 0.8])` of series have a second hump ≥ 80% of the peak), which argues for timing forecasts that can be bimodal.
+- **Timing is geographic, but mostly season-specifically.** Average relative timing correlates `r f2(cor_lat)` with latitude (the South peaks first), and neighbouring states are alike (Moran's I `r f2(mi_knn["I"])`). But the gradient varies between seasons, and a state's relative timing barely repeats (season-to-season correlation `r f2(mean(pair_r, na.rm = TRUE))`).
+- **Type and subtype:** B usually peaks after A (median `r blag_med` weeks). State-level ILINet series with a high B share are more often multi-peaked (`r percent(lo_hi("ILINet states", "multi-peaked (≥ 60%)")[1], 1)` vs `r percent(lo_hi("ILINet states", "multi-peaked (≥ 60%)")[3], 1)` for the lowest vs highest B-share tercile), and about 4 in 10 double-humped series have their later hump at the B peak. H3N2-dominant seasons are larger in FluSurv-NET (rank correlation with the H3 share `r f2(rt("median relative peak size, FluSurv-NET", "vs H3 share"))`); timing is only loosely related to subtype.
+- **Follow-ups.** The candidate features suggested here (regional synchrony, latitude/longitude, B share, H3 share) were tested in `relative-size-eda.html`. The overall conclusions, and what remains to be done, are in the methods document (*Development results* and *Open questions and future work*).

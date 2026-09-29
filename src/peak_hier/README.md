@@ -9,8 +9,11 @@ Forecasts the seasonal targets `peak week inc flu hosp` (pmf over the 34 window 
 FluSurv-NET seasons before the forecast season; revisions to recent NHSN data are simulated from NHSN data
 vintages. Methods are described in `analysis/peak-models/peak-models-methods.qmd`.
 
-Development status: evaluated on ILINet development seasons only (`analysis/peak-models/validate_ilinet.py`). In
-development a weaker likelihood tempering (`likelihood_weight` 0.02-0.05) scored better than the default 0.15.
+Development status (idmodels 8c56bf0): evaluated on the ILINet development seasons 2018/19 and 2019/20 only
+(`analysis/peak-models/validate_ilinet.py`), not yet on NHSN. The committed defaults (`peak_hier`, likelihood weight 0.15)
+scored worse than the variants `hier__w05` (0.05) and `hier__w02c12` (0.02); the default has not been changed pending a
+decision. Version names and results are in `analysis/peak-models/peak-models-methods.qmd` (sections "Versions and names"
+and "Development results").
 
 ## Running locally
 
