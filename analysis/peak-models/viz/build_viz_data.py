@@ -42,9 +42,43 @@ def read_peak_rows(path: Path) -> pd.DataFrame:
     return df
 
 
+def add_as_of_data(seasons: dict) -> None:
+    """
+    For each season and forecast date, the weekly admissions of every location as published in the latest NHSN (or,
+    before 2024-11-15, HHS) data release on or before the forecast date, i.e. the data the models used. Stored as
+    seasons[season]["asof"][ref][location] = counts per window date (null where not yet reported).
+    """
+    import datetime
+
+    from idmodels.peak.revision import load_nhsn_vintages
+
+    last = max((r for s in seasons.values() for r in s["refs"]), default=None)
+    if last is None:
+        return
+    v = load_nhsn_vintages(datetime.date.fromisoformat(last))
+    v = v.assign(wk=pd.to_datetime(v["wk_end_date"]).dt.strftime("%Y-%m-%d"))
+    as_ofs = sorted(v["as_of"].unique())
+    by_as_of = {a: g for a, g in v.groupby("as_of")}
+    for s in seasons.values():
+        s["asof"], s["asof_date"] = {}, {}
+        for ref in s["refs"]:
+            ref_ts = pd.Timestamp(ref)
+            avail = [a for a in as_ofs if a <= ref_ts]
+            if not avail:
+                continue
+            g = by_as_of[avail[-1]]
+            g = g.loc[g["wk"].isin(s["dates"]) & (pd.to_datetime(g["wk"]) < ref_ts)]
+            s["asof"][ref] = {loc: [None if pd.isna(x) else int(round(x)) for x in
+                                    h.drop_duplicates("wk", keep="last").set_index("wk")["inc"].reindex(s["dates"])]
+                              for loc, h in g.groupby("location")}
+            s["asof_date"][ref] = str(pd.Timestamp(avail[-1]).date())
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--hub_root", default=str(ROOT.parent / "FluSight-forecast-hub"))
+    parser.add_argument("--no_vintages", action="store_true",
+                        help="skip the as-published weekly admissions (NHSN data vintages) for each forecast date")
     parser.add_argument("--extra", nargs=3, action="append", default=[], metavar=("MODEL_ID", "LABEL", "DIR"),
                         help="an additional sandbox model version to include, e.g. an earlier run kept elsewhere")
     args = parser.parse_args()
@@ -123,6 +157,8 @@ def main():
 
     for s in seasons.values():
         s["refs"] = sorted(s["forecasts"])
+    if not args.no_vintages:
+        add_as_of_data(seasons)
     out = {
         "models": models,
         "p_scale": 1e4,

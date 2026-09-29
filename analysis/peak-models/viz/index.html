@@ -199,7 +199,7 @@ th { font-family: var(--font-ui); font-weight: 600; color: var(--ink-2); }
 
   // revalidate so an updated data file is never replaced by a stale cached copy
   // the data file name carries a content hash, so a cached copy of an older file can never be used
-  fetch("data-48903ce150.json", { cache: "no-cache" }).then((r) => r.json()).then((data) => { D = normalize(data); init(); })
+  fetch("data-bad52688ea.json", { cache: "no-cache" }).then((r) => r.json()).then((data) => { D = normalize(data); init(); })
     .catch(() => { $("status").textContent = "Could not load forecast data."; });
 
   function normalize(data) {
@@ -356,12 +356,15 @@ th { font-family: var(--font-ui); font-weight: 600; color: var(--ink-2); }
 
   function drawObserved(S, ref, loc, L) {
     const box = $("obsChart"); box.innerHTML = "";
-    const obs = S.obs[state.loc] || [];
+    const obs = S.obs[state.loc] || [];  // final data
+    const asof = ((S.asof || {})[ref] || {})[state.loc];  // as published on the forecast date (the models' input)
     const truth = S.truth[state.loc];
     const H = 150, top = 10, bottom = 26, h = H - top - bottom;
     const svg = el("svg", { width: L.W, height: H, viewBox: `0 0 ${L.W} ${H}`, role: "img",
       "aria-label": `Weekly flu hospital admissions in ${loc.name}, ${state.season}` }, box);
-    const max = Math.max(1, ...obs.filter((v) => v != null));
+    // fixed axis for this location and season: final data and every as-published series of the season
+    const allAsof = Object.values(S.asof || {}).flatMap((byLoc) => byLoc[state.loc] || []);
+    const max = Math.max(1, ...obs.filter((v) => v != null), ...allAsof.filter((v) => v != null));
     const niceMax = niceCeil(max);
     const y = (v) => top + h - (v / niceMax) * h;
     [0, 0.5, 1].forEach((f) => {
@@ -371,12 +374,21 @@ th { font-family: var(--font-ui); font-weight: 600; color: var(--ink-2); }
     });
     monthTicks(S, L, svg, top + h + 4);
     const ri = refIndex(S, ref);
-    const pts = obs.map((v, i) => v == null ? null : [xOf(L, i) + L.cw / 2, y(v)]);
+    const toPts = (arr) => arr.map((v, i) => v == null ? null : [xOf(L, i) + L.cw / 2, y(v)]);
     const path = (arr) => arr.filter(Boolean).map((p, i) => (i ? "L" : "M") + p[0].toFixed(1) + " " + p[1].toFixed(1)).join("");
-    const seen = pts.map((p, i) => (i < ri ? p : null));
-    const later = pts.map((p, i) => (i >= Math.floor(ri) - 1 ? p : null));
-    el("path", { d: path(later), fill: "none", stroke: css("--future"), "stroke-width": 2, "stroke-dasharray": "3 3" }, svg);
+    const pts = toPts(obs);
+    // dashed: final data for the whole season; solid: the data as published on the forecast date
+    el("path", { d: path(pts), fill: "none", stroke: css("--future"), "stroke-width": 2, "stroke-dasharray": "3 3" }, svg);
+    const seen = asof ? toPts(asof).map((p, i) => (i < ri ? p : null)) : pts.map((p, i) => (i < ri ? p : null));
     el("path", { d: path(seen), fill: "none", stroke: css("--ink"), "stroke-width": 2 }, svg);
+    seen.forEach((p, i) => {
+      if (!p) return;
+      const hit = el("circle", { cx: p[0], cy: p[1], r: 6, fill: "transparent" }, svg);
+      const fin = obs[i] != null ? fmt.format(obs[i]) : "–";
+      const pub = asof && asof[i] != null ? fmt.format(asof[i]) : fin;
+      hit.addEventListener("mousemove", (e) => showTip(e, `Week ending ${dfmt(S.dates[i])}: ${pub} as published on the forecast date · ${fin} final`));
+      hit.addEventListener("mouseleave", hideTip);
+    });
     if (truth) {
       const [px, py] = pts[truth.week] || [];
       if (px != null) {
@@ -385,9 +397,12 @@ th { font-family: var(--font-ui); font-weight: 600; color: var(--ink-2); }
     }
     drawNow(svg, L, ri, top, top + h);
     const t0 = el("text", { x: L.left - 8, y: top + h + 16, "text-anchor": "end" }, svg); t0.textContent = loc.abbr;
-    $("obsNote").textContent = truth
-      ? `Solid: data available before the forecast date. Dashed: data reported later. Observed peak ${fmt.format(truth.count)} admissions in the week ending ${dfmt(S.dates[truth.week])}.`
-      : "Solid: data available before the forecast date. Dashed: data reported later.";
+    const rel = (S.asof_date || {})[ref];
+    const solid = asof
+      ? `Solid: weekly admissions as published in the data release of ${dfmt(rel, { month: "short", day: "numeric", year: "numeric" })}, the latest before the forecast date (what the models used).`
+      : "Solid: final data before the forecast date (no data release available for this date).";
+    $("obsNote").textContent = `${solid} Dashed: final data for the whole season, so the gap shows later revisions.` +
+      (truth ? ` Observed peak (final data) ${fmt.format(truth.count)} admissions in the week ending ${dfmt(S.dates[truth.week])}.` : "");
   }
 
   function drawNow(svg, L, ri, y0, y1) {
