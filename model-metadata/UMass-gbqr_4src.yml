@@ -1,0 +1,31 @@
+team_name: "UMass-Amherst"
+team_abbr: "UMass"
+model_name: "GBQR with NSSP, ILINet, FluSurv-NET"
+model_abbr: "gbqr_4src"
+model_version: "1.0"
+model_contributors: [
+  {
+    "name": "Li Shandross",
+    "affiliation": "UMass Amherst",
+    "email": "lshandross@umass.edu"
+  },
+  {
+    "name": "Evan Ray",
+    "affiliation": "UMass Amherst",
+    "email": "elray@umass.edu"
+  },
+  {
+    "name": "Nick Reich",
+    "affiliation": "UMass Amherst",
+    "email": "nick@umass.edu"
+  }
+]
+license: "CC-BY-4.0"
+designated_model: true
+methods: "Gradient boosting quantile regression fit to NHSN, NSSP, ILINet, FluSurv-NET data."
+methods_long: "
+  Gradient boosting quantile regression, fit to NHSN, NSSP, ILINet, FluSurv-NET data.
+"
+data_inputs: "Weekly incident laboratory-confirmed influenza hospitalizations from NHSN. Weekly percentage of emergency department visits with an influenza diagnosis from NSSP. Weekly percentage of outpatient visits for influenza-like illness from ILINet. Weekly influenza hospitalization surveillance rates from FluSurv-NET."
+ensemble_of_models: false
+ensemble_of_hub_models: false
