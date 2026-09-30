@@ -8,7 +8,8 @@ import numpy as np
 import torch
 from chronos import ChronosPipeline
 
-from iddata.loader import DiseaseDataLoader
+from iddata.enums import Disease
+from iddata.sources.nhsn import NHSNDataSource
 
 
 @click.command()
@@ -92,12 +93,8 @@ def main(
 
     print(f"Fetching historical flu hospitalization data...")
     # Fetch historical data up to reference_date
-    loader = DiseaseDataLoader()
-    target_data = loader.load_nhsn(
-        disease=disease,
-        as_of=reference_date,
-        rates=False  # We want raw counts, not rates
-    )
+    source = NHSNDataSource(disease=Disease.FLU, rates=False)
+    target_data = source.load(as_of=reference_date)
 
     # Convert date column and sort
     target_data['wk_end_date'] = pd.to_datetime(target_data['wk_end_date'])
