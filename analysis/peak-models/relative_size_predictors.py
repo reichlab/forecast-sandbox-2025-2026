@@ -11,6 +11,7 @@ analysis/peak-models/eda/:
   cv_results.parquet         per-row CV scores (pinball, log loss) for the section 9 feature sets; cv_sets.csv
   cv_holiday.parquet, cv_holiday_adjust.parquet, holiday_excess.parquet, holiday_calendar.csv   (section 10)
   cv_lit.parquet, reflection_check.csv                                                          (section 11)
+  cv_sb_groups.parquet       section 9 groups and holiday added to SB (so every group has an SB reference)
   cv_bootstrap.csv           season-bootstrap win rates and per-season comparisons for every feature set
   importance.csv             LightGBM gain importances
   predictors_numbers.json    leakage / consistency checks, holiday adjustment factors, runtimes
@@ -1084,6 +1085,32 @@ def type_outputs(d, dcv, cv_main, reuse=False):
     return boot
 
 
+def sb_group_outputs(d, dcv, cv_main, reuse=False):
+    """Section 9 groups (and the holiday features) added to SB, so that every group is compared with SB."""
+    sets = {"SB": SB}
+    for g in ["trend", "timing", "onset", "level_hist"]:
+        sets[f"SB + {GROUP_LABELS[g]}"] = SB + GROUPS_NEW[g]
+    sets["SB + holiday"] = SB + HOLIDAY
+    path = OUT / "cv_sb_groups.parquet"
+    # SB and SB + level vs history were already fit in section 9 (same features, same folds)
+    done = {"SB": "+ synchrony + burden", "SB + level vs history": "+ synchrony + burden + level"}
+    if reuse and path.exists():
+        cvs = pd.read_parquet(path)
+    else:
+        cvs = pd.concat([cv_main[cv_main["set"] == v].assign(set=k) for k, v in done.items()], ignore_index=True)
+    missing = {k: v for k, v in sets.items() if k not in cvs["set"].unique()}
+    if missing:
+        cvs = pd.concat([cvs, cv_feature_sets(dcv, missing)], ignore_index=True)
+        cvs.to_parquet(path)
+    boot = []
+    for st in list(sets)[1:]:
+        for metric in ["pinball", "logloss"]:
+            boot.append({"family": "SB groups", "set": st, "reference": "SB", "metric": metric,
+                         "boot_win": season_bootstrap(cvs, st, "SB", metric),
+                         "seasons_better": int((per_season_rel(cvs, st, "SB", metric) < 1).sum())})
+    return boot
+
+
 def gain_importance(dcv, feats, label):
     import lightgbm as lgb
 
@@ -1109,6 +1136,9 @@ def main():
     parser.add_argument("--reuse_lit_cv", action="store_true", help="reuse eda/cv_lit.parquet")
     parser.add_argument("--reuse_regional_cv", action="store_true", help="reuse eda/cv_regional.parquet")
     parser.add_argument("--reuse_types_cv", action="store_true", help="reuse eda/cv_types.parquet")
+    parser.add_argument("--reuse_sb_groups_cv", action="store_true", help="reuse eda/cv_sb_groups.parquet")
+    parser.add_argument("--sb_groups_only", action="store_true",
+                        help="with --reuse_cv: only add the SB-referenced group sets (cv_sb_groups.parquet), then stop")
     parser.add_argument("--workers", type=int, default=3, help="parallel single-threaded LightGBM fits")
     args = parser.parse_args()
     global N_WORKERS
@@ -1159,6 +1189,9 @@ def main():
                          "boot_win": season_bootstrap(cv, a, "current", metric),
                          "seasons_better": int((per_season_rel(cv, a, "current", metric) < 1).sum())})
     t_cv = time.time() - t0
+    if args.sb_groups_only:
+        sb_group_outputs(d, dcv, cv, reuse=args.reuse_sb_groups_cv)
+        return
     boot += holiday_outputs(d, dcv, cv, nums, reuse=args.reuse_holiday_cv)
     boot += literature_outputs(d, dcv, cv, nums, reuse=args.reuse_lit_cv)
     t_reg = time.time()
@@ -1167,6 +1200,7 @@ def main():
     t_typ = time.time()
     boot += type_outputs(d, dcv, cv, reuse=args.reuse_types_cv)
     nums["runtime_types_cv_s"] = round(time.time() - t_typ)
+    boot += sb_group_outputs(d, dcv, cv, reuse=args.reuse_sb_groups_cv)
     pd.DataFrame(boot).to_csv(OUT / "cv_bootstrap.csv", index=False)
     pd.concat([gain_importance(dcv, CURRENT + ALL_NEW, "current + all new"),
                gain_importance(dcv, SB + ALL_LIT, "SB + all literature"),

@@ -1,0 +1,1380 @@
+---
+title: "Forecasting the flu season peak"
+subtitle: "Direct peak models for the FluSight peak targets: design, validation and results"
+author: "Nick Reich · UMass Amherst"
+date: 2026-10-08
+format:
+  revealjs:
+    width: 1600
+    height: 900
+    margin: 0.04
+    slide-number: true
+    embed-resources: true
+    transition: none
+    include-in-header:
+      text: |
+        <style>
+        .reveal { font-size: 30px; }
+        .reveal h2 { font-size: 44px; }
+        .reveal .slide-subtitle { font-size: 0.75em; color: #52514e; }
+        .reveal .small { font-size: 0.75em; }
+        .reveal .tiny { font-size: 0.6em; color: #52514e; }
+        .reveal ul li { margin-bottom: 0.25em; }
+        .reveal .callout { border-left: 6px solid #2a78d6; padding: 0.3em 0.6em; background: #f3f7fd; }
+        .reveal table { font-size: 0.7em; }
+        .reveal .formula { font-family: Georgia, serif; font-size: 1.05em; }
+        .reveal pre code { font-size: 0.62em; line-height: 1.25; }
+        </style>
+execute:
+  echo: false
+  warning: false
+  message: false
+knitr:
+  opts_chunk:
+    dev: "png"
+    dpi: 110
+    fig.width: 14
+    fig.height: 6.6
+    cache: true
+    autodep: true
+---
+
+```{r setup}
+#| cache: false
+source("R/slides_helpers.R")
+library(maps)
+library(sf)
+```
+
+```{r data}
+windows <- peak_windows()
+weekly <- load_weekly_nhsn()
+oracle <- load_peak_oracle()
+fc <- load_model_output()
+V <- load_viewer_data()
+scores <- load_scores("peak-scores.csv")
+ili <- read_csv("ilinet-validation/scores.csv", show_col_types = FALSE, col_types = cols(location = col_character()))
+replay <- read_parquet("eda/replay_rows.parquet")
+pred <- read_parquet("eda/predictor_rows.parquet")
+states <- function(d) d |> filter(location != "US")
+final_season <- function(loc, season_) weekly |> filter(location == loc, season_of(date) == season_)
+truth_week <- function(loc, season_) oracle$peak_week[oracle$location == loc & oracle$season == season_]
+truth_size <- function(loc, season_) oracle$peak_count[oracle$location == loc & oracle$season == season_]
+```
+
+# FluSight and flu season peaks
+
+## FluSight: CDC's collaborative flu forecasting
+
+```{r f-us-weekly}
+#| fig-height: 5.6
+us <- weekly |> filter(location == "US", date >= as.Date("2023-08-01"), date < as.Date("2026-07-01")) |> mutate(season = season_of(date))
+pk <- us |> group_by(season) |> slice_max(value, n = 1, with_ties = FALSE)
+ggplot(us, aes(date, value)) +
+  geom_line(color = INK, linewidth = 0.9) +
+  geom_point(data = pk, color = "#d9531e", size = 3.5) +
+  geom_text(data = pk, aes(label = paste0(season, ": ", comma(value), " (", format(date, "%b %d"), ")")),
+            vjust = -1, size = 5, color = "#d9531e") +
+  scale_y_continuous("Weekly flu hospital admissions (US)", labels = label_comma(), expand = expansion(c(0, 0.15))) +
+  scale_x_date(NULL, date_breaks = "6 months", date_labels = "%b %Y") +
+  labs(title = "NHSN laboratory-confirmed influenza hospital admissions, United States")
+```
+
+- Teams submit weekly forecasts of **NHSN flu hospital admissions** for the US, 50 states, DC and PR
+- Weekly targets: 0–3 week-ahead quantiles · Seasonal targets: **peak week** and **peak size**
+
+::: notes
+FluSight is CDC's collaborative forecasting challenge. The target is NHSN weekly laboratory-confirmed influenza hospital admissions (the hub's target data shown here start in 2023/24). Points mark each season's national peak (final data). 2024/25 was the largest season in over a decade.
+:::
+
+## NHSN Seasons differ in timing and size
+
+```{r f-seasons}
+cur <- us |> filter(season %in% c("2023/24", "2024/25", "2025/26")) |> mutate(sw = as.integer((date - season_week_date(season, 1)) / 7) + 1)
+p1 <- ggplot(cur, aes(sw, value, color = season)) + geom_line(linewidth = 1.1) +
+  scale_color_manual(NULL, values = c("2023/24" = "#9aa1ab", "2024/25" = "#1baf7a", "2025/26" = "#d9531e")) +
+  scale_x_season_week(limits = c(1, 53)) + scale_y_continuous("US weekly admissions", labels = label_comma()) +
+  labs(title = "National curves by season week") + theme(legend.position = c(0.15, 0.8))
+pw <- oracle |> filter(location != "US", season <= "2025/26") |> mutate(sw = as.integer((peak_week - season_week_date(season, 1)) / 7) + 1)
+p2 <- ggplot(pw, aes(sw, season)) +
+  geom_jitter(height = 0.18, width = 0, alpha = 0.55, size = 2.4, color = BLUE) +
+  stat_summary(fun = median, geom = "point", shape = 124, size = 12, color = INK) +
+  scale_x_season_week(limits = c(10, 43)) + labs(y = NULL, title = "State peak weeks (bar = median)")
+p1 + p2 + plot_layout(widths = c(1.3, 1))
+```
+
+::: notes
+Left: US curves aligned by season week (week 1 = MMWR week 31). Right: each dot is one state's peak week in final NHSN data; within a season states spread over several weeks, and seasons shift as a whole. Peak timing is mostly a season-level phenomenon (in ILINet, season explains about 69% of the variance of peak week, location about 6%).
+:::
+
+## Training data: when do seasons peak? {visibility="hidden"}
+
+```{r f-eda-peakweek}
+#| fig-height: 6.6
+pkw_series <- replay |> distinct(source, agg_level, location, season, peak_week, group) |>
+  mutate(group = factor(group, levels = SOURCE_GROUPS))
+pe1 <- ggplot(pkw_series, aes(peak_week, fill = group)) + geom_histogram(binwidth = 1, color = "white") +
+  facet_wrap(~group, ncol = 1, scales = "free_y") + scale_fill_manual(values = SOURCE_COLORS, guide = "none") +
+  scale_x_season_week(limits = c(9.5, 43.5)) + labs(y = "series", title = "Peak week, all training series")
+pe2 <- pkw_series |> filter(group != "ILINet national + regions") |>
+  ggplot(aes(peak_week, season, color = group)) +
+  geom_jitter(height = 0.2, width = 0, alpha = 0.45, size = 1.8) +
+  stat_summary(fun = median, geom = "point", shape = 124, size = 9, color = INK) +
+  scale_color_manual(NULL, values = SOURCE_COLORS) + scale_x_season_week(limits = c(9.5, 43.5)) +
+  labs(y = NULL, title = "By season (bar = median): seasons shift as a whole") +
+  guides(color = guide_legend(override.aes = list(size = 4, alpha = 1)))
+pe1 + pe2 + plot_layout(widths = c(1, 1.15))
+```
+
+::: notes
+ILINet × % positive (national, HHS regions, states) and FluSurv-NET (network and sites), `r nrow(pkw_series)` series from `r n_distinct(pkw_series$season)` seasons, 1997/98–2022/23 without pandemic seasons; peak week = first week with the season's maximum within weeks 10–43 (final data). Peaks range from November to April, but within a season they cluster: the season, not the location, sets most of the timing.
+:::
+
+
+## Peak week of every location, every season
+
+```{r eda-peaks-data}
+#| include: false
+# figures from peak-timing-size-eda.qmd (figures 2, 4, 6 and 10), same data rules: ILINet + FluSurv-NET, window season
+# weeks 10-43, complete series (>= 25 observed window weeks, peak > 0); objects prefixed eda_ to keep them separate
+eda_d <- load_surveillance("ilinet-validation/data-ilinet-flusurvnet.parquet")
+eda_peaks <- eda_d |> filter(season_week >= WINDOW[1], season_week <= WINDOW[2], !is.na(inc)) |>
+  group_by(source, agg_level, group, location, season) |>
+  summarise(n_obs = n(), peak = max(inc), peak_week = season_week[which.max(inc)], .groups = "drop") |>
+  filter(n_obs >= 25, peak > 0) |>
+  mutate(loc = loc_label(location)) |>
+  group_by(source, location) |> mutate(rel_size = log(peak) - median(log(peak))) |> ungroup()
+eda_dev <- eda_peaks |> filter(group == "ILINet states") |>
+  group_by(season) |> mutate(dev = peak_week - median(peak_week)) |> ungroup()
+EDA_ALBERS <- 5070
+eda_st <- tibble(abb = c(state.abb, "DC"), name = c(tolower(state.name), "district of columbia"),
+                 lon = c(state.center$x, -77.03), lat = c(state.center$y, 38.90))
+eda_rel <- eda_dev |> select(loc, season, dev) |> inner_join(eda_st, by = c("loc" = "abb")) |>
+  filter(!loc %in% c("AK", "HI"))
+eda_avg <- eda_rel |> group_by(loc, name, lon, lat) |> summarise(avg = mean(dev), n = n(), .groups = "drop")
+eda_us <- sf::st_as_sf(maps::map("state", fill = TRUE, plot = FALSE)) |> rename(name = ID) |> sf::st_transform(EDA_ALBERS)
+eda_fill <- function(limits, name) {
+  scale_fill_gradient2(name, low = "#2166ac", mid = "#f2f1ee", high = "#b2182b", midpoint = 0, limits = limits,
+                       oob = scales::squish, na.value = "grey80")
+}
+eda_theme_map <- theme_void(base_family = "Helvetica") +
+  theme(legend.position = "bottom", plot.title = element_text(face = "bold"),
+        plot.background = element_rect(fill = "white", color = NA))
+```
+
+```{r eda-week-season}
+#| fig-width: 12
+#| fig-height: 5.8
+eda_med <- eda_peaks |> group_by(group, season) |> summarise(med = median(peak_week), .groups = "drop")
+ggplot(eda_peaks, aes(peak_week, season)) +
+  geom_jitter(aes(color = group), height = 0.18, width = 0, size = 1, alpha = 0.55) +
+  geom_point(data = eda_med, aes(med, season), shape = "|", size = 6, color = INK) +
+  facet_wrap(~group, nrow = 1) +
+  scale_color_manual(values = SOURCE_COLORS, guide = "none") +
+  scale_x_season_week(limits = c(WINDOW[1] - 0.5, WINDOW[2] + 0.5), breaks = c(10, 20, 30, 40)) +
+  scale_y_discrete(NULL, limits = rev) +
+  theme(panel.grid.major.y = element_blank())
+```
+
+::: notes
+Each dot is one location's peak week in one season (jittered vertically); black bars are the season's median peak week. Seasons shift as a whole: in ILINet states, the season explains about 69% of the variation in peak week, the location only about 6%. The season median ranges from week 18 (2022/23) to week 33 (2011/12). Source: peak-timing-size-eda, figure 2.
+:::
+
+## Where states tend to peak early or late
+
+```{r eda-map-avg}
+#| fig-width: 10
+#| fig-height: 6
+eda_md <- eda_us |> left_join(eda_avg |> transmute(name, avg = ifelse(n < 4, NA, avg)), by = "name")
+eda_pts <- sf::st_as_sf(eda_avg, coords = c("lon", "lat"), crs = 4326)
+ggplot() +
+  geom_sf(data = eda_md, aes(fill = avg), color = "white", linewidth = 0.25) +
+  geom_sf_text(data = eda_pts, aes(label = n), size = 3, color = INK) +
+  eda_fill(limits = c(-4, 4), name = "average weeks vs season median") +
+  coord_sf(crs = EDA_ALBERS) +
+  labs(title = "Average relative peak timing, ILINet states", subtitle = "Number on each state: seasons with a complete series (grey: fewer than 4)") +
+  eda_theme_map + guides(fill = guide_colorbar(barwidth = 16, barheight = 0.7, title.position = "top"))
+```
+
+::: notes
+Each state's peak week minus that season's median peak week, averaged over seasons (blue = typically early, red = typically late); numbers are the seasons with a complete series (grey: fewer than 4). A south-to-north gradient: about 0.2 weeks later per degree of latitude; latitude and longitude explain about 60% of the variation in these averages, and Moran's I is 0.56 (5 nearest neighbours). Source: peak-timing-size-eda, figure 4.
+:::
+
+## The geography changes from season to season
+
+```{r eda-map-facets}
+#| fig-width: 12
+#| fig-height: 6.2
+eda_ma <- tidyr::expand_grid(name = eda_us$name, season = sort(unique(eda_rel$season))) |>
+  left_join(eda_rel |> select(name, season, dev), by = c("name", "season")) |>
+  left_join(eda_us, by = "name") |> sf::st_as_sf()
+ggplot(eda_ma, aes(fill = dev)) +
+  geom_sf(color = "white", linewidth = 0.1) +
+  facet_wrap(~season, ncol = 4) +
+  eda_fill(limits = c(-8, 8), name = "weeks vs season median (clipped at ±8)") +
+  coord_sf(crs = EDA_ALBERS) +
+  eda_theme_map + theme(strip.text = element_text(face = "bold")) +
+  guides(fill = guide_colorbar(barwidth = 16, barheight = 0.7, title.position = "top"))
+```
+
+::: notes
+Relative peak timing of each state, one map per season (grey = no complete series). The north-south tendency shows up in most seasons, but the pattern shifts: the latitude slope is positive in 10 of 11 seasons, the east-west slope flips sign, and a state's relative timing barely repeats from one season to the next (correlation about 0.11). Season-specific gradients explain more of the within-season spread than persistent state effects. Source: peak-timing-size-eda, figure 6.
+:::
+
+## Big and small seasons, relative to each state's typical peak
+
+```{r eda-size-heat}
+#| fig-width: 11
+#| fig-height: 6.4
+# rows ordered by centroid latitude, north at the top (state.center puts AK and HI at their inset positions)
+eda_lat <- eda_st |> mutate(lat = case_when(abb == "AK" ~ 64.7, abb == "HI" ~ 20.3, TRUE ~ lat))
+eda_sz <- eda_peaks |> filter(group == "ILINet states") |> left_join(eda_lat |> select(abb, lat), by = c("loc" = "abb"))
+eda_sz |>
+  ggplot(aes(season, factor(loc, levels = distinct(eda_sz, loc, lat) |> arrange(lat) |> pull(loc)),
+             fill = pmax(pmin(rel_size, 1.5), -1.5))) +
+  geom_tile(color = "white", linewidth = 0.3) +
+  scale_fill_gradient2("log(peak / location median)", low = "#2166ac", mid = "#f2f1ee", high = "#b2182b",
+                       midpoint = 0, limits = c(-1.5, 1.5)) +
+  labs(x = NULL, y = "states by centroid latitude, south to north") +
+  theme(panel.grid.major = element_blank(), axis.text.x = element_text(angle = 45, hjust = 1),
+        axis.text.y = element_text(size = 6.5), axis.title.y = element_text(size = 10)) +
+  guides(fill = guide_colorbar(barwidth = 12, barheight = 0.6, title.position = "top"))
+```
+
+::: notes
+Log of each state's season peak relative to its own median peak (0 = a typical season for that state; +0.7 ≈ twice as large, −0.7 ≈ half). Big and small seasons appear as whole columns: 2011/12 and 2015/16 are small almost everywhere, 2012/13, 2017/18, 2019/20 and 2022/23 lean large. The season explains about 41% of the variation in log size for ILINet states. This is why the models express the current maximum relative to the location's typical peak (hist_rel). Rows are ordered by state centroid latitude (north at the top). Source: peak-timing-size-eda, figure 10.
+:::
+
+
+# The peak targets
+
+## Peak week: a probability for each of 34 Saturdays
+
+```{r example-forecast}
+ex_loc <- "US"; ex_ref <- as.Date("2025-12-27"); ex_model <- "GBQR core / core+hol"
+ex_all <- fc |> filter(location == ex_loc, reference_date == ex_ref)
+ex <- ex_all |> filter(model == ex_model)
+ex_truth <- oracle |> filter(location == ex_loc, season == "2025/26")
+```
+
+```{r f-pmf-example}
+#| fig-height: 6.0
+plot_peak_forecast(
+  prelim = prelim_on(V, "2025/26", ex_loc, ex_ref),
+  pmf = ex_all |> filter(target == "peak week inc flu hosp") |> transmute(model, week = as.Date(output_type_id), value),
+  ref_date = ex_ref, final = final_season(ex_loc, "2025/26"), past = past_seasons(weekly, ex_loc, "2025/26"),
+  size_q = ex_all |> filter(target == "peak inc flu hosp") |> transmute(model, tau = output_type_id, value),
+  models = unname(MODEL_IDS), truth = ex_truth$peak_week) +
+  plot_annotation(title = paste0("US, forecast date ", format(ex_ref, "%b %d %Y"), " (grey vertical line)"),
+                  subtitle = paste("Top: as published on the forecast date (solid), final (dashed), earlier seasons (grey);\nbands: peak-size 50% / 95% intervals and median, placed at each model's most likely peak week.\nBelow: peak-week pmfs. Dashed orange: observed peak week."))
+```
+
+- A **pmf over the window**: season weeks 10–43, the 34 Saturdays (2026/27: `r format(min(windows[["2026/27"]]), "%b %d %Y")` – `r format(max(windows[["2026/27"]]), "%b %d %Y")`), summing to 1 · peak week = first week with the season's **maximum final count** · ties not scored · scored by **log score** and **RPS**
+
+::: notes
+The peak week target is a probability mass function over the window weeks. Past weeks can still have probability because recent weeks are revised. The log score is ln p(observed week); we show −log score so that lower is better throughout. RPS is the squared distance between forecast and observed cumulative distributions over the 34 weeks, so near misses cost less. Our models floor every week at 1e-4 so the log score is always finite. The figure is made with plot_peak_forecast() (R/slides_helpers.R).
+:::
+
+## Peak size: 23 quantiles of the season's maximum weekly count
+
+```{r f-quantile-example}
+#| fig-height: 5.0
+q <- ex |> filter(target == "peak inc flu hosp") |> mutate(tau = as.numeric(output_type_id))
+ggplot(q, aes(value, tau)) +
+  geom_step(color = BLUE, linewidth = 1.2) + geom_point(color = BLUE, size = 3) +
+  geom_vline(xintercept = ex_truth$peak_count, color = "#d9531e", linewidth = 1) +
+  annotate("text", x = ex_truth$peak_count, y = 0.08, label = paste0(" observed peak ", comma(ex_truth$peak_count)),
+           hjust = 0, color = "#d9531e", size = 5) +
+  scale_x_log10("Peak weekly admissions (log scale)", labels = label_comma()) +
+  scale_y_continuous("Quantile level", breaks = c(0.01, 0.1, 0.25, 0.5, 0.75, 0.9, 0.99)) +
+  labs(title = paste0("Peak-size quantiles of one of these forecasts (", ex_model, ")"))
+```
+
+- Levels: `r paste(Q_LEVELS, collapse = ", ")`
+- Scored by **WIS** on the count and on the **log(count + 1)** scale, and by **50% / 95% interval coverage**
+
+::: notes
+The peak size target is the maximum weekly count over the window weeks in final data, forecast as 23 quantiles. WIS is twice the mean pinball loss over the levels; on the log scale every location counts roughly equally, so we lead with log-WIS.
+:::
+
+## How FluSight models did on the peak targets in 2025/26
+
+```{r f-hub-2526}
+#| fig-height: 6.4
+H_NAMES <- c("peak size: log-WIS", "peak week: RPS", "peak week: −log score (floored at 1e-4)")
+h <- scores |> filter(season == "2025/26", location != "US")
+n_ok <- h |> count(model) |> filter(n >= 800) |> pull(model)
+hs <- h |> filter(model %in% n_ok) |> group_by(model, label) |>
+  summarise(`peak week: RPS` = mean(rps, na.rm = TRUE), `peak size: log-WIS` = mean(wis_log, na.rm = TRUE),
+            `peak week: −log score (floored at 1e-4)` = -mean(pmax(log_score, log(1e-4))),
+            zero = mean(log_score < log(1e-4)), n = n(), .groups = "drop") |>
+  mutate(kind = case_when(model %in% names(MODEL_IDS) ~ label, model == "FluSight-ensemble" ~ "FluSight-ensemble",
+                          TRUE ~ "other FluSight models"))
+hub_order <- hs |> arrange(desc(`peak size: log-WIS`)) |> pull(label)
+hl <- hs |> pivot_longer(all_of(H_NAMES)) |> mutate(name = factor(name, levels = H_NAMES))
+hl <- hl |> mutate(label_n = paste0(label, " (", comma(n), ")"))
+hub_order_n <- hs |> arrange(desc(`peak size: log-WIS`)) |> transmute(paste0(label, " (", comma(n), ")")) |> pull()
+ggplot(hl |> filter(!model %in% names(MODEL_IDS)), aes(value, factor(label_n, levels = hub_order_n), color = kind)) +
+  geom_point(size = 4.5, na.rm = TRUE) + facet_wrap(~name, scales = "free_x") + model_scale_color(NULL) +
+  labs(x = "lower is better", y = NULL, title = "Average scores on 2025/26 peak forecasts, states (each model on the forecasts it submitted)",
+       subtitle = paste0("In parentheses: forecasts submitted (1 location × 1 week); maximum ",
+                         comma(n_distinct(h$location) * n_distinct(h$reference_date)), " = ",
+                         n_distinct(h$location), " states × ", n_distinct(h$reference_date), " weeks"))
+```
+
+::: notes
+Standardized scoring (score_peak_forecasts.py) of the 2025/26 FluSight peak submissions, states only, models with at least 800 scored forecasts, ordered by peak-size log-WIS. Panels: peak size (log-WIS), peak week (RPS and −log score). Hub models are scored on the forecasts they submitted, so they cover different dates/locations. `r hz <- hs |> filter(!model %in% names(MODEL_IDS), !is.na(zero), zero > 0); paste0(nrow(hz), " hub models put (essentially) zero probability on the observed peak week in ", percent(min(hz$zero), 0.1), "–", percent(max(hz$zero), 0.1), " of their forecasts")`; with an unfloored log score that alone wrecks the mean, so the log score here is floored at log(1e-4), as in the score explorer. FluSight-lop_norm has no log score (pmf not scoreable). Our models are added on the results slide.
+:::
+
+# Data, targets and notation
+
+## Data sources
+
+| source | what | geography, seasons | role | data as of the forecast date |
+|---|---|---|---|---|
+| **NHSN** | lab-confirmed flu hospital admissions | US, states, DC, PR; 2022/23– | **the target**; also training | weekly NHSN releases (vintages) → revision model |
+| **ILINet × % positive** | weighted % ILI × WHO/NREVSS clinical-lab % positive | national + 10 HHS regions 1997/98–; states 2010/11– | training (and ILINet development tests) | Delphi Epidata release history (ILINet and % positive) |
+| **FluSurv-NET** | lab-confirmed hospitalization rate per 100,000 | network overall + 13 sites; 2010/11– | training only | final data (earlier seasons only) |
+| **WHO/NREVSS type counts** | clinical-lab A and B positives; A subtypes | own geography / HHS region / national | B share and H3 features (not in the final models) | final counts for training; Delphi clinical-lab vintages in real time |
+| NSSP | % of ED visits for influenza | states, national | **available, not used** (idmodels can load it for training) | snapshots only from 2025-09-17 |
+
+- Pandemic seasons (2008/09–2009/10, 2020/21–2021/22) are excluded · ILINet for PR and the US Virgin Islands is dropped (all-zero series)
+
+::: notes
+Training uses all seasons before the forecast season. NHSN as-published values come from the archived weekly releases; the revision model (idmodels.peak.revision.RevisionModel) block-bootstraps historical log revision ratios of the latest 10 weeks. ILINet development used Delphi's release history so that ILINet could be forecast as it was published. The FluSurv-NET site count (13) and season ranges are those of the exploratory replay rows.
+:::
+
+## Season weeks
+
+::: columns
+::: {.column width="38%"}
+::: small
+- A **season** runs from MMWR week 31 to MMWR week 30 of the next year (early August to late July), labelled by its two years, e.g. 2025/26
+- **Season week** *s* = MMWR week − 30, counting on past the new year: MMWR week 1 is season week 23 (24 after a 53-week year)
+- Every week ends on a **Saturday**; data, forecast dates and target dates are all week-ending Saturdays
+- A season has 52 weeks, or 53 when its first year has 53 MMWR weeks (2014, 2020, 2025)
+- **Peak window**: season weeks 10–43, the 34 Saturdays from early October to late May that FluSight's peak-week pmf covers
+- All sources use the same season weeks, so ILINet, FluSurv-NET and NHSN seasons line up week for week
+:::
+:::
+::: {.column width="62%"}
+```{r f-season-weeks}
+#| fig-width: 9
+#| fig-height: 5.6
+# season weeks of the four NHSN-era seasons; week 10 is the first window Saturday in hub-config/tasks.json and the
+# number of weeks per season follows MMWR (2025 has 53 weeks, so 2025/26 has a season week 53)
+sw_n <- c("2023/24" = 52, "2024/25" = 52, "2025/26" = 53, "2026/27" = 52)
+sw <- purrr::imap_dfr(sw_n, \(n, s) tibble(season = s, week = 1:n, date = windows[[s]][1] + (week - 10) * 7)) |>
+  mutate(in_window = week >= 10 & week <= 43, season = factor(season, levels = rev(names(sw_n))))
+sw_lab <- sw |> group_by(season) |> filter(week %in% c(1, 10, 43, max(week))) |>
+  mutate(lab = format(date, "%b %d\n%Y"))
+ggplot(sw, aes(week, season)) +
+  geom_tile(aes(fill = in_window), color = "white", linewidth = 0.4, height = 0.55) +
+  geom_text(data = sw_lab, aes(label = lab), vjust = -0.55, nudge_y = 0.28, size = 3.2, lineheight = 0.9,
+            color = INK) +
+  geom_tile(data = filter(sw, format(date, "%m-%d") >= "12-25" & format(date, "%m-%d") <= "12-31"),
+            fill = NA, color = "#d9531e", linewidth = 0.8, height = 0.55) +
+  scale_fill_manual(NULL, values = c(`TRUE` = BLUE, `FALSE` = "#d5d9df"),
+                    labels = c(`TRUE` = "peak window (weeks 10–43)", `FALSE` = "outside the window")) +
+  scale_x_continuous("Season week", breaks = c(1, 10, 20, 23, 30, 43, 52), expand = expansion(add = c(2.5, 2.5))) +
+  scale_y_discrete(NULL, expand = expansion(add = c(0.5, 0.9))) +
+  labs(title = "Season weeks and the peak window, 2023/24 – 2026/27",
+       subtitle = "Each tile is one week ending on a Saturday · orange outline: the week containing Christmas") +
+  theme(panel.grid = element_blank(), legend.position = "bottom")
+```
+:::
+:::
+
+::: notes
+Season weeks come from iddata (add_season_columns): season week = MMWR week − 30, wrapping at the new year by the number of MMWR weeks in the previous year. Because 2025 has 53 MMWR weeks, 2025/26 has 53 season weeks and 2026/27 starts a week later (Aug 8 2026), so its window runs Oct 10 2026 – May 29 2027. A given season week falls on nearly the same calendar date each year (within a few days), which is what lets the models compare seasons week by week. season_week_to_date() in idmodels.peak.base converts back to dates.
+:::
+
+## Notation: running max, relative size z, weeks to peak k
+
+::: columns
+::: {.column width="38%"}
+::: small
+Season week *s* = 1 is MMWR week 31; the peak window is weeks 10–43. For a series *y* at the current week *t*:
+
+- <span class="formula"><i>M<sub>t</sub></i></span> = the largest value so far
+- <span class="formula"><i>Y</i>*</span> = the season's peak (largest final value in the window), reached first in week <span class="formula"><i>W</i>*</span>
+- Relative size: <span class="formula"><i>z</i> = log((<i>Y</i>* + ε) / (<i>M<sub>t</sub></i> + ε))</span> ≥ 0, and <span class="formula"><i>z</i> = 0</span> exactly when the peak has passed
+- Weeks to peak: <span class="formula"><i>k</i> = <i>W</i>* − <i>t</i></span>; <span class="formula"><i>k</i> ≤ 0</span> means already peaked
+- ε: a small source-specific constant (either 0.01 or 0.001: chosen to be roughly 1/1000 of a typical national peak for that source)
+- Back to the targets: 
+   - peak-size quantile <span class="formula">= (<i>M<sub>t</sub></i> + ε) e<sup><i>Q<sub>z</sub></i></sup> − ε</span>
+   - P(peak week = *t* + *k*)
+:::
+:::
+::: {.column width="62%"}
+```{r f-z-example}
+#| fig-width: 9
+#| fig-height: 6.6
+sa <- read_parquet("eda/season_arrays.parquet") |> filter(source == "ilinet", location == "25", season == "2017/18")
+pk_w <- sa$season_week[which.max(ifelse(sa$season_week >= 10, sa$y, -Inf))]
+pk_y <- max(sa$y[sa$season_week >= 10], na.rm = TRUE)
+tt <- 22; mt <- sa$M[sa$season_week == tt]
+ztt <- log(pk_y / mt)
+ggplot(sa, aes(season_week)) +
+  geom_line(aes(y = y), color = "#b7bdc6", linewidth = 1.1) +
+  geom_line(data = filter(sa, season_week <= tt), aes(y = y), color = INK, linewidth = 1.3) +
+  geom_step(data = filter(sa, season_week <= tt, season_week >= 10), aes(y = M), color = BLUE, linewidth = 1.1,
+            linetype = "22") +
+  annotate("point", x = pk_w, y = pk_y, color = "#d9531e", size = 4) +
+  annotate("segment", x = tt, xend = tt, y = mt, yend = pk_y, color = "#d9531e", linewidth = 1.2,
+           arrow = arrow(length = unit(0.3, "cm"), ends = "both")) +
+  annotate("text", x = tt - 0.4, y = (mt + pk_y) / 2, hjust = 1, size = 5.5, color = "#d9531e",
+           label = sprintf("z = log(Y* / M_t) = %.2f", ztt)) +
+  annotate("segment", x = tt, xend = pk_w, y = pk_y * 1.04, yend = pk_y * 1.04, color = "#1baf7a", linewidth = 1.2,
+           arrow = arrow(length = unit(0.3, "cm"), ends = "both")) +
+  annotate("text", x = (tt + pk_w) / 2, y = pk_y * 1.1, size = 5.5, color = "#1baf7a",
+           label = sprintf("k = W* − t = %d − %d = %d", pk_w, tt, pk_w - tt)) +
+  annotate("text", x = tt, y = mt * 0.9, label = sprintf("M_t at t = %d", tt), size = 5, color = BLUE, hjust = 1.05) +
+  scale_x_season_week() + scale_y_continuous("ILINet × % positive, Massachusetts", expand = expansion(c(0.02, 0.12))) +
+  labs(title = "Worked example: Massachusetts 2017/18 at season week 22",
+       subtitle = "Black: data through week t · dashed blue: running max M_t · grey: rest of the season")
+```
+:::
+:::
+
+::: notes
+z is unchanged when a series is rescaled, so ILINet (percent of visits), FluSurv-NET (rates) and NHSN (admissions) can be pooled. The size forecast is converted back with quantile equivariance. To our knowledge this target has not been used in epidemic forecasting before; analogues exist in optimal stopping (ultimate maximum) and actuarial reserving (age-to-ultimate factors). The timing model predicts the class of k: already peaked, 1, ..., 12, or more than 12 weeks ahead.
+:::
+
+## Training data: how much higher will the peak be?
+
+```{r f-eda-zfan}
+#| fig-height: 6.6
+zf <- replay |> mutate(group = factor(group, levels = SOURCE_GROUPS)) |> group_by(group, season_week) |>
+  summarise(q10 = quantile(z, 0.1), q25 = quantile(z, 0.25), q50 = median(z), q75 = quantile(z, 0.75),
+            q90 = quantile(z, 0.9), p0 = mean(z == 0), .groups = "drop")
+pz1 <- ggplot(zf, aes(season_week)) +
+  geom_ribbon(aes(ymin = q10, ymax = q90, fill = group), alpha = 0.22) +
+  geom_ribbon(aes(ymin = q25, ymax = q75, fill = group), alpha = 0.5) +
+  geom_line(aes(y = q50, color = group), linewidth = 1) + facet_wrap(~group, nrow = 1) +
+  scale_fill_manual(values = SOURCE_COLORS, guide = "none") + scale_color_manual(values = SOURCE_COLORS, guide = "none") +
+  scale_x_season_week() + coord_cartesian(ylim = c(0, 6)) +
+  labs(y = "eventual z = log(Y* / M_t)", title = "Eventual z by season week (median, 50% and 80% of series)")
+pz2 <- ggplot(zf, aes(season_week, p0, color = group)) + geom_line(linewidth = 1.2) +
+  scale_color_manual(NULL, values = SOURCE_COLORS) + scale_x_season_week() +
+  scale_y_continuous("share with z = 0", labels = label_percent(), limits = c(0, 1)) +
+  labs(title = "Share of series already past their peak")
+pz1 / pz2 + plot_layout(heights = c(1.4, 1))
+```
+
+::: notes
+Training replay rows (ILINet, FluSurv-NET), with each season truncated at every week t. Early in the season z is large and very uncertain (the running max is tiny); by week ~30 most series have z = 0. The y axis is cut at z = 6 (a 400-fold increase). These are the unconditional versions of what the models predict.
+:::
+
+
+
+# Baseline model
+
+## Climatology and conditional climatology
+
+::: columns
+::: {.column width="45%"}
+**Climatology**: the distribution of what happened in past seasons, ignoring the current one
+
+- **Peak-week climatology** (figure): historical peak weeks, kernel-smoothed (sd 1.5 weeks)
+- **Conditional climatology**: restrict to past series in the *same situation* at week *t* (same season week, same weeks since <i>M<sub>t</sub></i>): how often had the peak already passed, and how large was *z*?
+- The **baseline** is this conditional lookup, with the peak-week climatology spreading any remaining chance of a future peak over the coming weeks
+- **GBQR** replaces the lookup with a learned function of many features of the current situation
+- **Open Question**: Might kernel smoothing be over-smoothing real spikes in the distributions?
+:::
+::: {.column width="55%"}
+```{r f-climatology}
+#| fig-width: 8
+#| fig-height: 6.2
+wk <- 10:43
+cnt <- tabulate(pkw_series$peak_week, nbins = 53)[wk]
+kern <- outer(wk, wk, function(a, b) dnorm(a - b, sd = 1.5))
+sm <- as.numeric(kern %*% cnt); sm <- sm / sum(sm)
+clim_d <- tibble(season_week = wk, raw = cnt / sum(cnt), smooth = sm)
+ggplot(clim_d, aes(season_week)) + geom_col(aes(y = raw), fill = "#cde2fb", width = 0.85) +
+  geom_line(aes(y = smooth), color = BLUE, linewidth = 1.4) +
+  scale_x_season_week(limits = c(9.5, 43.5)) + scale_y_continuous("P(peak week)", labels = label_percent()) +
+  labs(title = "Peak-week climatology", subtitle = "bars: share of training series · line: kernel-smoothed (sd 1.5 weeks)")
+```
+:::
+:::
+
+::: notes
+In the models the climatology is computed from the training seasons only (all series of all sources) and is also used by GBQR to spread the "more than 12 weeks ahead" class over the later window weeks.
+:::
+
+
+## Baseline: forecasting from history
+
+::: columns
+::: {.column width="38%"}
+The baseline is the conditional climatology, with no model fitting. It finds past series (one location in one past season) that were in the same situation as this one now: the same season week, and the same number of weeks since their running maximum <i>M<sub>t</sub></i>.
+
+The share of them that had already peaked gives the chance that this one has (figure). How much they still grew afterwards (*z*) gives the peak-size forecast. Any remaining chance of a future peak is spread over the coming weeks by the peak-week climatology.
+:::
+::: {.column width="62%"}
+```{r f-baseline-peaked}
+#| fig-width: 9
+#| fig-height: 6.6
+# every possible cell (weeks since the max can be at most season week - 10), filled with the value the baseline uses:
+# (peaked + 0.5) / (n + 1), which is 50% for an empty cell; cells with fewer than 20 past series are outlined and
+# show their count
+WSM_LABS <- c("0", "1", "2", "3", "4+")
+bp <- replay |> filter(season_week >= 10, season_week <= 43) |>
+  mutate(b = pmin(wks_since_max, 4)) |>
+  group_by(season_week, b) |> summarise(peaked = sum(k <= 0), n = n(), .groups = "drop")
+bp <- tidyr::expand_grid(season_week = 10:43, b = 0:4) |> filter(b <= season_week - 10) |>
+  left_join(bp, by = c("season_week", "b")) |>
+  mutate(peaked = coalesce(peaked, 0L), n = coalesce(n, 0L), p = (peaked + 0.5) / (n + 1),
+         wsm = factor(WSM_LABS[b + 1], levels = WSM_LABS), low = n < 20)
+ggplot(bp, aes(season_week, wsm, fill = p)) + geom_tile(color = "white") +
+  geom_tile(data = filter(bp, low), fill = NA, color = "#d9531e", linewidth = 0.6, width = 0.88, height = 0.92) +
+  geom_text(data = filter(bp, low), aes(label = n, color = p > 0.55), size = 2.8, show.legend = FALSE) +
+  scale_color_manual(values = c(`TRUE` = "white", `FALSE` = INK)) +
+  scale_fill_gradient("P(already peaked) used by the baseline", low = "#f4f6f9", high = "#0d366b",
+                      labels = label_percent(), limits = c(0, 1)) +
+  scale_x_season_week(limits = c(9.5, 43.5)) +
+  labs(y = "weeks since the running maximum",
+       title = "Conditional climatology: share of past series already past their peak",
+       subtitle = "Orange outline: fewer than 20 past series in the cell (number = count);\na cell with 0 past series gets 50%") +
+  theme(legend.position = "bottom", legend.key.width = unit(2, "cm"))
+```
+:::
+:::
+
+::: notes
+Lookup over all training replay rows (ILINet, FluSurv-NET; here shown from the exploratory replay rows, 31,108 rows). Note the 4+ bin: by mid-season a maximum set more than a month ago is often an early-season bump, which the baseline cannot distinguish from a real peak.
+:::
+
+## Baseline: how big
+
+```{r f-baseline-size}
+#| fig-height: 6.2
+zq <- replay |> filter(season_week %in% c(14, 18, 22, 26, 30)) |>
+  mutate(wsm = factor(pmin(wks_since_max, 4), labels = c("0", "1", "2", "3", "4+"))) |>
+  group_by(season_week, wsm) |> filter(n() >= 20) |>
+  summarise(lo = quantile(z, 0.1), q1 = quantile(z, 0.25), med = median(z), q3 = quantile(z, 0.75),
+            hi = quantile(z, 0.9), .groups = "drop") |> mutate(t = paste("season week", season_week))
+ggplot(zq, aes(wsm)) + geom_linerange(aes(ymin = lo, ymax = hi), color = "#9ec5f4", linewidth = 5) +
+  geom_linerange(aes(ymin = q1, ymax = q3), color = "#3987e5", linewidth = 5) + geom_point(aes(y = med), size = 3) +
+  facet_wrap(~t, nrow = 1) + labs(x = "weeks since the running max", y = "z = log(peak / max so far)",
+                                  title = "Remaining growth by week and weeks since the max, 10/25/50/75/90% quantiles")
+```
+
+::: notes
+The size forecast is read off the empirical distribution of z for historical rows within 2 weeks of the current season week and in the same weeks-since-max bin. Remaining probability for a future peak is spread over later weeks in proportion to the kernel-smoothed climatology on the previous section's slide.
+:::
+
+## Baseline: details of the lookup
+
+::: small
+**P(already peaked)**, the timing lookup
+
+- One cell per season week *t* and weeks since <i>M<sub>t</sub></i> (0, 1, 2, 3, 4+), from all training series (all sources, all earlier seasons)
+- Estimate = (number already peaked + 0.5) / (*n* + 1), a Jeffreys prior: small cells are pulled toward 50%, and an empty cell gives exactly 50%
+- No pooling across weeks and no minimum count, so sparse cells give noisy estimates. These are rare situations late in the season (a series setting a new maximum in April, or 1–3 weeks past one), where most such series have in fact peaked, so the pull toward 50% is in the wrong direction
+- Before the window opens (*t* < 10) the probability is 0; once no window weeks remain it is 1
+- The remaining 1 − P(already peaked) is spread over the later window weeks in proportion to the peak-week climatology
+
+**Peak size**, the *z* lookup
+
+- Empirical quantiles of *z* from rows within ±2 season weeks of *t* in the same weeks-since-max bin
+- If that bin has fewer than 20 rows, all bins within ±2 weeks are pooled
+- Converted back to admissions: peak-size quantile = (<i>M<sub>t</sub></i> + ε) e<sup><i>Q<sub>z</sub></i></sup> − ε
+
+Possible refinement (not used in the results shown): pool the timing lookup over ±2 weeks as the size lookup does, or merge sparse late bins with the 4+ bin rather than shrinking toward 50%.
+:::
+
+::: notes
+Implementation: idmodels.peak.baseline.PeakBaselineModel (config: size_week_halfwidth = 2). The low-count cells are outlined in the figure two slides back. The baseline is the reference for the relative scores later in the deck, so it was kept as run.
+:::
+
+# GBQR models
+
+## GBQR: two models fit to replayed historical seasons
+
+```{r f-schematic}
+#| fig-height: 6.4
+box <- function(x, y, w, h, lab, fill) annotate("label", x = x, y = y, label = lab, fill = fill, size = 6,
+                                                  label.padding = unit(0.6, "lines"), label.size = 0, lineheight = 0.95)
+arr <- function(x, y, xend, yend) annotate("segment", x = x, y = y, xend = xend, yend = yend,
+                                           arrow = arrow(length = unit(0.3, "cm"), type = "closed"), color = INK2)
+ggplot() + xlim(0, 12) + ylim(0, 6) + theme_void() +
+  box(1.4, 3, 2, 2, "Historical seasons\nNHSN · ILINet · FluSurv-NET\n(only seasons before\nthe forecast season)", "#eef3fa") +
+  box(4.5, 3, 2, 2, "Season replay\ntruncate each season\nat every week t\n→ features at t", "#eef3fa") +
+  box(7.9, 4.8, 2, 1, "Peak size: LightGBM quantile\nregression of z = log(peak / max so far)\n23 levels, pinball loss", "#fde9df") +
+  box(7.9, 1.2, 2, 1, "Peak timing: LightGBM classifier\nweeks until peak: passed, 1…12, >12\n(>12 spread by climatology)", "#e3f4ec") +
+  box(11, 3, 1, 1, "25 bags over\nseasons; 200\nrevised-data\ndraws", "#f4f4f4") +
+  arr(2.85, 3, 3.35, 3) + arr(5.7, 3.6, 6.3, 4.2) + arr(5.7, 2.4, 6.3, 1.8) +
+  arr(9.6, 4.2, 10.2, 3.6) + arr(9.6, 1.8, 10.2, 2.4)
+```
+
+::: notes
+Direct models: the targets are peak timing and size themselves, not simulated trajectories. Every historical season is replayed: at each season week t the features use only data through t, and the outcomes are k and z (previous section). Size: 23 LightGBM quantile regressions; timing: multiclass classifier. Each is bagged over 25 random 70% subsets of training seasons. At forecast time, the latest 10 weeks of NHSN are revised 200 times by resampling historical revision vectors; features and predictions are recomputed per draw and pooled. Size and timing have separate feature lists.
+:::
+
+## Core features (13): the state of the season so far
+
+| feature | meaning |
+|---|---|
+| `season_week` | current week *t* |
+| `rel_max` | level now vs. the max so far |
+| `wks_since_max` | weeks since the max |
+| `g1`, `g2`, `g3` | 1-week, previous 1-week, 3-week log growth |
+| `rm3` | 3-week mean vs. the max |
+| `cum_rel` | cumulative incidence vs. the max |
+| `hist_rel` | max so far vs. the location's typical peak |
+| `nat_rel_max`, `nat_wks_since_max`, `nat_g3` | the same for the national series |
+| `src_code` | data source |
+
+- All features are log ratios or week counts, computed from data through week *t* only
+- **`hist_rel`** is by far the strongest single predictor of size
+- Feature packs (next slides) are added to the core set separately for the size and the timing model
+
+::: notes
+In the exploratory cross-validation, dropping hist_rel made the size loss 63% worse.
+:::
+
+## Feature pack: SB (synchrony + burden)
+
+- **Synchrony** (4): across the *other* locations of the same source in the same season, within the same revision draw
+  - `sync_med_rel_max`: median level now vs. their max so far
+  - `sync_med_g3`: median 3-week log growth
+  - `sync_frac_past2`: share ≥ 2 weeks past their max
+  - `sync_frac_half`: share at ≥ half their max
+- **Burden** (2): cumulative incidence so far vs. the location's typical season total (`cum_vs_hist_total`) and vs. its typical total by this week (`cum_vs_hist_same_week`)
+- Other locations' `hist_rel` is **not** in SB: tested separately as "severity in peaked locations" (`sev_peaked`: median `hist_rel` of other locations ≥ 2 weeks past their max) in the literature round; it did not help (size pinball loss `r { l <- read_parquet("eda/cv_lit.parquet") |> group_by(set) |> summarise(p = mean(pinball)); f2(l$p[l$set == "SB + severity in peaked locations"] / l$p[l$set == "SB"], 3) }` × SB)
+- → **used for size, not timing**
+
+::: notes
+The synchrony features are means/medians over locations, recomputed for every revision draw so that they see the same revised data as the location's own features. SB helps size in 2024/25 and 2025/26 NHSN but hurt in 2023/24; it consistently hurts timing, so the final configuration uses it only for size.
+:::
+
+## Feature pack: holiday weeks
+
+- Weeks ending Dec 22 – Jan 7: holiday indicator, max-set-in-holiday, weeks since holidays, holiday excess, level vs. the **non-holiday** max
+- Motivation: % ILI jumps when routine visits drop
+- Data: **all sources** jump ≈ 0.4 log units in holiday weeks — mostly real epidemic activity, but ILINet runs ahead within the block, and ILINet maxima set in a holiday week are more often exceeded later
+- → **kept as a timing variant** (core + holiday: `UMass-peak_gbqr_core_hol`)
+
+::: notes
+Holiday excess = mean log level of the holiday weeks minus the mean of the two weeks before and after.
+:::
+
+## Feature pack: latitude / longitude
+
+::: columns
+::: {.column width="40%"}
+- State centroid latitude and longitude (state series only)
+- Timing is geographic: South/Southeast early, Northeast late (≈ 0.2 weeks later per degree north; Moran's I 0.56)
+- …but most spread is **season-specific**; persistent state effects explain ≈ 10%
+- NHSN test: size SB + lat/lon 0.197 vs. SB 0.193 log-WIS (2023/24–2024/25)
+- → **not adopted**
+:::
+::: {.column width="60%"}
+```{r f-map}
+#| fig-width: 9
+#| fig-height: 6.4
+ilid <- load_surveillance("ilinet-validation/data-ilinet-flusurvnet.parquet") |>
+  filter(source == "ilinet", agg_level == "state", season_week >= 10, season_week <= 43, !is.na(inc))
+pkw <- ilid |> group_by(location, season) |> filter(n() >= 25) |>
+  summarise(pw = season_week[which.max(inc)], pk = max(inc), .groups = "drop") |> filter(pk > 0) |>
+  group_by(season) |> mutate(dev = pw - median(pw)) |> ungroup() |> mutate(abb = loc_label(location))
+st_info <- tibble(abb = c(state.abb, "DC"), name = c(tolower(state.name), "district of columbia"))
+avg <- pkw |> group_by(abb) |> summarise(avg = mean(dev), n = n()) |> inner_join(st_info, by = "abb") |>
+  mutate(avg = ifelse(n < 4, NA, avg))
+usmap <- sf::st_as_sf(maps::map("state", fill = TRUE, plot = FALSE)) |> rename(name = ID) |>
+  sf::st_transform(5070) |> left_join(avg, by = "name")
+ggplot(usmap) + geom_sf(aes(fill = avg), color = "white", linewidth = 0.25) + coord_sf(crs = 5070) +
+  scale_fill_gradient2("avg. weeks vs. season median", low = "#2166ac", mid = "#f2f1ee", high = "#b2182b",
+                       limits = c(-4, 4), oob = squish, na.value = "grey85") +
+  theme_void(base_size = 15) + theme(legend.position = "bottom", legend.key.width = unit(2, "cm"),
+                                     plot.title = element_text(face = "bold")) +
+  labs(title = "Average relative peak timing, ILINet states", subtitle = "Number on each state: seasons with a complete series (grey: fewer than 4)")
+```
+:::
+:::
+
+::: notes
+Average over seasons of a state's peak week minus that season's median state peak week (ILINet states with at least 4 seasons; grey: fewer). From peak-timing-size-eda section 2.4: latitude and longitude explain about 60% of the variation in average timing; residual Moran's I 0.27. Season-specific gradients explain more of the within-season spread (adjusted ~18%) than persistent state effects (~10%). Neighbour and HHS-region synchrony features added nothing beyond national synchrony.
+:::
+
+## Feature pack: influenza B share
+
+- Clinical-lab A and B positives (WHO/NREVSS) for the series' own geography: B share (3-week and season to date), its trend, A and B growth, B relative to its own max
+- Real time: as-published counts (Delphi vintages); training: final counts
+- A late B wave overtaking the A peak is the exception: when B grows faster than A late in the season it mostly signals that the A wave is over
+- NHSN test (core + all extras, timing): −log score 1.309 vs. 1.273 for core
+- → **not adopted**
+
+::: notes
+About 4 in 10 double-humped series are an A wave followed by a B wave. Real-time lab counts are revised (e.g. Massachusetts A positives first published as 227, later 336).
+:::
+
+## Feature pack: recession and records
+
+- **Recession**: decline since the max per week (`rec_rate`), share of weeks since the max that fell (`rec_consist`)
+- **Records**: new maxima in the last 4 weeks (`n_rec4`), share of weeks since week 10 that set a record (`rec_frac`)
+- From hydrology (recession curves) and record statistics
+- Steady declines usually mean the peak has passed — but the core features already see most of that
+- NHSN caution: under-reported latest weeks **look like declines**
+- → **not adopted**
+
+## Feature packs: trend, H3 subtype, and the baseline offset
+
+- **Trend**: local Taylor fits over 4–8 weeks (level, slope, curvature), rolling means, lags 1–4 → **not adopted**
+- **H3 subtype**: A(H3) share of subtyped A positives (HHS region, national). H3 seasons are larger in FluSurv-NET hospitalizations, but the share added nothing beyond the season's own data → **not adopted**
+- **Baseline offset** (`size_offset`): boost each size quantile regression from the baseline's quantile (LightGBM `init_score`) instead of the unconditional quantile. Fixes implausibly wide late-season upper tails, but **consistently hurts size** → **off by default**
+
+::: notes
+The offset also scored worse in the earlier NHSN hindcasts.
+:::
+
+## Feature packs borrowed from other fields
+
+::: small
+| pack | features | idea |
+|---|---|---|
+| **chain ladder** (actuarial reserving) | `cl_z`, `p0_hist`, `z_bf` | `cl_z`: median eventual *z* at the same season week in the **location's earlier seasons** (pooled over all series of the source if it has < 3 earlier seasons) — the "development factor" from the current max to the ultimate peak. `p0_hist`: share of those seasons already peaked by this week. `z_bf`: **Bornhuetter–Ferguson**-style blend of that development pattern with the prior (typical peak): log(1 + (1 − e<sup>−cl_z</sup>) · e<sup>−hist_rel</sup>) |
+| severity in peaked locations | `sev_peaked`, `sev_gap`, `n_peaked` | how big this season turned out in locations that have peaked (median `hist_rel`), its gap to this location, and how many have peaked |
+| reflection principle | `p_exc`, `ez_rw`, … | chance that a random walk from the current level exceeds the max before the window ends |
+| deceleration | `g_decel`, `gfrac`, … | how far growth has slowed from its maximum |
+| Bass implied peak | `bass_rel` | peak implied by a Bass diffusion curve fit to the cumulative curve |
+| cross-source | `xs_rel_max`, `xs_wsm`, `xs_g3` | the same location and season in the other source (ILINet ↔ FluSurv-NET) |
+| recession, records | (previous slide) | hydrology recession curves; record statistics |
+:::
+
+- None improved size beyond SB in the screening (next section)
+
+::: notes
+Chain ladder: in claims reserving, the ratio of ultimate to reported claims at a given development age is estimated from earlier accident years; here the "age" is the season week and the ultimate is the season peak. Bornhuetter–Ferguson blends that development pattern with an a-priori estimate of the ultimate (here the location's typical peak, through hist_rel).
+:::
+
+
+## Revision simulation: method
+
+::: columns
+::: {.column width="38%"}
+::: small
+The newest weeks of the current season will still be revised. The simulation keeps the as-published series and makes 200 plausible final versions of its **10 newest weeks**, using how past releases were revised.
+
+1. **Learn from past releases.** For each past release and location, record how its 10 newest weeks changed by the newest release on the forecast date: the ratio final / reported for lag *j* = 0 (newest week), …, 9. One release × location = one **revision vector** of 10 ratios
+2. **Group** the vectors by the newest reported count (< 50, 50–500, > 500 admissions): small counts are revised proportionally more
+3. **Simulate.** For each location, draw 200 whole vectors from its group and multiply its 10 newest as-published weeks by them: revised = (reported + 1) × ratio − 1. Older weeks stay as published
+:::
+:::
+::: {.column width="62%"}
+```{r f-revision-method}
+#| fig-width: 9.2
+#| fig-height: 6.4
+rv <- read_parquet("eda/revision_vectors.parquet")
+rx <- read_parquet("eda/revision_example.parquet") |> mutate(date = as.Date(date, tz = "UTC"))
+rx_ref <- as.Date(rx$ref_date[1]); rx_s <- rx$stratum[1]
+rv_s <- rv |> filter(stratum == rx_s) |> mutate(ratio = exp(rho))
+rv_med <- rv_s |> group_by(lag) |> summarise(ratio = median(ratio), .groups = "drop")
+pa <- ggplot(rv_s, aes(lag, ratio)) +
+  geom_hline(yintercept = 1, color = INK2) +
+  geom_line(aes(group = vector), color = BLUE, alpha = 0.18, linewidth = 0.4) +
+  geom_line(data = rv_med, color = INK, linewidth = 1.2) +
+  scale_x_reverse("lag j: weeks before the newest reported week", breaks = 0:9) +
+  scale_y_log10("final / reported", labels = label_number(accuracy = 0.01)) +
+  coord_cartesian(ylim = c(0.85, 1.4)) +
+  labs(title = "1. Past revision vectors",
+       subtitle = paste0(comma(n_distinct(rv_s$vector)), " vectors in the > 500 group (", comma(n_distinct(rv$vector)),
+                         " in all) · black: median"))
+rx_w <- rx |> filter(date >= rx_ref - 7 * 13, date <= rx_ref)
+last10 <- sort(unique(rx_w$date[rx_w$series == "reported"]), decreasing = TRUE)[1:10]
+pb <- ggplot(rx_w, aes(date, value)) +
+  annotate("rect", xmin = min(last10) - 3.5, xmax = max(last10) + 3.5, ymin = min(rx_w$value, na.rm = TRUE) * 0.8,
+           ymax = max(rx_w$value, na.rm = TRUE) * 1.25, fill = "#eef2f7") +
+  geom_line(data = filter(rx_w, series == "draw"), aes(group = draw), color = BLUE, alpha = 0.08) +
+  geom_line(data = filter(rx_w, series == "final"), color = INK, linetype = "22", linewidth = 0.8) +
+  geom_line(data = filter(rx_w, series == "reported"), color = INK, linewidth = 1.2) +
+  scale_y_log10("weekly admissions\n(log scale)", labels = label_comma(), expand = expansion(0)) +
+  scale_x_date(NULL, date_breaks = "2 weeks", date_labels = "%b %d") +
+  labs(title = paste0("2. Applied to the US release of ", format(rx_ref, "%b %d %Y")),
+       subtitle = "black: as published · blue: 200 revised draws · dashed: final
+shaded: the 10 newest weeks, which the draws revise")
+pa / pb
+```
+:::
+:::
+
+::: notes
+Code: idmodels.peak.revision (RevisionModel.fit / sample, apply_revisions). Ratios are computed as (final + 1) / (reported + 1) on counts. Only releases at least 10 weeks older than the newest release contribute vectors, so their values have had time to settle; a group with fewer than 30 vectors borrows from the whole pool. Because whole vectors are drawn, revisions at different lags of one release stay together. With fewer than 200 vectors in all (the first weeks of 2023/24), small symmetric noise is used instead (sd 0.1 / (1 + lag)). The figure uses the actual vectors and draws for this forecast date (revision_example.py). On this date the newest US weeks were under-reported (Jan 4: 36,504 published, 39,662 final); the final values lie inside the spread of the draws.
+:::
+
+## Revision simulation: where and when it is used
+
+::: small
+- **Only at forecast time**, on the current season. Training seasons use the data as available on the forecast date, with no simulation
+- **Every draw goes through the whole model.** Each of the 200 revised series is a plausible final version of the season so far. All features (running max, growth, synchrony across locations, the national series) are recomputed on each draw, and the model predicts on each
+- **Combining the draws:** peak-week pmf = average of the 200 draws' pmfs; peak size = quantiles of the pooled samples (200 draws × 200 levels each)
+- **Effect:** a recent week that may be revised up can still turn out to be the peak, and the running max carries its own uncertainty
+- **All models:** the baseline and both GBQR models; the ILINet development runs used Delphi's ILINet release history the same way
+- **Pool size grows with the archive** (releases start 2023-10-11; one release ≈ 53 vectors):
+
+| forecast date | usable releases | vectors |
+|---|---|---|
+| until early Jan 2024 | 0–3 | < 200: fallback noise |
+| Jan 2025 | 30 | ≈ 1,600 |
+| Jan 2026 | 81 | ≈ 4,300 |
+
+Consecutive releases share 9 of their 10 weeks and locations are revised together, so there are far fewer independent revision patterns than vectors.
+:::
+
+::: notes
+Called in PeakModel._predict_current_season (idmodels.peak.base). Settings: num_revision_draws = 200, revision_max_lag = 10. Only releases published by the forecast date are used, so there is no look-ahead. The 2024 gap in NHSN reporting (June–October) means no releases from that period.
+:::
+
+## Correcting for revisions matters
+
+::: columns
+::: {.column width="40%"}
+- Side experiment: the **baseline** on ILINet states, 2018/19–2019/20, forecast with
+  - **final** data (as if no revisions)
+  - data **as published** on each forecast date
+  - as published **+ revision simulation**
+- ILINet first releases differ from final by a median 6–9% (90th percentile 45–65%, mostly positivity)
+- → all model runs use as-published data + revision simulation
+:::
+::: {.column width="60%"}
+```{r f-realtime}
+#| fig-width: 8.5
+#| fig-height: 6.2
+rt <- ili |> filter(agg_level == "state", model %in% c("baseline", "baseline@rt", "baseline@rtrev")) |>
+  group_by(model) |> summarise(nls = -mean(log_score), `95% coverage` = mean(cov95)) |>
+  mutate(setting = recode(model, "baseline" = "final data", "baseline@rt" = "as published",
+                          "baseline@rtrev" = "as published\n+ revision simulation"),
+         setting = factor(setting, levels = c("final data", "as published", "as published\n+ revision simulation")))
+ggplot(rt, aes(setting, nls)) + geom_col(fill = BLUE, width = 0.75) +
+  geom_text(aes(y = nls / 2, label = paste0(f2(nls), "\n95% size coverage\n", percent(`95% coverage`, 1))),
+            color = "white", size = 5, fontface = "bold", lineheight = 0.9) +
+  labs(x = NULL, y = "peak-week −log score (lower is better)", title = "Provisional data matter",
+       subtitle = "baseline, ILINet states, 2018/19 + 2019/20")
+```
+:::
+:::
+
+::: notes
+Without revision handling the baseline's −log score rises from `r f2(rt$nls[rt$model == "baseline"])` (final data) to `r f2(rt$nls[rt$model == "baseline@rt"])` (as published), and 95% coverage drops from `r percent(rt$"95% coverage"[rt$model == "baseline"], 1)` to `r percent(rt$"95% coverage"[rt$model == "baseline@rt"], 1)`; the revision simulation recovers most of it. This is separate from the feature-set validation that follows.
+:::
+
+
+# Validation design
+
+## Exploratory CV: screening feature packs quickly
+
+::: columns
+::: {.column width="52%"}
+- **Data**: ILINet (national, regions, states) + FluSurv-NET replay rows, 22 seasons 1997/98–2022/23, even season weeks (15,321 rows), **final data**
+- **Leave one season out**: 22 folds, each holding out one whole season (all sources and locations)
+- **Size**: LightGBM quantile regression of eventual *z* (levels 0.1–0.9), mean pinball loss
+- **Timing proxy**: a LightGBM **binary classifier** for *z* > 0 ("has the peak passed?"), log loss
+- One fit per fold: no bagging, no revision simulation, no NHSN
+- The full timing model (weeks-to-peak classes) was evaluated only in the **ILINet development runs**
+:::
+::: {.column width="48%"}
+```{r f-loso}
+#| fig-width: 7
+#| fig-height: 5.8
+lo <- tidyr::crossing(fold = 1:8, s = 1:8) |> mutate(role = ifelse(fold == s, "held out", "training"))
+ggplot(lo, aes(s, fold, fill = role)) + geom_tile(color = "white", linewidth = 1) +
+  scale_fill_manual(NULL, values = c("training" = "#9ec5f4", "held out" = "#d9531e")) +
+  scale_y_reverse("fold", breaks = 1:8) + scale_x_continuous("season", breaks = 1:8) +
+  labs(title = "Leave one season out", subtitle = "schematic: 22 folds in practice") + theme(panel.grid = element_blank())
+```
+:::
+:::
+
+::: notes
+relative_size_predictors.py. Unlike forward chaining, held-out seasons can be earlier than training seasons, which is fine for ranking feature ideas but not for estimating real-time skill.
+:::
+
+## Screening results: every pack relative to SB
+
+```{r f-cv-summary}
+#| fig-height: 6.8
+screen_one <- function(file, sets, ref = "SB", rename = NULL) {
+  d <- read_parquet(paste0("eda/", file, ".parquet"))
+  if (!is.null(rename)) d <- d |> mutate(set = ifelse(set %in% names(rename), rename[set], set))
+  ps <- d |> filter(set %in% c(ref, names(sets))) |> group_by(set, season) |>
+    summarise(pin = sum(pinball), ll = sum(logloss), n = n(), .groups = "drop")
+  r <- ps |> filter(set == ref) |> select(season, pin0 = pin, ll0 = ll)
+  ps |> filter(set != ref) |> inner_join(r, by = "season") |> mutate(pack = unname(sets[set]))
+}
+scr <- bind_rows(
+  screen_one("cv_results", c("current" = "core (SB removed)"), rename = c("+ synchrony + burden" = "SB")),
+  screen_one("cv_sb_groups", c("SB + trend (Taylor, rolling means, lags)" = "trend", "SB + timing vs history" = "timing vs history",
+                               "SB + onset" = "onset", "SB + level vs history" = "level vs history", "SB + holiday" = "holiday")),
+  screen_one("cv_types", c("SB + B share / B rising" = "B share", "SB + H3 share" = "H3 share")),
+  screen_one("cv_regional", c("SB + latitude/longitude" = "lat/lon", "SB + 5 nearest states" = "5 nearest states",
+                              "SB + HHS region" = "HHS region", "SB + wave position" = "wave position")),
+  screen_one("cv_lit", c("SB + recession + records" = "recession + records", "SB + chain ladder" = "chain ladder",
+                         "SB + reflection principle" = "reflection principle",
+                         "SB + severity in peaked locations" = "severity in peaked locations",
+                         "SB + deceleration" = "deceleration", "SB + Bass implied peak" = "Bass implied peak",
+                         "SB + cross-source" = "cross-source")))
+set.seed(1)
+boot_idx <- replicate(2000, sample(unique(scr$season), replace = TRUE), simplify = FALSE)
+scr_sum <- scr |> group_by(pack) |> group_modify(function(g, k) {
+  stat <- function(x) c(size = sum(x$pin) / sum(x$pin0) - 1, ll = (sum(x$ll) - sum(x$ll0)) / sum(x$n))
+  b <- sapply(boot_idx, function(s) stat(g[match(s, g$season), ]))
+  e <- stat(g)
+  tibble(metric = c("size", "ll"), est = e, lo = apply(b, 1, quantile, 0.05), hi = apply(b, 1, quantile, 0.95))
+}) |> ungroup() |>
+  mutate(gbqr = pack %in% c("trend", "holiday", "B share", "H3 share", "lat/lon", "recession + records"),
+         gbqr = ifelse(pack == "core (SB removed)", "reference", ifelse(gbqr, "also tested in GBQR runs", "screening only")),
+         est = ifelse(metric == "size", 100 * est, est), lo = ifelse(metric == "size", 100 * lo, lo),
+         hi = ifelse(metric == "size", 100 * hi, hi),
+         metric = factor(recode(metric, size = "peak size\npinball loss vs. SB (%)",
+                                ll = "has the peak passed? (binary classifier, screening proxy)\nlog-loss change vs. SB"),
+                         levels = c("peak size\npinball loss vs. SB (%)",
+                                    "has the peak passed? (binary classifier, screening proxy)\nlog-loss change vs. SB")))
+scr_order <- scr_sum |> filter(metric == levels(metric)[1]) |> arrange(desc(est)) |> pull(pack)
+ggplot(scr_sum, aes(est, factor(pack, levels = scr_order), color = gbqr)) +
+  geom_vline(xintercept = 0, color = INK, linewidth = 0.9) +
+  geom_errorbar(aes(xmin = lo, xmax = hi), width = 0, linewidth = 1, orientation = "y") + geom_point(size = 4) +
+  geom_text(data = tibble(metric = factor(levels(scr_sum$metric)[1], levels = levels(scr_sum$metric))),
+            aes(x = 0, y = -Inf, label = "SB"), inherit.aes = FALSE, vjust = -0.4, hjust = -0.3, size = 5, fontface = "bold") +
+  facet_wrap(~metric, scales = "free_x") +
+  scale_color_manual(NULL, values = c("also tested in GBQR runs" = "#eb6834", "screening only" = BLUE, "reference" = INK2)) +
+  labs(x = "change vs. SB (negative = better) · bars: 90% season-bootstrap intervals", y = NULL,
+       title = "Each pack added to SB (core + synchrony + burden); leave-one-season-out on ILINet + FluSurv-NET") +
+  theme(strip.text = element_text(size = 13))
+```
+
+::: notes
+Every set is fit on the same rows and folds, so differences are paired; intervals resample the 22 held-out seasons. `r best_ll <- scr_sum |> filter(metric == levels(metric)[2], pack != "core (SB removed)") |> arrange(est) |> slice(1); paste0("No pack improves size beyond SB; the largest gain on the has-it-peaked proxy is ", best_ll$pack, " (", formatC(best_ll$est, format = "f", digits = 4), ").")` Trend, timing vs history, onset and holiday were originally run only against core; they were rerun here on top of SB (eda/cv_sb_groups.parquet). The packs in orange went on to the GBQR ILINet runs, where most exploratory gains did not carry over.
+:::
+
+## Develop on ILINet, test on NHSN, keep a final season
+
+```{r f-cv-schema}
+#| fig-height: 6.6
+all_seasons <- c(sprintf("%d/%02d", 2010:2019, (11:20) %% 100), "2022/23", "2023/24", "2024/25", "2025/26")
+rows <- tibble(eval = c("2018/19", "2019/20", "2023/24", "2024/25", "2025/26"),
+               stage = c("ILINet development", "ILINet development", "NHSN test", "NHSN test", "NHSN final"))
+sch <- tidyr::crossing(rows, season = all_seasons) |>
+  mutate(role = case_when(season == eval ~ "forecast in real time", season < eval ~ "training", TRUE ~ "not used"),
+         role = ifelse(stage == "ILINet development" & season >= "2020/21" & role != "forecast in real time", "not used", role),
+         sid = match(season, all_seasons), eval = factor(eval, levels = rev(rows$eval)))
+ggplot(sch, aes(sid, eval, fill = role)) + geom_tile(color = "white", linewidth = 1.2, height = 0.8) +
+  scale_fill_manual(NULL, values = c("training" = "#9ec5f4", "forecast in real time" = "#d9531e", "not used" = "#f1f0ec")) +
+  scale_x_continuous(NULL, breaks = seq_along(all_seasons), labels = all_seasons, expand = expansion(0.01)) +
+  geom_text(data = distinct(sch, eval, stage), aes(x = 0.4, y = eval, label = stage), hjust = 1, size = 5,
+            inherit.aes = FALSE) +
+  coord_cartesian(xlim = c(-2.6, length(all_seasons) + 0.5), clip = "off") +
+  labs(y = "evaluation season", title = "Forward chaining: train on earlier seasons only, forecast each season week by week",
+       subtitle = "ILINet development uses no NHSN · earlier ILINet/FluSurv-NET seasons (1997/98+) also train (not shown) · pandemic seasons excluded") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1), panel.grid = element_blank())
+```
+
+::: notes
+Development: state ILINet × % positive, 2018/19 and 2019/20, 29 reference dates each, trained on all earlier ILINet + FluSurv-NET seasons, no NHSN at all; the full GBQR model (bags, timing classes, revision simulation) is run. Test: NHSN 2023/24 and 2024/25. Final check: 2025/26 (kept held out until the configuration was chosen; note earlier-session models had been examined on it). All evaluations are real time: as-published data at each reference date plus revision simulation.
+:::
+
+# Forecasts
+
+## US 2025/26: peak-week forecasts through the season
+
+```{r f-us-pmf}
+#| fig-height: 7.0
+pmf_strip_data(fc, "US", "2025/26", final_season("US", "2025/26"), truth = truth_week("US", "2025/26")) +
+  plot_annotation(title = "Each row is one forecast date (black bar); dashed orange: observed peak week; below: final data")
+```
+
+## US: peak-size forecasts through the season
+
+```{r f-us-size}
+#| fig-height: 6.8
+(size_ribbons(fc, "US", "2025/26", truth_size("US", "2025/26"), ylab = NULL, peak_week = truth_week("US", "2025/26")) +
+   labs(x = NULL, title = "2025/26: peak weekly admissions, log scale (median, 50% and 95% intervals; orange: observed peak size and, dashed, peak week)")) /
+  (size_ribbons(fc, "US", "2024/25", truth_size("US", "2024/25"), ylab = NULL, peak_week = truth_week("US", "2024/25")) +
+     labs(title = "2024/25, the record season: GBQR under-predicted the rise"))
+```
+
+::: notes
+The dashed vertical line is the observed peak week: forecast dates to its right were made after the peak. 2024/25: GBQR's median peak-size forecast was on average 21–23% below the observed peak across states.
+:::
+
+## US 2024/25: one forecast during the rise
+
+```{r f-us-2425}
+#| fig-height: 6.8
+ref2425 <- as.Date("2025-01-11")
+e2 <- fc |> filter(location == "US", reference_date == ref2425)
+plot_peak_forecast(
+  prelim = prelim_on(V, "2024/25", "US", ref2425),
+  pmf = e2 |> filter(target == "peak week inc flu hosp") |> transmute(model, week = as.Date(output_type_id), value),
+  ref_date = ref2425, final = final_season("US", "2024/25"), past = past_seasons(weekly, "US", "2024/25"),
+  size_q = e2 |> filter(target == "peak inc flu hosp") |> transmute(model, tau = output_type_id, value),
+  models = unname(MODEL_IDS), truth = truth_week("US", "2024/25")) +
+  plot_annotation(title = paste0("US, forecast date ", format(ref2425, "%b %d %Y"),
+                                 ": the latest weeks were under-reported; the peak was still ",
+                                 as.integer(truth_week("US", "2024/25") - ref2425) / 7, " weeks away"),
+                  subtitle = "Solid: as published · dashed: final · grey: 2023/24\nbands: peak-size 50% / 95% intervals and median at each model's most likely peak week · dashed orange: observed peak week")
+```
+
+::: notes
+On 2025-01-11 the US weeks ending Dec 28 and Jan 4 were published as 26,850 and 36,504 (final 28,669 and 39,662), which looks like slower growth. Made with plot_peak_forecast().
+:::
+
+## California 2025/26: an under-reported peak
+
+```{r ca-data}
+ca_obs <- weekly |> filter(location == "06", date >= as.Date("2025-10-01"), date <= as.Date("2026-05-31"))
+ca_asof <- asof_series(V, "2025/26", "06")
+ca_refs <- as.Date(c("2026-01-31", "2026-02-14", "2026-02-21", "2026-02-28"))
+ca_pk <- oracle |> filter(location == "06", season == "2025/26")
+```
+
+```{r f-ca-data}
+#| fig-height: 6.6
+d <- ca_asof |> filter(reference_date %in% ca_refs, !is.na(value)) |>
+  mutate(panel = factor(paste("forecast date", format(reference_date, "%b %d")),
+                        levels = paste("forecast date", format(ca_refs, "%b %d"))))
+ggplot() +
+  geom_line(data = ca_obs, aes(date, value), color = "#b7bdc6", linewidth = 1.1, linetype = "22") +
+  geom_line(data = d, aes(date, value), color = INK, linewidth = 1.2) + geom_point(data = d |> group_by(panel) |>
+    slice_max(date, n = 1), aes(date, value), color = "#d9531e", size = 3.5) +
+  facet_wrap(~panel, nrow = 1) + coord_cartesian(xlim = as.Date(c("2025-11-15", "2026-04-15"))) +
+  scale_y_continuous("CA weekly flu admissions", labels = label_comma()) + scale_x_date(NULL, date_labels = "%b") +
+  labs(title = "Solid: as published on the forecast date · dashed: final data · orange: latest reported week")
+```
+
+::: notes
+`r d0 <- ca_asof |> filter(reference_date == as.Date("2026-02-21")) |> filter(!is.na(value)) |> slice_max(date, n = 1); paste0("On 2026-02-21 the latest CA week (ending ", format(d0$date, "%b %d"), ") was published as ", comma(d0$value), " admissions; its final value is ", comma(ca_obs$value[ca_obs$date == d0$date]), " (", percent(d0$value / ca_obs$value[ca_obs$date == d0$date], 1), "), and that week turned out to be the season peak.")` The latest week was well below final at several dates (e.g. 82% on Jan 31, 79% on Mar 28), but at the peak it made the series look as if it had already turned down a week earlier.
+:::
+
+## California: how the forecasts reacted
+
+```{r f-ca-pmf}
+#| fig-height: 7.0
+cp <- fc |> filter(location == "06", reference_date %in% ca_refs, target == "peak week inc flu hosp") |>
+  mutate(week = as.Date(output_type_id))
+p_wrong <- cp |> filter(reference_date == as.Date("2026-02-21"), week == ca_pk$peak_week - 7)
+p_right <- cp |> filter(reference_date == as.Date("2026-02-21"), week == ca_pk$peak_week)
+pmf_strip_data(fc, "06", "2025/26", final_season("06", "2025/26"), truth = ca_pk$peak_week, mark_refs = ca_refs) +
+  plot_annotation(title = "California 2025/26 peak-week forecasts (dotted rows: the dates on the previous slide; dashed orange: observed peak week)")
+```
+
+::: notes
+When the latest week is under-reported at the peak, the series looks like it has already turned. On Feb 21 the models gave `r paste0(p_wrong$model, " ", percent(p_wrong$value, 1), collapse = ", ")` to the week before the true peak (the largest week as published), and only `r paste0(percent(p_right$value, 1), collapse = " / ")` to the true peak week. The revision simulation is meant to put probability back on the latest week; here it did not do enough (we have not yet checked how this under-report compares with the historical revision vectors).
+:::
+
+## California: peak-size forecasts
+
+```{r f-ca-size}
+#| fig-height: 6.6
+size_ribbons(fc, "06", "2025/26", ca_pk$peak_count, peak_week = ca_pk$peak_week) +
+  geom_vline(xintercept = ca_refs, color = INK2, linetype = "dotted") +
+  labs(title = "California 2025/26 peak size (dotted: dates on the previous slides; orange: observed peak size and, dashed, week)")
+```
+
+## A 2023/24 example: Massachusetts
+
+```{r f-ma-pmf}
+#| fig-height: 7.0
+pmf_strip_data(fc, "25", "2023/24", final_season("25", "2023/24"), truth = truth_week("25", "2023/24")) +
+  plot_annotation(title = "Massachusetts 2023/24 peak-week forecasts (dashed orange: observed peak week; below: final data)")
+```
+
+# Results
+
+## ILINet development: timing feature sets
+
+```{r ili-sets}
+tim_map <- c("gbqr" = "core", "gbqr__sb" = "SB", "gbqr__R1" = "SB (reported-at-t)", "gbqr__R2" = "core + B",
+             "gbqr__R3" = "core + lat/lon", "gbqr__R4" = "core + recession", "gbqr__R5" = "core + holiday",
+             "gbqr__R6" = "core + B + lat/lon + rec. + hol.", "gbqr__R7" = "SB + B", "gbqr__R8" = "SB + lat/lon + rec.",
+             "gbqr__R9" = "SB + B + lat/lon + rec.", "gbqr__R10" = "SB + B + lat/lon + rec. + hol.")
+siz_map <- c("gbqr" = "core", "gbqr__sb" = "SB", "gbqr__R1" = "SB (reported-at-t)", "gbqr__R2" = "SB + offset",
+             "gbqr__R3" = "SB + B", "gbqr__R4" = "SB + trend", "gbqr__R5" = "SB + H3", "gbqr__R6" = "SB + recession",
+             "gbqr__R7" = "SB + lat/lon", "gbqr__R8" = "SB + B + offset", "gbqr__R9" = "SB + trend + B",
+             "gbqr__R10" = "core + offset")
+ir <- ili |> filter(agg_level == "state", grepl("@rtrev$", model)) |> mutate(run = sub("@rtrev$", "", model),
+                                                                            neg_log_score = -log_score) |>
+  filter(run %in% c(names(tim_map), "baseline"))
+dot_sets <- function(d, map, metric, xlab, title, highlight = NULL) {
+  s <- d |> filter(run %in% names(map)) |> group_by(run, season) |> summarise(v = mean(.data[[metric]]), .groups = "drop") |>
+    bind_rows(d |> filter(run %in% names(map)) |> group_by(run) |> summarise(v = mean(.data[[metric]])) |> mutate(season = "both")) |>
+    mutate(set = map[run], season = factor(season, levels = c("2018/19", "2019/20", "both")))
+  ord <- s |> filter(season == "both") |> arrange(desc(v)) |> pull(set)
+  hl <- tibble(set = highlight, pos = match(highlight, ord))
+  ggplot(s, aes(v, factor(set, levels = ord))) + geom_blank() +
+    annotate("rect", xmin = -Inf, xmax = Inf, ymin = hl$pos - 0.45, ymax = hl$pos + 0.45, fill = "#fde9df") +
+    annotate("text", x = Inf, y = hl$pos, label = "passed to NHSN test ", hjust = 1, color = "#d9531e", size = 4.5,
+             fontface = "bold") +
+    geom_point(aes(color = season, size = season == "both")) +
+    scale_size_manual(values = c(`TRUE` = 5, `FALSE` = 3), guide = "none") +
+    scale_color_manual(NULL, values = c("2018/19" = "#e69f00", "2019/20" = "#56b4e9", "both" = INK)) +
+    labs(x = xlab, y = NULL, title = title,
+         subtitle = "ILINet states, as-published data + revision simulation · large black dot: 2018/19 + 2019/20 pooled; small dots: each season\nshaded: passed on to the NHSN test")
+}
+```
+
+```{r f-ili-timing}
+#| fig-height: 6.8
+dot_sets(ir, tim_map, "neg_log_score", "peak-week −log score (lower is better)",
+         "Timing: core-based sets ≈ core; every SB-based timing set is worse",
+         highlight = c("core", "core + holiday", "core + B + lat/lon + rec. + hol."))
+```
+
+::: notes
+ILINet 2018/19 + 2019/20, as-published data + revision simulation, ~45 states, 29 reference dates per season. Each run fits separate size and timing models, so the timing scores depend only on the timing feature set (verified: identical forecasts across runs with the same timing set). Baseline: −log score `r f2(-mean(ir$log_score[ir$run == "baseline"]), 3)`.
+:::
+
+## ILINet development: size feature sets
+
+```{r f-ili-size}
+#| fig-height: 6.8
+dot_sets(ir, siz_map, "wis_log", "peak-size log-WIS (lower is better)",
+         "Size: SB best (tied with SB + lat/lon); the baseline offset clearly hurts",
+         highlight = c("SB", "SB + lat/lon", "SB + B"))
+```
+
+::: small
+**core** was also carried to the NHSN test, as the reference set without SB.
+:::
+
+::: notes
+ILINet 2018/19 + 2019/20 pooled and by season. Baseline log-WIS `r f2(mean(ir$wis_log[ir$run == "baseline"]), 3)`. Chosen configuration from ILINet: size SB, timing core.
+:::
+
+## NHSN test: choosing the final feature sets
+
+```{r f-nhsn-test}
+#| fig-height: 6.4
+# NHSN hindcasts of the sets passed on from ILINet (2023/24 + 2024/25). Size and timing models are fitted separately,
+# so each run scores one size set and one timing set
+nt_tim <- c("UMass-peak_gbqr__N1" = "core", "UMass-peak_gbqr__N2" = "core + holiday",
+            "UMass-peak_gbqr__N3" = "core + B + lat/lon + rec. + hol.", "UMass-peak_baseline" = "baseline")
+nt_siz <- c("UMass-peak_gbqr__N1" = "SB", "UMass-peak_gbqr__N2" = "SB + lat/lon", "UMass-peak_gbqr__N3" = "SB + B",
+            "UMass-peak_gbqr" = "core", "UMass-peak_baseline" = "baseline")
+nt <- load_scores("peak-scores-nhsn-hindcasts.csv") |>
+  filter(location != "US", season %in% c("2023/24", "2024/25"))
+nt_dots <- function(map, metric, xlab, title, final) {
+  d <- nt |> filter(model %in% names(map)) |> mutate(set = map[model], v = if (metric == "nls") -log_score else wis_log)
+  s <- bind_rows(d |> group_by(set, season) |> summarise(v = mean(v), .groups = "drop"),
+                 d |> group_by(set) |> summarise(v = mean(v)) |> mutate(season = "both")) |>
+    mutate(season = factor(season, levels = c("2023/24", "2024/25", "both")))
+  ord <- s |> filter(season == "both") |> arrange(desc(v)) |> pull(set)
+  pos <- match(final, ord)
+  ggplot(s, aes(v, factor(set, levels = ord))) + geom_blank() +
+    annotate("rect", xmin = -Inf, xmax = Inf, ymin = pos - 0.45, ymax = pos + 0.45, fill = "#fde9df") +
+    geom_point(aes(color = season, size = season == "both")) +
+    scale_size_manual(values = c(`TRUE` = 5, `FALSE` = 3), guide = "none") +
+    scale_color_manual(NULL, values = c("2023/24" = "#e69f00", "2024/25" = "#56b4e9", "both" = INK)) +
+    labs(x = xlab, y = NULL, title = title)
+}
+(nt_dots(nt_tim, "nls", "peak-week −log score (lower is better)", "Timing", c("core", "core + holiday")) |
+   nt_dots(nt_siz, "wis", "peak-size log-WIS (lower is better)", "Size", c("SB", "core"))) +
+  plot_layout(guides = "collect") & theme(legend.position = "bottom")
+```
+
+::: small
+NHSN hindcasts, states, 2023/24 + 2024/25 (large dot: pooled). **Shaded: kept for the final models.** Timing: the full set is clearly worse; core and core + holiday tie. Size: all sets within noise; SB kept, with core as the simpler alternative. Final GBQR models pair them: size SB + timing core, and size core + timing core + holiday (next slides, with 2025/26 added).
+:::
+
+::: notes
+Runs: N1 (size SB, timing core), N2 (size SB + lat/lon, timing core + holiday), N3 (size SB + B, timing core + B + lat/lon + recession + holiday), and core/core. Because size and timing are fitted separately, the timing scores of a run depend only on its timing set and the size scores only on its size set. These runs cover 2023/24 and 2024/25 only; 2025/26 was run only for the final models, which are in model-output (UMass-peak_gbqr_sb, UMass-peak_gbqr_core_hol). Source: analysis/peak-models/peak-scores-nhsn-hindcasts.csv.
+:::
+
+## NHSN: the three final models, by season
+
+```{r f-nhsn-season}
+#| fig-height: 6.6
+um <- scores |> filter(model %in% names(MODEL_IDS), location != "US") |> mutate(label = factor(label, levels = unname(MODEL_IDS)))
+by_season <- um |> group_by(label, season) |>
+  summarise(`−log score` = -mean(log_score), RPS = mean(rps), `log-WIS` = mean(wis_log), .groups = "drop")
+pt <- by_season |> pivot_longer(c(`−log score`, RPS)) |>
+  ggplot(aes(season, value, fill = label)) + geom_col(position = position_dodge(0.8), width = 0.75) +
+  facet_wrap(~name, scales = "free_y") + model_scale_fill(NULL, labels = TIMING_LABELS) +
+  labs(x = NULL, y = "lower is better", title = "Peak week (timing)") + guides(fill = guide_legend(ncol = 1))
+ps <- ggplot(by_season, aes(season, `log-WIS`, fill = label)) + geom_col(position = position_dodge(0.8), width = 0.75) +
+  model_scale_fill(NULL, labels = SIZE_LABELS) + labs(x = NULL, y = "log-WIS (lower is better)", title = "Peak size") +
+  guides(fill = guide_legend(ncol = 1))
+pt + ps + plot_layout(widths = c(2, 1)) +
+  plot_annotation(title = "Real-time hindcasts, states (2023/24: 29 dates, 2024/25: 23, 2025/26: 28)",
+                  caption = "Blue = UMass-peak_gbqr_sb (size SB, timing core) · orange = UMass-peak_gbqr_core_hol (size core, timing core + holiday)")
+```
+
+::: notes
+Standardized scoring from model-output (UMass-peak_gbqr_sb, UMass-peak_gbqr_core_hol, UMass-peak_baseline), 52 locations without the US total. Each GBQR model has its own size and timing feature sets, so the legends name the set that produced the scores in each panel. Both GBQR models clearly beat the baseline in 2023/24 and 2025/26; in 2024/25 the baseline wins on peak size (log-WIS) and slightly on timing.
+:::
+
+## NHSN: where in the season the models win
+
+```{r f-nhsn-wfp}
+#| fig-height: 7.0
+wf <- um |> filter(weeks_from_peak >= -10, weeks_from_peak <= 8) |>
+  group_by(label, season, weeks_from_peak) |> summarise(`−log score` = -mean(log_score), `log-WIS` = mean(wis_log),
+                                                        n = n(), .groups = "drop") |> filter(n >= 10)
+wfp <- function(metric, labs_, ttl) {
+  ggplot(wf, aes(weeks_from_peak, .data[[metric]], color = label)) + geom_vline(xintercept = 0, color = "#d9531e") +
+    geom_line(linewidth = 1.1) + facet_wrap(~season, nrow = 1) + model_scale_color(NULL, labels = labs_) +
+    labs(x = NULL, y = metric, title = ttl) + theme(legend.position = "right")
+}
+(wfp("−log score", TIMING_LABELS, "Peak week: −log score") + theme(axis.text.x = element_blank())) /
+  (wfp("log-WIS", SIZE_LABELS, "Peak size: log-WIS") + labs(x = "forecast date minus observed peak week (weeks)")) +
+  plot_annotation(title = "Scores by weeks from each state's peak (lower is better)")
+```
+
+## NHSN: calibration of peak size
+
+```{r f-nhsn-cov}
+#| fig-height: 6.6
+cv <- bind_rows(um, um |> mutate(season = "all seasons")) |> group_by(label, season) |>
+  summarise(`50% interval` = mean(cov50), `95% interval` = mean(cov95), .groups = "drop") |>
+  pivot_longer(c(`50% interval`, `95% interval`)) |>
+  mutate(season = factor(season, levels = c("2023/24", "2024/25", "2025/26", "all seasons")))
+ggplot(cv, aes(season, value, color = label)) + geom_blank() +
+  annotate("rect", xmin = 3.5, xmax = 4.5, ymin = -Inf, ymax = Inf, fill = "#f1f0ec") +
+  geom_hline(data = tibble(name = c("50% interval", "95% interval"), t = c(0.5, 0.95)), aes(yintercept = t),
+             linetype = "22", color = INK2) +
+  geom_point(size = 5, position = position_dodge(0.5)) +
+  geom_text(data = cv |> filter(season == "all seasons"), aes(label = percent(value, 1)),
+            position = position_dodge(0.5), vjust = -1.1, size = 4.2, show.legend = FALSE) +
+  facet_wrap(~name) + model_scale_color(NULL, labels = SIZE_LABELS) +
+  scale_y_continuous("coverage", labels = label_percent()) +
+  labs(x = NULL, title = "Peak-size interval coverage by season and pooled over all three seasons (dashed: nominal)")
+```
+
+::: notes
+`r ov <- um |> group_by(label) |> summarise(c50 = mean(cov50), c95 = mean(cov95)); paste0("Pooled over 2023/24–2025/26 (states, all forecast dates): ", paste0(SIZE_LABELS[as.character(ov$label)], " ", percent(ov$c50, 1), " (50%) / ", percent(ov$c95, 1), " (95%)", collapse = "; "), ".")` GBQR 50% intervals covered only 38–44% in 2023/24 and 2024/25 (too narrow) and about 75% in 2025/26 (too wide). Mean relative error of the median peak size: GBQR +21–28% in 2023/24, −21 to −23% in 2024/25 (record season), about +9% in 2025/26. The baseline over-predicted 2023/24 by 131% on average.
+:::
+
+## 2025/26: our models against the FluSight submissions
+
+```{r f-hub-ours}
+#| fig-height: 6.6
+hs2 <- hs |> select(label, kind, all_of(H_NAMES[1:2]), n) |> pivot_longer(all_of(H_NAMES[1:2])) |>
+  mutate(name = factor(name, levels = H_NAMES[1:2]))
+best <- hs |> arrange(`peak size: log-WIS`)
+best_txt <- paste0("Lowest log-WIS: ", paste(best$label[1:3], f2(best$`peak size: log-WIS`[1:3], 3), collapse = "; "), ".")
+best_rps <- hs |> arrange(`peak week: RPS`)
+rps_txt <- paste0("Lowest RPS: ", paste(best_rps$label[1:4], f2(best_rps$`peak week: RPS`[1:4], 3), collapse = "; "), ".")
+ggplot(hs2, aes(value, factor(label, levels = hub_order), fill = kind)) + geom_col(width = 0.7) +
+  facet_wrap(~name, scales = "free_x") + model_scale_fill(NULL) +
+  labs(x = "lower is better", y = NULL, title = "2025/26 peak forecasts, states — GBQR has the best peak-size log-WIS",
+       caption = "GBQR SB / core: size SB, timing core · GBQR core / core+hol: size core, timing core + holiday")
+```
+
+::: notes
+`r best_txt` `r rps_txt` Hub models are scored on their own submitted forecasts; ours are real-time hindcasts.
+:::
+
+## Takeaways
+
+::: columns
+::: {.column width="55%"}
+- **Size**: core + SB · **timing**: core (or core + holiday)
+- **SB hurts timing** and **the baseline offset hurts size**, consistently
+- Most exploratory gains (B share, lat/lon, recession, trend, H3) **did not carry over** to GBQR
+- **2025/26**: GBQR best peak-size log-WIS of all FluSight submissions
+- **2024/25**: the baseline beat GBQR — under-prediction in a record season, with under-reported latest weeks during the rise
+- Next: diagnose 2024/25, GBQR + baseline ensemble, interval recalibration, seed sensitivity
+:::
+::: {.column width="45%"}
+```{r f-takeaway}
+#| fig-width: 6.5
+#| fig-height: 6.2
+tk <- um |> group_by(label) |> summarise(t = -mean(log_score), s = mean(wis_log))
+tkp <- function(d, lab, ttl) ggplot(d, aes(v, factor(lab[as.character(label)], levels = rev(lab)), fill = label)) +
+  geom_col(width = 0.7) + geom_text(aes(x = v / 2, label = f2(v, 3)), color = "white", fontface = "bold", size = 5) +
+  model_scale_fill(guide = "none") + labs(x = NULL, y = NULL, title = ttl)
+tkp(tk |> mutate(v = t), TIMING_LABELS, "Peak week: −log score") /
+  tkp(tk |> mutate(v = s), SIZE_LABELS, "Peak size: log-WIS") +
+  plot_annotation(title = "NHSN 2023/24–2025/26, states", subtitle = "lower is better")
+```
+:::
+:::
+
+# Code and tools
+
+## idmodels: the `idmodels.peak` subpackage
+
+::: columns
+::: {.column width="55%"}
+::: small
+**Shared machinery**
+
+- `base.py`: abstract **`PeakModel`** — `load_inputs(ref_date)` → **`PeakInputs`** (data, NHSN `vintages`, optional `strain` counts); `fit()` builds replay rows; `forecast()` / `run()` → hub CSV for both peak targets; **`CurrentSeason`**; subclasses implement `_fit(rows)` and `_predict(feats)` → (timing classes, z quantiles)
+- `series.py`: **`SeasonArrays`**, `build_season_arrays`, `state_features` (core + SB; `SYNC_BURDEN_FEATURES`), `build_replay_rows`, `peak_week_climatology`
+- `extra_features.py`: `FEATURE_GROUPS` = trend, recession, holiday, latlon, bshare, h3; `extra_features()`, `type_arrays()`, `holiday_matrix()`, `centroids()`
+- `revision.py`: **`RevisionModel`** (block bootstrap of log revision ratios of the last 10 weeks, strata by count), `apply_revisions`, `load_nhsn_vintages`
+:::
+:::
+::: {.column width="45%"}
+::: small
+**`PeakModel` subclasses**
+
+- **`PeakBaselineModel`** — conditional climatology
+- **`PeakGBQRModel`** — LightGBM size quantiles + timing classes; separate `_size_features()` / `_timing_features()`; `oob_predict()`
+- **`PeakKCDEModel`** — kernel conditional density / analogs
+- **`PeakHierModel`** — Bayesian hierarchical (NumPyro) timing hazard + size
+- **`PeakHybridModel`** (`PeakHierModel` subclass) — hierarchical model with GBQR out-of-bag predictions as offsets
+
+KCDE, hierarchical and hybrid are implemented but not among the final models.
+:::
+:::
+:::
+
+## idmodels: configuration, commits and tests
+
+::: columns
+::: {.column width="55%"}
+::: small
+**`config.py`**: abstract **`PeakModelConfig`** — `supplementary_sources` (ILINet, FluSurv-NET), `sync_burden_features`, `sync_reported_only`, `exclude_training_series`, `window_start_week` / `window_end_week` (10 / 43), `replay_start_week`, `min_window_obs`, `num_revision_draws` (200), `revision_max_lag` (10), `pmf_floor` (1e-4), `timing_smoothing_sd`, `num_size_levels`
+
+- `PeakBaselineModelConfig` (`size_week_halfwidth`)
+- **`PeakGBQRModelConfig`** (`num_bags` 25, `bag_frac_samples` 0.7, `max_k` 12, `size_offset`, **`size_feature_groups`**, **`timing_feature_groups`**, LightGBM `n_estimators`, `learning_rate`, `min_child_samples`)
+- `PeakKCDEModelConfig`, `PeakHierModelConfig`, `PeakHybridModelConfig`
+
+```python
+PeakGBQRModelConfig(model_name="peak_gbqr_sb",
+    size_feature_groups=["core", "sb"], timing_feature_groups=["core"])
+PeakGBQRModelConfig(model_name="peak_gbqr_core_hol",
+    size_feature_groups=["core"], timing_feature_groups=["core", "holiday"])
+```
+:::
+:::
+::: {.column width="45%"}
+::: small
+**Commits** (branch on reichlab/idmodels)
+
+| commit | change |
+|---|---|
+| `bde15df` | direct seasonal peak models: base, baseline, GBQR, KCDE, revision, series |
+| `8c56bf0` | hierarchical model, real-time validation hooks, new features |
+| `1dd468d` | GBQR feature groups, `extra_features.py`, hybrid model |
+| `da4f102` | influenza type counts through the NHSN path (`PeakInputs.strain`) |
+| `f51b32c` | rename GBQR group `base` → `core` (alias kept) |
+
+**Tests**: `tests/unit/peak/test_peak.py`, 21 tests — features and extra features never look ahead, replay targets, revision model, a valid hub submission from every model, GBQR out-of-bag predictions exclude their own season, size and timing feature sets are independent
+:::
+:::
+:::
+
+## Sandbox code and tools
+
+::: columns
+::: {.column width="50%"}
+**sandbox** (`analysis/peak-models/`)
+
+- `validate_ilinet.py` — ILINet development runs (final / as published / + revisions)
+- `epidata_ilinet.py` — Delphi Epidata release history
+- `nhsn_validation.py` — NHSN real-time hindcasts · `score_peak_forecasts.py`
+- `relative_size_predictors.py` — exploratory CV (feature screening)
+:::
+::: {.column width="50%"}
+- Models: `src/peak_gbqr_sb`, `src/peak_gbqr_core_hol`, `src/peak_baseline` → `model-output/`
+- Docs: methods (`peak-models-methods.qmd`), EDA in R (`relative-size-eda.qmd`, `peak-timing-size-eda.qmd`)
+- Viewers: [forecast viewer](https://claude.ai/artifact/8CaLNVYYRHMYsXem7z1vQP) · [score explorer](https://claude.ai/artifact/SRJcPGzCi649uqnSiXHft2)
+:::
+:::
+
+::: notes
+Sandbox commits through 1f55bd3 (final models in model-output) and the viewer updates. Feature definitions in idmodels were checked against the exploratory harness on its 31,108 training rows (core and burden identical; synchrony differs slightly); leakage checks confirm no future data enters the features.
+:::
