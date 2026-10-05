@@ -3,4 +3,4 @@ numpy
 pandas
 torch
 chronos-forecasting
-iddata @ git+https://github.com/reichlab/iddata@a04057f6034a21e87b10fa2e44eb64cc1bffb096
+iddata @ git+https://github.com/reichlab/iddata@5f99e09115b977cca76be41d68e971c55f8e2a89
