@@ -1,15 +1,9 @@
 #!/bin/bash
 
-# All 84 real FluSight round (reference) dates across the 3 complete
-# historical seasons currently in the hub's target data (2023-24, 2024-25,
-# 2025-26) -- see submit-unity-parallel.sh's comments above its own copy
-# of this list for how it was verified against
-# model-output/FluSight-baseline/'s actual submitted reference dates.
-# Keep this list in sync with that script's `dates=(...)` array, and with
-# ../WISAR6/run-all-forecasts-2023-2025.sh's (same date list, different
-# transform).
+# All 80 valid reference dates across the 2023-24, 2024-25, and 2025-26
+# seasons in ../../hub-config/tasks.json. Keep this list in sync with the
+# season scripts (submit-unity-season-*.sh).
 dates=(
-  "2023-10-14"
   "2023-10-21"
   "2023-10-28"
   "2023-11-04"
@@ -39,7 +33,6 @@ dates=(
   "2024-04-20"
   "2024-04-27"
   "2024-05-04"
-  "2024-11-23"
   "2024-11-30"
   "2024-12-07"
   "2024-12-14"
@@ -60,12 +53,9 @@ dates=(
   "2025-04-05"
   "2025-04-12"
   "2025-04-19"
-  "2025-04-26"
   "2025-05-03"
   "2025-05-10"
   "2025-05-17"
-  "2025-05-24"
-  "2025-05-31"
   "2025-11-22"
   "2025-11-29"
   "2025-12-06"
@@ -93,6 +83,7 @@ dates=(
   "2026-05-09"
   "2026-05-16"
   "2026-05-23"
+  "2026-05-30"
 )
 
 for date in "${dates[@]}"

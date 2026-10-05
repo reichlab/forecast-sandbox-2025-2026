@@ -44,14 +44,15 @@ the `idmodels`/`sarix` packages that other AR(6) models on this hub use.
 - `pyproject.toml` / `uv.lock`: pinned dependencies, managed with
   [`uv`](https://docs.astral.sh/uv/).
 - `submit-unity-season-{2023-24,2024-25,2025-26}.sh`: SLURM array jobs,
-  one task per reference date in that season. These produced the
+  one task per reference date in that season (29, 23, and 28 dates: the
+  valid reference dates in `hub-config/tasks.json`). These produced the
   forecasts in `model-output/UMass-WISAR6_fourthroot_adaptive_t/`.
 - `submit-unity-all-seasons.sh`: submits the three season arrays in
   sequence, each starting after the previous one finishes.
 - `wisar6-task.sh`: the shared per-task body the season scripts source.
-- `run-all-forecasts-2023-2025.sh`: runs all 84 dates sequentially, for
+- `run-all-forecasts-2023-2025.sh`: runs all 80 dates sequentially, for
   local use.
-- `submit-unity-parallel.sh`: an older single 84-task array job (2 chains,
+- `submit-unity-parallel.sh`: an older single 80-task array job (2 chains,
   no progress log). The season scripts replace it.
 
 ## To run locally

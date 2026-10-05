@@ -16,7 +16,7 @@
                                          #   hours is deliberately generous
                                          #   until a real measurement exists
                                          #   -- tighten this once you have one.
-#SBATCH --array=0-83                    # Array indices (84 dates total)
+#SBATCH --array=0-79                    # Array indices (80 dates total)
 #SBATCH -o logs/slurm-%A_%a.out         # Output file (%A=job ID, %a=array index)
 #SBATCH -e logs/slurm-%A_%a.err         # Error file
 #SBATCH --mail-type=FAIL,TIME_LIMIT_80  # Email on failure or 80% time reached
@@ -45,27 +45,11 @@
 # set it to 1) and resubmit the failed array indices.
 export WISAR6_MCMC_CORES=2
 
-# Array of dates to process -- all 84 actual FluSight round (reference)
-# dates across the 3 complete historical seasons present in the hub's
-# target data as of 2026-09-30 (2023-24, 2024-25, 2025-26), verified
-# directly against model-output/FluSight-baseline/'s own submitted
-# reference dates (the authoritative source for "which Saturdays were
-# real round dates") rather than assumed from a fixed weekly cadence --
-# the season boundaries have real gaps (e.g. no submissions between
-# 2024-05-04 and 2024-11-23) that a naive date-range generator would get
-# wrong. Each date is passed directly as the actual Saturday reference
-# date (main.py's --today_date rounds forward to the nearest Saturday via
-# relativedelta(weekday=5), so a Saturday maps to itself). Also verified
-# that every date here has an at-or-before snapshot in the hub's
-# auxiliary-data/target-data-archive/, so main.py's point-in-time-correct
-# historical lookup (see README.md's "Historical vs. live data" section)
-# works for all of them without silently falling back to the live
-# (potentially leaky) target-data file.
-#
-# Keep this list in sync with ../WISAR6/submit-unity-parallel.sh's (same
-# date list, different transform).
+# Array of dates to process: all 80 valid reference dates across the
+# 2023-24, 2024-25, and 2025-26 seasons in ../../hub-config/tasks.json.
+# Each date is a Saturday reference date (main.py's --today_date rounds
+# forward to the nearest Saturday, so a Saturday maps to itself).
 dates=(
-  "2023-10-14"
   "2023-10-21"
   "2023-10-28"
   "2023-11-04"
@@ -95,7 +79,6 @@ dates=(
   "2024-04-20"
   "2024-04-27"
   "2024-05-04"
-  "2024-11-23"
   "2024-11-30"
   "2024-12-07"
   "2024-12-14"
@@ -116,12 +99,9 @@ dates=(
   "2025-04-05"
   "2025-04-12"
   "2025-04-19"
-  "2025-04-26"
   "2025-05-03"
   "2025-05-10"
   "2025-05-17"
-  "2025-05-24"
-  "2025-05-31"
   "2025-11-22"
   "2025-11-29"
   "2025-12-06"
@@ -149,6 +129,7 @@ dates=(
   "2026-05-09"
   "2026-05-16"
   "2026-05-23"
+  "2026-05-30"
 )
 
 # Get the date for this array task

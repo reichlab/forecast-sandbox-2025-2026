@@ -5,7 +5,7 @@
 #SBATCH --mem=4G                        # Test MaxRSS was 0.48-0.78 GB; 4G leaves headroom
 #SBATCH -p cpu
 #SBATCH -t 02:00:00                     # Student-t sampling cost unknown; WISAR6_fourthroot took up to 31 min
-#SBATCH --array=0-29%10                # 30 reference dates in the 2023-24 season, at most 10 running at once
+#SBATCH --array=0-28%10                # 29 reference dates in the 2023-24 season, at most 10 running at once
 #SBATCH -o logs/%x-%A_%a.out
 #SBATCH -e logs/%x-%A_%a.err
 #SBATCH --mail-type=END,FAIL,TIME_LIMIT_80
@@ -19,10 +19,9 @@
 # slowest WISAR6_fourthroot task (jobs 65186564-6: 31 / 47 / 69 min) since the
 # Student-t WIS loss (betaincinv quantiles) is likely slower to sample.
 #
-# Dates are identical to ../WISAR6_fourthroot/submit-unity-season-2023-24.sh.
+# Dates are this season's valid reference dates in ../../hub-config/tasks.json.
 
 dates=(
-  "2023-10-14"
   "2023-10-21"
   "2023-10-28"
   "2023-11-04"
