@@ -1,0 +1,16 @@
+[project]
+name = "wisar6-fourthroot"
+version = "0.1.0"
+description = "Add your description here"
+requires-python = ">=3.11"
+dependencies = [
+    "arviz>=0.23.4",
+    "click>=8.5.0",
+    "matplotlib>=3.11.2",
+    "numpy>=2.4.6",
+    "pandas>=3.0.6",
+    "pymc>=5.28.5",
+    "pytensor>=2.38.3",
+    "python-dateutil>=2.9.0.post0",
+    "scipy>=1.17.1",
+]
