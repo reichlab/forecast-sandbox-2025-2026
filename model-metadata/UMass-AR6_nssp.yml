@@ -1,0 +1,32 @@
+team_name: "UMass-Amherst"
+team_abbr: "UMass"
+model_name: "AR(6) SARIX (NSSP only)"
+model_abbr: "AR6_nssp"
+model_version: "1.0"
+model_contributors: [
+  {
+    "name": "Li Shandross",
+    "affiliation": "UMass Amherst",
+    "email": "lshandross@umass.edu"
+  },
+  {
+    "name": "Evan Ray",
+    "affiliation": "UMass Amherst",
+    "email": "elray@umass.edu"
+  },
+  {
+    "name": "Nick Reich",
+    "affiliation": "UMass Amherst",
+    "email": "nick@umass.edu"
+  }
+]
+license: "CC-BY-4.0"
+designated_model: true
+methods: "Bayesian autoregressive (AR order 6) model fit to NSSP ED visit data, with AR coefficients pooled across locations."
+methods_long: "
+  SARIX (Bayesian ARIMA with exogenous covariates) model with autoregressive order p=6, fit to NSSP emergency department visit data.
+  Theta (AR coefficient) parameters are pooled (shared) across locations, with no Fourier seasonality terms.
+"
+data_inputs: "Weekly percentage of emergency department visits with a diagnosis of influenza, from NSSP."
+ensemble_of_models: false
+ensemble_of_hub_models: false
