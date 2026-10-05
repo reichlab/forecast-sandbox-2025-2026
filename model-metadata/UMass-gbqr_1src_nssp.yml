@@ -1,0 +1,31 @@
+team_name: "UMass-Amherst"
+team_abbr: "UMass"
+model_name: "GBQR (NSSP only)"
+model_abbr: "gbqr_1src_nssp"
+model_version: "1.0"
+model_contributors: [
+  {
+    "name": "Li Shandross",
+    "affiliation": "UMass Amherst",
+    "email": "lshandross@umass.edu"
+  },
+  {
+    "name": "Evan Ray",
+    "affiliation": "UMass Amherst",
+    "email": "elray@umass.edu"
+  },
+  {
+    "name": "Nick Reich",
+    "affiliation": "UMass Amherst",
+    "email": "nick@umass.edu"
+  }
+]
+license: "CC-BY-4.0"
+designated_model: true
+methods: "Gradient boosting quantile regression fit to NSSP ED visit data."
+methods_long: "
+  Gradient boosting quantile regression, fit only to NSSP emergency department visit data.
+"
+data_inputs: "Weekly percentage of emergency department visits with a diagnosis of influenza, from NSSP."
+ensemble_of_models: false
+ensemble_of_hub_models: false
