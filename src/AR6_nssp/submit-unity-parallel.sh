@@ -5,7 +5,7 @@
 #SBATCH --mem=32G                       # Memory per node
 #SBATCH -p cpu                          # Partition name
 #SBATCH -t 01:00:00                     # Time limit (1 hours)
-#SBATCH --array=0-27                   # Array indices (28 dates total)
+#SBATCH --array=0-24                   # Array indices (25 dates total)
 #SBATCH -o logs/slurm-%A_%a.out         # Output file (%A=job ID, %a=array index)
 #SBATCH -e logs/slurm-%A_%a.err         # Error file
 #SBATCH --mail-type=FAIL,TIME_LIMIT_80  # Email on failure or 80% time reached
@@ -14,12 +14,9 @@
 # Array of dates to process
 dates=(
   "2025-11-19"
-  "2025-11-26"
   "2025-12-03"
   "2025-12-10"
   "2025-12-17"
-  "2025-12-24"
-  "2025-12-31"
   "2026-01-07"
   "2026-01-14"
   "2026-01-21"

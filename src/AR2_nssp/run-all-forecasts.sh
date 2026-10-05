@@ -1,14 +1,13 @@
 #!/bin/bash
 # Generate forecasts for this model across every reference_date in hub-config/tasks.json.
+# Excludes 2025-11-26, 2025-12-24, 2025-12-31 (Thanksgiving/Christmas/New Year's run dates):
+# NSSP's holiday-week reporting lag produces invalid output for these reference dates.
 
 dates=(
   "2025-11-19"
-  "2025-11-26"
   "2025-12-03"
   "2025-12-10"
   "2025-12-17"
-  "2025-12-24"
-  "2025-12-31"
   "2026-01-07"
   "2026-01-14"
   "2026-01-21"
