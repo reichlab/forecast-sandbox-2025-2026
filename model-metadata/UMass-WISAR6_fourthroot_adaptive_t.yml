@@ -11,7 +11,7 @@ model_contributors: [
   },
 ]
 license: "CC-BY-4.0"
-designated_model: false
+designated_model: true
 methods: "WIS-loss AR(6) with Fourier seasonality fit jointly to all locations on the fourth-root scale, with learned prior scales and Student-t (df=5) innovations."
 data_inputs: "Weekly incident flu hospitalizations from NHSN."
 methods_long: "

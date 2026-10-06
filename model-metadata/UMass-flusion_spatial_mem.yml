@@ -21,7 +21,7 @@ model_contributors: [
   }
 ]
 license: "CC-BY-4.0"
-designated_model: false
+designated_model: true
 methods: "Ensemble of statistical and machine learning models with Moving Epidemic Method (MEM) based adaptive weighting."
 data_inputs: "Weekly incident flu hospitalizations from NHSN, FluSurv-NET, and ILINet."
 methods_long: "
