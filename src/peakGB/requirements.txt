@@ -1,0 +1,3 @@
+click
+python-dateutil
+idmodels @ git+https://github.com/reichlab/idmodels@f51b32c1b952e22929cfe3a696ac9e1dc6417cc6

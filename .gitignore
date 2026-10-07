@@ -16,3 +16,6 @@ analysis/peak-models/ilinet-validation/
 analysis/peak-models/nhsn-hindcasts/
 **/__pycache__/
 analysis/peak-models/eda/
+
+# outputs of src/peakGB runs (forecast csv and plots), as in reichlab/operational-models
+src/peakGB/output/
