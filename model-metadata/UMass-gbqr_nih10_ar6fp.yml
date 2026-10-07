@@ -1,0 +1,39 @@
+team_name: "UMass-Amherst"
+team_abbr: "UMass"
+model_name: "Ensemble of GBQR 5src NIH-Flu n=10 and AR6 Fourier pooled"
+model_abbr: "gbqr_nih10_ar6fp"
+model_version: "1.0"
+model_contributors: [
+  {
+    "name": "Thomas Robacker",
+    "affiliation": "UMass Amherst",
+    "email": "trobacker@umass.edu"
+  },
+  {
+    "name": "Li Shandross",
+    "affiliation": "UMass Amherst",
+    "email": "lshandross@umass.edu"
+  },
+  {
+    "name": "Evan Ray",
+    "affiliation": "UMass Amherst",
+    "email": "elray@umass.edu"
+  },
+  {
+    "name": "Nick Reich",
+    "affiliation": "UMass Amherst",
+    "email": "nick@umass.edu"
+  }
+]
+license: "CC-BY-4.0"
+designated_model: true
+methods: "Equally weighted quantile average of UMass-gbqr_5src_nihflu_otid10 and UMass-AR6_fourierP_thetaP."
+data_inputs: "Weekly incident flu hospitalizations from NHSN; NSSP ED visits; ILINet; FluSurv-NET; Flu Scenario Modeling Hub NIH-Flu_TS synthetic trajectories."
+methods_long: "
+  Equally weighted quantile average (hubEnsembles::simple_ensemble) of two existing hub models:
+   1. UMass-gbqr_5src_nihflu_otid10: gradient boosting quantile regression fit to NHSN, NSSP, ILINet, and FluSurv-NET data, augmented with Flu SMH NIH-Flu_TS synthetic trajectories (n=10).
+   2. UMass-AR6_fourierP_thetaP: an AR(6) model with K=2 Fourier seasonality, AR and Fourier parameters pooled across locations (fourth-root scale).
+  No additional model fitting; built from the component model-output files by src/gbqr_ar_ensembles.
+  "
+ensemble_of_models: true
+ensemble_of_hub_models: true
