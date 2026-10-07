@@ -1,6 +1,6 @@
 team_name: "UMass-Amherst"
 team_abbr: "UMass"
-model_name: "GBQR with NHSN, FluSurv-NET, ILINet"
+model_name: "GBQR vanilla"
 model_abbr: "gbqr_3src"
 model_version: "1.0"
 model_contributors: [
@@ -9,26 +9,18 @@ model_contributors: [
     "affiliation": "UMass Amherst",
     "email": "elray@umass.edu"
   },
-  {
+    {
     "name": "Nick Reich",
     "affiliation": "UMass Amherst",
     "email": "nick@umass.edu"
-  },
-  {
-    "name": "Thomas Robacker",
-    "affiliation": "UMass Amherst",
-    "email": "trobacker@umass.edu"
   }
 ]
 license: "CC-BY-4.0"
-designated_model: false
-methods: "Gradient boosting quantile regression fit jointly to all locations on NHSN, FluSurv-NET, and ILINet data."
-data_inputs: "Weekly incident flu hospitalizations from NHSN; FluSurv-NET; ILINet."
+designated_model: true
+methods: "Standard flusion GBQR approach."
 methods_long: "
-  Gradient boosting quantile regression with standard flusion options (100 bags, fourth-root transform),
-  fit jointly to all 53 locations on NHSN, FluSurv-NET, and ILINet data. Same configuration as the
-  gbqr_3src component of UMass-flusion_spatial2_prod; supplies the national (US) GBQR forecast for the
-  gbqr_3src_spatial x AR ensembles. Run with idmodels v2.1.0.
-  "
+  Gradient boosting quantile regression, fit to NHSN, FluSurv-NET, and ILINet data only and using standard flusion hyperparameters.
+"
+data_inputs: "Weekly incident flu hospitalizations from NHSN."
 ensemble_of_models: false
 ensemble_of_hub_models: false
