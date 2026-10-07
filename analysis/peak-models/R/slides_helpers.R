@@ -181,7 +181,12 @@ plot_peak_forecast <- function(prelim, pmf, ref_date, final = NULL, past = NULL,
   if (is.null(xlim)) xlim <- range(pmf$week) + c(-4, 4)
   inx <- function(d) if (is.null(d)) NULL else filter(d, date >= xlim[1], date <= xlim[2], value > 0)
   prelim <- inx(prelim); final <- inx(final); past <- inx(past)
-  xs <- scale_x_date(NULL, limits = xlim, date_breaks = "1 month", date_labels = "%b", expand = expansion(0))
+  # gridlines on the 1st of each month, except within two weeks of the right edge (no room for that month's label)
+  month_breaks <- function(lim) {
+    b <- seq(as.Date(format(lim[1], "%Y-%m-01")), lim[2], by = "1 month")
+    b[b >= lim[1] & b <= lim[2] - 14]
+  }
+  xs <- scale_x_date(NULL, limits = xlim, breaks = month_breaks, date_labels = "%b", expand = expansion(0))
   top <- ggplot() + geom_vline(xintercept = ref_date, color = INK2, linewidth = 0.6)
   if (!is.null(past)) top <- top + geom_line(data = past, aes(date, value, group = season), color = "#c9ced6",
                                              linewidth = 0.5)
@@ -207,12 +212,22 @@ plot_peak_forecast <- function(prelim, pmf, ref_date, final = NULL, past = NULL,
   if (!is.null(truth)) top <- top + geom_vline(xintercept = truth, color = "#d9531e", linewidth = 0.8, linetype = "22")
   top <- top + xs + model_scale_fill(guide = "none") + model_scale_color(guide = "none") +
     scale_y_log10(ylab, labels = label_comma()) + theme(axis.text.x = element_blank())
+  # weeks where the cumulative peak-week probability first reaches 25%, 50% and 75% (a dot above that week's bar;
+  # dots for quartiles falling in the same week are stacked)
+  qd <- pmf |> filter(model %in% models) |> mutate(model = factor(model, levels = models)) |>
+    group_by(model) |> arrange(week, .by_group = TRUE) |> mutate(cum = cumsum(value), top = max(value)) |>
+    reframe(p = c(0.25, 0.5, 0.75), week = week[vapply(p, function(x) which(cum >= x - 1e-9)[1], 1L)],
+            value = value[vapply(p, function(x) which(cum >= x - 1e-9)[1], 1L)], top = top[1]) |>
+    group_by(model, week) |> mutate(y = value + top * (0.1 + 0.12 * (row_number() - 1))) |> ungroup()
   bottom <- pmf |> filter(model %in% models) |> mutate(model = factor(model, levels = models)) |>
     ggplot(aes(week, value, fill = model)) + geom_col(width = 5.5) +
+    geom_point(data = qd, aes(week, y), inherit.aes = FALSE, color = INK, size = 2) +
     geom_vline(xintercept = ref_date, color = INK2, linewidth = 0.6) +
     facet_wrap(~model, ncol = 1, strip.position = "right") + xs + model_scale_fill(guide = "none") +
     scale_y_continuous("P(peak in week)", labels = label_percent(), n.breaks = 3) +
-    theme(strip.text.y = element_text(angle = 0, hjust = 0, face = "bold"))
+    theme(strip.text.y = element_text(angle = 0, hjust = 0, face = "bold"),
+          # gridlines mark the 1st of each month; start each month's name at its gridline
+          axis.text.x = element_text(hjust = 0, margin = margin(t = 2)))
   if (!is.null(truth)) bottom <- bottom + geom_vline(xintercept = truth, color = "#d9531e", linewidth = 0.8,
                                                      linetype = "22")
   if (is.null(heights)) heights <- c(1.6, 0.55 * length(models))

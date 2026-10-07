@@ -266,7 +266,7 @@ plot_peak_forecast(
   size_q = ex_all |> filter(target == "peak inc flu hosp") |> transmute(model, tau = output_type_id, value),
   models = unname(MODEL_IDS), truth = ex_truth$peak_week) +
   plot_annotation(title = paste0("US, forecast date ", format(ex_ref, "%b %d %Y"), " (grey vertical line)"),
-                  subtitle = paste("Top: as published on the forecast date (solid), final (dashed), earlier seasons (grey);\nbands: peak-size 50% / 95% intervals and median, placed at each model's most likely peak week.\nBelow: peak-week pmfs. Dashed orange: observed peak week."))
+                  subtitle = paste("Top: as published on the forecast date (solid), final (dashed), earlier seasons (grey);\nbands: peak-size 50% / 95% intervals and median, placed at each model's most likely peak week.\nBelow: peak-week pmfs; dots: weeks where the cumulative probability reaches 25%, 50% and 75%.\nDashed orange: observed peak week."))
 ```
 
 - A **pmf over the window**: season weeks 10–43, the 34 Saturdays (2026/27: `r format(min(windows[["2026/27"]]), "%b %d %Y")` – `r format(max(windows[["2026/27"]]), "%b %d %Y")`), summing to 1 · peak week = first week with the season's **maximum final count** · ties not scored · scored by **log score** and **RPS**
@@ -1013,7 +1013,7 @@ plot_peak_forecast(
   plot_annotation(title = paste0("US, forecast date ", format(ref2425, "%b %d %Y"),
                                  ": the latest weeks were under-reported; the peak was still ",
                                  as.integer(truth_week("US", "2024/25") - ref2425) / 7, " weeks away"),
-                  subtitle = "Solid: as published · dashed: final · grey: 2023/24\nbands: peak-size 50% / 95% intervals and median at each model's most likely peak week · dashed orange: observed peak week")
+                  subtitle = "Solid: as published · dashed: final · grey: 2023/24\nbands: peak-size 50% / 95% intervals and median at each model's most likely peak week · dashed orange: observed peak week\ndots: weeks where the cumulative peak-week probability reaches 25%, 50% and 75%")
 ```
 
 ::: notes
