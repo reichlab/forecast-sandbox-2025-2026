@@ -1,0 +1,32 @@
+team_name: "UMass-Amherst"
+team_abbr: "UMass"
+model_name: "AR(2) SARIX with Fourier and theta pooling (NSSP only)"
+model_abbr: "AR2_fourierP_thetaP_nssp"
+model_version: "1.0"
+model_contributors: [
+  {
+    "name": "Li Shandross",
+    "affiliation": "UMass Amherst",
+    "email": "lshandross@umass.edu"
+  },
+  {
+    "name": "Evan Ray",
+    "affiliation": "UMass Amherst",
+    "email": "elray@umass.edu"
+  },
+  {
+    "name": "Nick Reich",
+    "affiliation": "UMass Amherst",
+    "email": "nick@umass.edu"
+  }
+]
+license: "CC-BY-4.0"
+designated_model: true
+methods: "Bayesian autoregressive (AR order 2) model with Fourier seasonality (K=2), fit to NSSP ED visit data, with both AR coefficients and Fourier seasonality parameters pooled across locations."
+methods_long: "
+  SARIX (Bayesian ARIMA with exogenous covariates) model with autoregressive order p=2, fit to NSSP emergency department visit data.
+  K=2 Fourier harmonic pairs are added to capture annual seasonality. Both theta (AR coefficient) and Fourier seasonality parameters are pooled (shared) across locations.
+"
+data_inputs: "Weekly percentage of emergency department visits with a diagnosis of influenza, from NSSP."
+ensemble_of_models: false
+ensemble_of_hub_models: false
