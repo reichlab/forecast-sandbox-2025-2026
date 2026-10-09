@@ -1,0 +1,33 @@
+team_name: "UMass-Amherst"
+team_abbr: "UMass"
+model_name: "GBQR with spatial covariates (NSSP main, all supplementary sources)"
+model_abbr: "gbqr_4src_spatial_nssp"
+model_version: "1.0"
+model_contributors: [
+  {
+    "name": "Li Shandross",
+    "affiliation": "UMass Amherst",
+    "email": "lshandross@umass.edu"
+  },
+  {
+    "name": "Evan Ray",
+    "affiliation": "UMass Amherst",
+    "email": "elray@umass.edu"
+  },
+  {
+    "name": "Nick Reich",
+    "affiliation": "UMass Amherst",
+    "email": "nick@umass.edu"
+  }
+]
+license: "CC-BY-4.0"
+designated_model: true
+methods: "Gradient boosting quantile regression fit to NSSP ED visit data, supplemented with NHSN, ILINet, and FluSurv-NET, with added directional wave spatial features."
+methods_long: "
+  Gradient boosting quantile regression, with NSSP emergency department visit data as the main source.
+  NHSN hospitalizations, ILINet outpatient illness percentages, and FluSurv-NET hospitalization rates are included as supplementary training sources.
+  Directional wave features (all 8 compass directions) added to capture spatial spread patterns across locations.
+"
+data_inputs: "Weekly percentage of emergency department visits with a diagnosis of influenza, from NSSP. Weekly incident laboratory-confirmed influenza hospitalizations from NHSN. Outpatient influenza-like illness percentage from ILINet. Laboratory-confirmed influenza hospitalization rates from FluSurv-NET."
+ensemble_of_models: false
+ensemble_of_hub_models: false
