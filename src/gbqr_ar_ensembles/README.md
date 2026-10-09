@@ -14,6 +14,12 @@ components' existing files in `model-output/`. No model fitting happens here; bu
 | UMass-gbqr_3src_ar6p | UMass-gbqr_3src | UMass-AR6_pooled | 2023/24 – 2025/26 |
 | UMass-gbqr_3src_ar6fp | UMass-gbqr_3src | UMass-AR6_fourierP_thetaP | 2023/24 – 2025/26 |
 | UMass-gbqr_3src_wisar | UMass-gbqr_3src | UMass-WISAR6_fourthroot_adaptive_t | 2023/24 – 2025/26 |
+| UMass-gbqr_3src_spatial_wisar | UMass-gbqr_3src_spatial (US: UMass-gbqr_3src) | UMass-WISAR6_fourthroot_adaptive_t | 2023/24 – 2025/26 |
+
+The two other spatial GBQR x AR pairs already exist as UMass-flusion_3src_spatial (with UMass-AR6_pooled) and
+UMass-flusion_3src_spatial_fourierP (with UMass-AR6_fourierP_thetaP); they were built elsewhere, but their files equal
+`ensemble_pair.R <model> UMass-gbqr_3src_spatial <ar model> UMass-gbqr_3src` exactly (checked with validate.py).
+`gbqr_3src_spatial` has no US forecasts, since its directional wave features are state-level only.
 
 An ensemble covers every reference date its two components share: the `gbqr_4src` and `nih10` GBQR components use
 NSSP or NIH flu scenario data available only for 2025/26, while `gbqr_3src` and the AR models cover all three seasons.
