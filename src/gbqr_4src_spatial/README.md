@@ -34,6 +34,13 @@ dates in parallel as a Slurm job array on Unity, throttled to a handful of concu
 the shared Unity "cpu" partition nodes see heavy multi-tenant contention that makes per-bag
 training time highly variable.
 
+`run-all-forecasts-2023-2025.sh` / `submit-unity-backfill-2023-2025.sh` run the same model over
+the 2023-24 and 2024-25 seasons, now that NSSP as a supplementary source supports `as_of` dates
+before 2025-09-17. NSSP has no versioned data that far back, so for those dates it falls back to
+static/current NSSP data filtered to the historical date rather than true real-time vintage;
+unlike the current season, no holiday dates are excluded here since static data isn't subject to
+the real-time reporting lag that motivated those exclusions.
+
 # requirements.txt
 
 `requirements.txt` was generated according to [README.md](../README.md).
