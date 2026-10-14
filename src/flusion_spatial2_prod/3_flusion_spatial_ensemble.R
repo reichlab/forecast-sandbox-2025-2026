@@ -11,8 +11,8 @@ hub_con <- hubData::connect_model_output(
   schema = arrow::schema(location = arrow::utf8())
 )
 
-state_models_to_blend <- c("UMass-gbqr_3src_spatial2", "UMass-AR6_pooled")
-us_models_to_blend <- c("UMass-gbqr_3src", "UMass-AR6_pooled")
+state_models_to_blend <- c("UMass-gbqr_3src_spatial2", "UMass-ar6_pooled")
+us_models_to_blend <- c("UMass-gbqr_3src", "UMass-ar6_pooled")
 
 state_dat <- hub_con |>
   filter(
