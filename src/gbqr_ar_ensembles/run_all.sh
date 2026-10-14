@@ -21,6 +21,9 @@ pairs=(
   "UMass-gbqr_3src_ar6fp  UMass-gbqr_3src  UMass-AR6_fourierP_thetaP"
   "UMass-gbqr_3src_wisar  UMass-gbqr_3src  UMass-WISAR6_fourthroot_adaptive_t"
   "UMass-gbqr_3src_spatial_wisar  UMass-gbqr_3src_spatial  UMass-WISAR6_fourthroot_adaptive_t  UMass-gbqr_3src"
+  "UMass-gbqr_4src_spatial_ar6p   UMass-gbqr_4src_spatial  UMass-AR6_pooled                    UMass-gbqr_4src"
+  "UMass-gbqr_4src_spatial_ar6fp  UMass-gbqr_4src_spatial  UMass-AR6_fourierP_thetaP           UMass-gbqr_4src"
+  "UMass-gbqr_4src_spatial_wisar  UMass-gbqr_4src_spatial  UMass-WISAR6_fourthroot_adaptive_t  UMass-gbqr_4src"
 )
 
 for p in "${pairs[@]}"; do
