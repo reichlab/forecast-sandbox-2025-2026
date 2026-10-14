@@ -5,24 +5,30 @@ components' existing files in `model-output/`. No model fitting happens here; bu
 
 | Ensemble | GBQR component | AR component | Seasons |
 |---|---|---|---|
-| UMass-gbqr_4src_ar6p | UMass-gbqr_4src | UMass-AR6_pooled | 2025/26 |
-| UMass-gbqr_4src_ar6fp | UMass-gbqr_4src | UMass-AR6_fourierP_thetaP | 2025/26 |
-| UMass-gbqr_4src_wisar | UMass-gbqr_4src | UMass-WISAR6_fourthroot_adaptive_t | 2025/26 |
-| UMass-gbqr_nih10_ar6p | UMass-gbqr_5src_nihflu_otid10 | UMass-AR6_pooled | 2025/26 |
-| UMass-gbqr_nih10_ar6fp | UMass-gbqr_5src_nihflu_otid10 | UMass-AR6_fourierP_thetaP | 2025/26 |
-| UMass-gbqr_nih10_wisar | UMass-gbqr_5src_nihflu_otid10 | UMass-WISAR6_fourthroot_adaptive_t | 2025/26 |
+| UMass-gbqr_4src_ar6p | UMass-gbqr_4src | UMass-AR6_pooled | 2023/24 – 2025/26 |
+| UMass-gbqr_4src_ar6fp | UMass-gbqr_4src | UMass-AR6_fourierP_thetaP | 2023/24 – 2025/26 |
+| UMass-gbqr_4src_wisar | UMass-gbqr_4src | UMass-WISAR6_fourthroot_adaptive_t | 2023/24 – 2025/26 |
+| UMass-gbqr_nih10_ar6p | UMass-gbqr_5src_nihflu_otid10 | UMass-AR6_pooled | 2023/24 – 2025/26 |
+| UMass-gbqr_nih10_ar6fp | UMass-gbqr_5src_nihflu_otid10 | UMass-AR6_fourierP_thetaP | 2023/24 – 2025/26 |
+| UMass-gbqr_nih10_wisar | UMass-gbqr_5src_nihflu_otid10 | UMass-WISAR6_fourthroot_adaptive_t | 2023/24 – 2025/26 |
 | UMass-gbqr_3src_ar6p | UMass-gbqr_3src | UMass-AR6_pooled | 2023/24 – 2025/26 |
 | UMass-gbqr_3src_ar6fp | UMass-gbqr_3src | UMass-AR6_fourierP_thetaP | 2023/24 – 2025/26 |
 | UMass-gbqr_3src_wisar | UMass-gbqr_3src | UMass-WISAR6_fourthroot_adaptive_t | 2023/24 – 2025/26 |
 | UMass-gbqr_3src_spatial_wisar | UMass-gbqr_3src_spatial (US: UMass-gbqr_3src) | UMass-WISAR6_fourthroot_adaptive_t | 2023/24 – 2025/26 |
+| UMass-gbqr_4src_spatial_ar6p | UMass-gbqr_4src_spatial (US: UMass-gbqr_4src) | UMass-AR6_pooled | 2023/24 – 2025/26 |
+| UMass-gbqr_4src_spatial_ar6fp | UMass-gbqr_4src_spatial (US: UMass-gbqr_4src) | UMass-AR6_fourierP_thetaP | 2023/24 – 2025/26 |
+| UMass-gbqr_4src_spatial_wisar | UMass-gbqr_4src_spatial (US: UMass-gbqr_4src) | UMass-WISAR6_fourthroot_adaptive_t | 2023/24 – 2025/26 |
 
 The two other spatial GBQR x AR pairs already exist as UMass-flusion_3src_spatial (with UMass-AR6_pooled) and
 UMass-flusion_3src_spatial_fourierP (with UMass-AR6_fourierP_thetaP); they were built elsewhere, but their files equal
 `ensemble_pair.R <model> UMass-gbqr_3src_spatial <ar model> UMass-gbqr_3src` exactly (checked with validate.py).
-`gbqr_3src_spatial` has no US forecasts, since its directional wave features are state-level only.
+`gbqr_3src_spatial` has no US forecasts, since its directional wave features are state-level only; the same is true
+of `gbqr_4src_spatial`, which uses `gbqr_4src` for its US forecast.
 
-An ensemble covers every reference date its two components share: the `gbqr_4src` and `nih10` GBQR components use
-NSSP or NIH flu scenario data available only for 2025/26, while `gbqr_3src` and the AR models cover all three seasons.
+An ensemble covers every reference date its two components share. The `gbqr_4src` and `nih10` GBQR components
+originally only had 2025/26 forecasts, since NSSP as a supplementary source only supported `as_of` dates from
+2025-09-17 on; now that both have been backfilled for 2023/24 and 2024/25 (NSSP falls back to static/current data
+for those earlier dates), these ensembles cover all three seasons like `gbqr_3src` and the AR models.
 
 ## Files
 

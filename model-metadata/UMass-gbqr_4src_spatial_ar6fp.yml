@@ -1,0 +1,34 @@
+team_name: "UMass-Amherst"
+team_abbr: "UMass"
+model_name: "Ensemble of spatial GBQR (NHSN, NSSP, ILINet, FluSurv-NET) and AR6 Fourier pooled"
+model_abbr: "gbqr_4src_spatial_ar6fp"
+model_version: "1.0"
+model_contributors: [
+  {
+    "name": "Li Shandross",
+    "affiliation": "UMass Amherst",
+    "email": "lshandross@umass.edu"
+  },
+  {
+    "name": "Evan Ray",
+    "affiliation": "UMass Amherst",
+    "email": "elray@umass.edu"
+  },
+  {
+    "name": "Nick Reich",
+    "affiliation": "UMass Amherst",
+    "email": "nick@umass.edu"
+  }
+]
+license: "CC-BY-4.0"
+designated_model: true
+methods: "Equally weighted quantile average of UMass-gbqr_4src_spatial (UMass-gbqr_4src for US) and UMass-AR6_fourierP_thetaP."
+data_inputs: "Weekly incident flu hospitalizations from NHSN; NSSP ED visits; ILINet; FluSurv-NET."
+methods_long: "
+  Equally weighted quantile average (hubEnsembles::simple_ensemble) of two existing hub models:
+   1. UMass-gbqr_4src_spatial: gradient boosting quantile regression fit to NHSN, NSSP, ILINet, and FluSurv-NET data, with directional wave spatial features. Its spatial features are state-level only, so for the US forecast UMass-gbqr_4src (the same model without spatial features) is used instead, as in UMass-gbqr_3src_spatial_wisar.
+   2. UMass-AR6_fourierP_thetaP: an AR(6) model with K=2 Fourier seasonality, AR and Fourier parameters pooled across locations (fourth-root scale).
+  No additional model fitting; built from the component model-output files by src/gbqr_ar_ensembles.
+  "
+ensemble_of_models: true
+ensemble_of_hub_models: true

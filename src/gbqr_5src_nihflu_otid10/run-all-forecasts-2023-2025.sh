@@ -1,0 +1,69 @@
+#!/bin/bash
+# Generate forecasts for this model across every reference_date in hub-config/tasks.json
+# for the 2023-24 and 2024-25 seasons. Requires idmodels@fc3b39f (ls/use-nssp-before-2025-09-17)
+# or later, which falls back to NSSP's static/current data for as_of dates before
+# 2025-09-17 (NSSP has no versioned data that far back, so these dates are not true
+# real-time vintage for the NSSP feature). SMH trajectory data also varies by as_of:
+# round 4 only before 2024-08-11 (covers the 2023-24 dates below), rounds 4+5 from
+# 2024-08-11 through 2025-08-10 (covers the 2024-25 dates below).
+
+dates=(
+  "2023-10-18"
+  "2023-10-25"
+  "2023-11-01"
+  "2023-11-08"
+  "2023-11-15"
+  "2023-11-22"
+  "2023-11-29"
+  "2023-12-06"
+  "2023-12-13"
+  "2023-12-20"
+  "2023-12-27"
+  "2024-01-03"
+  "2024-01-10"
+  "2024-01-17"
+  "2024-01-24"
+  "2024-01-31"
+  "2024-02-07"
+  "2024-02-14"
+  "2024-02-21"
+  "2024-02-28"
+  "2024-03-06"
+  "2024-03-13"
+  "2024-03-20"
+  "2024-03-27"
+  "2024-04-03"
+  "2024-04-10"
+  "2024-04-17"
+  "2024-04-24"
+  "2024-05-01"
+  "2024-11-27"
+  "2024-12-04"
+  "2024-12-11"
+  "2024-12-18"
+  "2024-12-25"
+  "2025-01-01"
+  "2025-01-08"
+  "2025-01-15"
+  "2025-01-29"
+  "2025-02-05"
+  "2025-02-12"
+  "2025-02-19"
+  "2025-02-26"
+  "2025-03-05"
+  "2025-03-12"
+  "2025-03-19"
+  "2025-03-26"
+  "2025-04-02"
+  "2025-04-09"
+  "2025-04-16"
+  "2025-04-30"
+  "2025-05-07"
+  "2025-05-14"
+)
+
+for date in "${dates[@]}"
+do
+  echo "Running for date: $date"
+  python main.py --today_date="$date"
+done
