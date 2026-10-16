@@ -1,0 +1,48 @@
+team_name: "UMass-Amherst"
+team_abbr: "UMass"
+model_name: "Ensemble of spatial GBQR and WIS-loss AR6 (adaptive, Student-t), combined with gbqr_4src_nssp for ED visits"
+model_abbr: "gbqr_3src_spatial_wisar_nssp"
+model_version: "1.0"
+model_contributors: [
+  {
+    "name": "Thomas Robacker",
+    "affiliation": "UMass Amherst",
+    "email": "trobacker@umass.edu"
+  },
+  {
+    "name": "Li Shandross",
+    "affiliation": "UMass Amherst",
+    "email": "lshandross@umass.edu"
+  },
+  {
+    "name": "Evan Ray",
+    "affiliation": "UMass Amherst",
+    "email": "elray@umass.edu"
+  },
+  {
+    "name": "Nick Reich",
+    "affiliation": "UMass Amherst",
+    "email": "nick@umass.edu"
+  }
+]
+license: "CC-BY-4.0"
+designated_model: true
+methods: "UMass-gbqr_3src_spatial_wisar (wk inc flu hosp) row-bound with UMass-gbqr_4src_nssp (wk inc flu prop ed visits)."
+data_inputs: "Weekly incident flu hospitalizations from NHSN; ILINet; FluSurv-NET; NSSP ED visits."
+methods_long: "
+  Combines two independently produced forecasts into one submission file, one row-bind per
+  reference date, no additional modeling:
+   1. UMass-gbqr_3src_spatial_wisar (target: wk inc flu hosp): an equally weighted quantile
+      average of UMass-gbqr_3src_spatial (UMass-gbqr_3src for US) and
+      UMass-WISAR6_fourthroot_adaptive_t. See UMass-gbqr_3src_spatial_wisar.yml for its methods.
+   2. UMass-gbqr_4src_nssp (target: wk inc flu prop ed visits): a standalone gradient boosting
+      quantile regression model with NSSP as its main source, supplemented by NHSN, ILINet, and
+      FluSurv-NET. Not blended with anything; included as-is.
+  UMass-gbqr_4src_nssp is only valid from the 2025/26 season onward (and skips reference dates
+  2025-11-29, 2025-12-27, 2026-01-03 due to holiday NSSP reporting lag); for reference dates
+  where it has no output, this submission contains the hosp-target forecast alone.
+  Produced by src/gbqr_3src_spatial_wisar, a self-contained pipeline that runs all four
+  component model fits and the ensembling/row-bind step with one command.
+  "
+ensemble_of_models: true
+ensemble_of_hub_models: true
