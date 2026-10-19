@@ -7,7 +7,7 @@ and the data loaded for a reference date are shared across models. NHSN data are
 so the current-season inputs are exactly what was available in real time.
 
 Usage (from the repository root, with an environment that has idmodels installed):
-    python analysis/peak-models/run_hindcasts.py --season 2025/26 --models baseline gbqr kcde
+    python analysis/peak-models/run_hindcasts.py --season 2025/26 --models baseline gbqr
 """
 import argparse
 import importlib.util
@@ -21,8 +21,7 @@ sys.path.insert(0, str(ROOT / "src"))
 
 from peak_common import make_run_config  # noqa: E402
 
-MODEL_CLASSES = {"baseline": "PeakBaselineModel", "gbqr": "PeakGBQRModel", "gbqr_offset": "PeakGBQRModel",
-                 "kcde": "PeakKCDEModel"}
+MODEL_CLASSES = {"baseline": "PeakBaselineModel", "gbqr": "PeakGBQRModel", "gbqr_offset": "PeakGBQRModel"}
 
 
 def load_model_config(name: str):
@@ -51,7 +50,7 @@ def main():
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--season", required=True)
-    parser.add_argument("--models", nargs="+", default=["baseline", "gbqr", "kcde"], choices=list(MODEL_CLASSES))
+    parser.add_argument("--models", nargs="+", default=["baseline", "gbqr"], choices=list(MODEL_CLASSES))
     parser.add_argument("--output_root", default=str(ROOT / "model-output"))
     parser.add_argument("--skip_existing", action="store_true")
     args = parser.parse_args()
