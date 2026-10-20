@@ -1,0 +1,23 @@
+team_name: "UMass-Amherst"
+team_abbr: "UMass"
+model_name: "AR(2), by location, nowcast: scale by completeness"
+model_abbr: "AR2_nc_scale"
+model_version: "1.0"
+model_contributors: [
+  {
+    "name": "Nick Reich",
+    "affiliation": "UMass Amherst",
+    "email": "nick@umass.edu"
+  }
+]
+license: "CC-BY-4.0"
+designated_model: false
+methods: "An AR(2) model with separate AR parameters for each location; nowcast: scale by completeness."
+data_inputs: "Weekly incident flu hospitalizations from NHSN. Data on hospitals reporting come from the Delphi Epidata archive."
+methods_long: "
+  An AR(2) model with separate AR parameters for each location, with the settings of the sandbox model AR2, run with idmodels commit 9dc7f48.
+  Before fitting, the newest NHSN week of each location is divided by its completeness: the number of hospitals reporting that week divided by the usual number (the median over the 2-4 weeks before it), both as of the Wednesday release the data come from (from the Delphi Epidata archive). Completeness is clipped to [0.05, 1]. Part of a retrospective comparison of nowcasting methods for the 2025/26 season
+  (src/nowcast_models; idmodels issue #34).
+  "
+ensemble_of_models: false
+ensemble_of_hub_models: false

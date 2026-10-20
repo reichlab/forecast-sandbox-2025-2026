@@ -1,0 +1,23 @@
+team_name: "UMass-Amherst"
+team_abbr: "UMass"
+model_name: "GBQR (NHSN, NSSP, ILINet, FluSurv-NET), nowcast: scale by completeness x state"
+model_abbr: "gbqr_4src_nc_state"
+model_version: "1.0"
+model_contributors: [
+  {
+    "name": "Nick Reich",
+    "affiliation": "UMass Amherst",
+    "email": "nick@umass.edu"
+  }
+]
+license: "CC-BY-4.0"
+designated_model: false
+methods: "Gradient boosting quantile regression fit to NHSN, NSSP, ILINet and FluSurv-NET data; nowcast: scale by completeness x state."
+data_inputs: "Weekly NHSN influenza hospitalizations, NSSP percent of ED visits for influenza, ILINet and FluSurv-NET. Data on hospitals reporting come from the Delphi Epidata archive."
+methods_long: "
+  Gradient boosting quantile regression fit to NHSN, NSSP, ILINet and FluSurv-NET data, with the settings of the sandbox model gbqr_4src, run with idmodels commit 9dc7f48.
+  Before fitting, the newest NHSN week of each location is divided by its completeness (as in the nc_scale variant) and then corrected by a factor for the location: the mean of log((settled + 1) / (scaled + 1)) over the location's settled weeks this season (at least 4 weeks old), each taken from the release in which it was the newest week, shrunk toward 0 by n / (n + 10). The factors are learned at each run from the Delphi Epidata archives of NHSN admissions and hospitals reporting, as published by then. Part of a retrospective comparison of nowcasting methods for the 2025/26 season
+  (src/nowcast_models; idmodels issue #34).
+  "
+ensemble_of_models: false
+ensemble_of_hub_models: false
