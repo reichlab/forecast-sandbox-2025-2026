@@ -11,7 +11,7 @@ model_contributors: [
   }
 ]
 license: "CC-BY-4.0"
-designated_model: false
+designated_model: true
 methods: "Gradient boosting quantile regression fit to NHSN data; no nowcast."
 data_inputs: "Weekly incident laboratory-confirmed influenza hospitalizations from NHSN."
 methods_long: "

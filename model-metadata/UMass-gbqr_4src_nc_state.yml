@@ -11,7 +11,7 @@ model_contributors: [
   }
 ]
 license: "CC-BY-4.0"
-designated_model: false
+designated_model: true
 methods: "Gradient boosting quantile regression fit to NHSN, NSSP, ILINet and FluSurv-NET data; nowcast: scale by completeness x state."
 data_inputs: "Weekly NHSN influenza hospitalizations, NSSP percent of ED visits for influenza, ILINet and FluSurv-NET. Data on hospitals reporting come from the Delphi Epidata archive."
 methods_long: "

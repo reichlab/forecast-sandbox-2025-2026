@@ -11,7 +11,7 @@ model_contributors: [
   }
 ]
 license: "CC-BY-4.0"
-designated_model: false
+designated_model: true
 methods: "An AR(2) model with separate AR parameters for each location; nowcast: scale by completeness x state."
 data_inputs: "Weekly incident flu hospitalizations from NHSN. Data on hospitals reporting come from the Delphi Epidata archive."
 methods_long: "
