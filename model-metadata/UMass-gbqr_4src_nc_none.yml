@@ -1,0 +1,23 @@
+team_name: "UMass-Amherst"
+team_abbr: "UMass"
+model_name: "GBQR (NHSN, NSSP, ILINet, FluSurv-NET), no nowcast"
+model_abbr: "gbqr_4src_nc_none"
+model_version: "1.0"
+model_contributors: [
+  {
+    "name": "Nick Reich",
+    "affiliation": "UMass Amherst",
+    "email": "nick@umass.edu"
+  }
+]
+license: "CC-BY-4.0"
+designated_model: true
+methods: "Gradient boosting quantile regression fit to NHSN, NSSP, ILINet and FluSurv-NET data; no nowcast."
+data_inputs: "Weekly NHSN influenza hospitalizations, NSSP percent of ED visits for influenza, ILINet and FluSurv-NET."
+methods_long: "
+  Gradient boosting quantile regression fit to NHSN, NSSP, ILINet and FluSurv-NET data, with the settings of the sandbox model gbqr_4src, run with idmodels commit 9dc7f48.
+  No nowcast: the control for the nowcast variants, run on the same idmodels commit. Part of a retrospective comparison of nowcasting methods for the 2025/26 season
+  (src/nowcast_models; idmodels issue #34).
+  "
+ensemble_of_models: false
+ensemble_of_hub_models: false
