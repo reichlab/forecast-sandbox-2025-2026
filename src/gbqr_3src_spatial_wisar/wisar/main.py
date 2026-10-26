@@ -152,20 +152,43 @@ def make_mcmc_progress_callback():
 # --------------------------------------------------------------------------
 
 def _find_archive_snapshot(as_of: datetime.date) -> Path:
-    """Return the most recent target-data-archive snapshot with a date <=
-    as_of, for point-in-time-correct historical backtesting. Falls back to
-    the live target-data file if as_of is on/after today (no archive needed)
-    or if no earlier archive snapshot exists (e.g. the very first forecast
-    dates in the hub's history)."""
-    if not TARGET_DATA_ARCHIVE_DIR.is_dir():
+    """Return the target-data snapshot that was actually available on as_of,
+    for point-in-time-correct historical backtesting.
+
+    The hub's archive_target_data.R names each snapshot after the LAST WEEK
+    OF DATA it contains (max(target_data$date)), not after the date it was
+    published. The file named for week W is committed the Wednesday after
+    W, so the file named for reference date R was published ~4 days after R
+    and contains revisions that were not available at R. Only snapshots
+    named strictly before as_of are therefore usable. The archive skips
+    some weeks, so the newest usable snapshot can end at R-14 or earlier;
+    generate_forecast handles that gap.
+
+    The live target-data file is used only for an operational run (as_of
+    on/after today). For a historical run with no usable snapshot this
+    raises FileNotFoundError rather than silently falling back to the live
+    (revised) file.
+
+    Real-time (operational) forecasts are unaffected by this snapshot
+    selection: they read the live file, which the hub refreshes on the same
+    Wednesday it archives the identical copy that the previous `<= as_of`
+    rule picked. Only historical backfills (as_of before today) change."""
+    if as_of >= datetime.date.today():
         return TARGET_DATA_PATH
-    candidates = sorted(TARGET_DATA_ARCHIVE_DIR.glob("target-hospital-admissions_*.csv"))
+    candidates = (
+        sorted(TARGET_DATA_ARCHIVE_DIR.glob("target-hospital-admissions_*.csv"))
+        if TARGET_DATA_ARCHIVE_DIR.is_dir() else []
+    )
     usable = [
         p for p in candidates
-        if p.stem.split("_")[-1] <= as_of.isoformat()
+        if p.stem.split("_")[-1] < as_of.isoformat()
     ]
     if not usable:
-        return TARGET_DATA_PATH
+        raise FileNotFoundError(
+            f"No target-data-archive snapshot named before {as_of} in "
+            f"{TARGET_DATA_ARCHIVE_DIR}; refusing to fall back to the live "
+            "(revised) target data for a historical reference date."
+        )
     return usable[-1]
 
 
@@ -214,6 +237,16 @@ def generate_forecast(reference_date: datetime.date, train_start: str = DEFAULT_
             f"No training data found before reference_date={reference_date} "
             f"with train_start={train_start}. Check the archive snapshot used."
         )
+
+    # The archive skips some weeks, so the newest snapshot available before
+    # the reference date may end more than one week before it. Simulate the
+    # missing leading weeks so horizon 0 still lands on the reference date.
+    last_train_date = train_df["date"].max()
+    n_gap_steps = (ref_ts - last_train_date).days // 7 - 1
+    if n_gap_steps > 0:
+        click.echo(f"Note: latest data available before {reference_date} ends "
+                   f"{last_train_date.date()}; simulating {n_gap_steps} extra "
+                   "leading step(s) to reach horizon 0.")
 
     # Per-location interior-gap interpolation, matching production's
     # idmodels._interpolate_by_location (see model.py's module docstring
@@ -283,13 +316,13 @@ def generate_forecast(reference_date: datetime.date, train_start: str = DEFAULT_
         q95, mean_scaled = transform_params[loc]
 
         sims = wisar6.simulate_forecast_draws(
-            idata, THETA_POOLING, li, z_hist, dates_hist, h_max=MAX_HORIZON,
+            idata, THETA_POOLING, li, z_hist, dates_hist, h_max=n_gap_steps + MAX_HORIZON,
             n_param_draws=N_PARAM_DRAWS, n_innov_per_param=N_INNOV_PER_PARAM,
             seed=SEED_FORECAST + li, innovation_dist=INNOVATION_DIST, t_dof=T_DOF,
-        )  # shape (n_sims, MAX_HORIZON)
+        )  # shape (n_sims, n_gap_steps + MAX_HORIZON)
 
         for h in range(MAX_HORIZON):
-            draws_z = sims[:, h]
+            draws_z = sims[:, n_gap_steps + h]
             draws_r = wisar6.invert_center_scale(draws_z, q95, mean_scaled)
             draws_natural = wisar6.invert_fourth_root_transform(draws_r, pop)
             target_end_date = reference_date + relativedelta.relativedelta(weeks=h)
