@@ -1,0 +1,10 @@
+click
+# pre-refactor idmodels (still has idmodels.preprocess) and the iddata it was built against;
+# install iddata with --no-deps after idmodels so this pin wins
+idmodels @ git+https://github.com/reichlab/idmodels.git@805d4beac89c0660c0549aae3ab109fdfaf68448
+iddata @ git+https://github.com/reichlab/iddata@5a7e74d7823d39b8a8ef6334c5191e440bc669d8
+xarray>=2025.1.2
+zarr>=3.0.8
+fsspec
+aiohttp
+requests

@@ -1,0 +1,4 @@
+data/gefs_*.csv
+data/*.log
+__pycache__/
+.venv/
