@@ -1,0 +1,31 @@
+team_name: "UMass-Amherst"
+team_abbr: "UMass"
+model_name: "Ensemble: AR2_fourierP_thetaP_nssp + gbqr_4src_spatial_nssp"
+model_abbr: "AR2_fourierP_thetaP_gbqr_4src_spatial_ens_nssp"
+model_version: "1.0"
+model_contributors: [
+  {
+    "name": "Li Shandross",
+    "affiliation": "UMass Amherst",
+    "email": "lshandross@umass.edu"
+  },
+  {
+    "name": "Evan Ray",
+    "affiliation": "UMass Amherst",
+    "email": "elray@umass.edu"
+  },
+  {
+    "name": "Nick Reich",
+    "affiliation": "UMass Amherst",
+    "email": "nick@umass.edu"
+  }
+]
+license: "CC-BY-4.0"
+designated_model: true
+methods: "Median ensemble of AR2_fourierP_thetaP_nssp and gbqr_4src_spatial_nssp, both fit to NSSP ED visit data."
+methods_long: "
+  A simple median ensemble combining two component models' quantile forecasts: an AR(2) SARIX model with Fourier seasonality (K=2) and both theta and Fourier parameters pooled across locations, and a GBQR model supplemented with NHSN, ILINet, and FluSurv-NET data plus directional spatial-wave features.
+"
+data_inputs: "Weekly percentage of emergency department visits with a diagnosis of influenza, from NSSP, plus whichever supplementary surveillance sources the component models use."
+ensemble_of_models: true
+ensemble_of_hub_models: false
