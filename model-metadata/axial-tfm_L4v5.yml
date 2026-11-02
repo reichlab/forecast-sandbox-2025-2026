@@ -1,0 +1,38 @@
+team_name: "axial"
+team_abbr: "axial"
+model_name: "Simulation-pretrained axial transformer"
+model_abbr: "tfm_L4v5"
+model_version: "1.0"
+model_contributors: [
+  {
+    "name": "Nikhil Lebaka",
+    "affiliation": "UMass Amherst",
+    "email": "nrlebaka@umass.edu"
+  }
+]
+license: "CC-BY-4.0"
+designated_model: true
+methods: "Small axial transformer pretrained on simulated SEIR seasons, fine-tuned each season on past real seasons; 15-network ensemble with NSSP ED-visit inputs."
+methods_long: "
+  A looped axial transformer (one block applied 4 times, 81k parameters) reads every location's season so far as a
+  grid of locations by weeks. It attends along each location's weeks, then across locations within each week, with no
+  location IDs, so it is equivariant to the order of locations. It outputs 23 monotone quantiles for horizons 0 to 3,
+  as log ratios to the newest count, trained on the pinball loss.
+  It is pretrained on fresh simulated seasons from a stochastic two-strain metapopulation SEIR model with seasonal
+  forcing, transmission drift, school holidays, summer circulation, reporting noise and an NSSP-like ED stream. It is
+  then fine-tuned once per season on 70% real batches (ILI+, FluSurv-NET, and NHSN seasons completed before that
+  season) and 30% simulated batches.
+  The forecast averages 15 networks (5 seeds each of an admissions-only network, an NSSP-input network, and an
+  NSSP-input network with an ED-visit output). The NSSP networks are weighted 0.75, 0.5, 0.5 and 0.25 at horizons 0 to
+  3 when NSSP is as current as NHSN; otherwise the admissions-only networks are used alone.
+  Newest NHSN weeks are corrected by a chain-ladder nowcast. The national median is set to the sum of the state
+  medians.
+  Spatial correlation is learned through attention across locations. Uncertainty comes from the quantile outputs,
+  averaged over seeds.
+  The ED target is the ED-output head. Peak size and peak week come from 500 season paths, each built by feeding
+  one-week-ahead draws back in as observed data.
+  All forecasts here are point-in-time backtests.
+"
+data_inputs: "Weekly incident influenza hospital admissions from NHSN (point-in-time versions), percent of ED visits for influenza from NSSP (point-in-time versions), and, for fine-tuning only, ILINet times WHO-NREVSS percent positive (ILI+) and FluSurv-NET hospitalization rates."
+ensemble_of_models: true
+ensemble_of_hub_models: false
