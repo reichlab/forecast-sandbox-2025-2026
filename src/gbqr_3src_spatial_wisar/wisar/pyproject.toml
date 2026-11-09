@@ -6,6 +6,7 @@ requires-python = ">=3.11"
 dependencies = [
     "arviz>=0.23.4",
     "click>=8.5.0",
+    "iddata @ git+https://github.com/reichlab/iddata@5f99e09115b977cca76be41d68e971c55f8e2a89",
     "matplotlib>=3.11.2",
     "numpy>=2.4.6",
     "pandas>=3.0.6",

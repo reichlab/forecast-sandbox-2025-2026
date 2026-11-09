@@ -19,6 +19,8 @@ import click
 import numpy as np
 import pandas as pd
 from dateutil import relativedelta
+from iddata.enums import Disease
+from iddata.sources.nhsn import NHSNDataSource
 
 import model as wisar6
 
@@ -26,17 +28,16 @@ import model as wisar6
 # Configuration
 # --------------------------------------------------------------------------
 
-# Data sources. TARGET_DATA_PATH is the hub's own curated target-data file;
-# for historical (--today_date in the past) runs we instead pull the
-# point-in-time-correct snapshot from the hub's own dated archive, since the
-# live file reflects revisions made after that date (see README.md's
-# "Historical vs. live data" section for why this matters and why we do NOT
-# use reichlab's `iddata` package for this -- the hub's own archive already
-# gives point-in-time correctness with a plain CSV read, so no extra
-# dependency is needed).
+# Data source. NHSN admissions come from reichlab's `iddata` package, the
+# same source and as_of convention (as_of = reference date) the other UMass
+# components use through idmodels. iddata picks the newest NHSN release
+# dated on or before as_of; releases are named by their (weekly, Wednesday)
+# release date, so this is point-in-time correct for historical runs and
+# has no skipped weeks. (The hub's target-data-archive, used previously,
+# skips some weeks, which left the model a week short of data on 9 of the
+# 80 backtest dates.) Before 2024-11-15 iddata serves the HHS-era series.
+# Only locations.csv is still read from the hub clone.
 HUB_ROOT = Path(__file__).resolve().parents[4] / "FluSight-forecast-hub"
-TARGET_DATA_PATH = HUB_ROOT / "target-data" / "target-hospital-admissions.csv"
-TARGET_DATA_ARCHIVE_DIR = HUB_ROOT / "auxiliary-data" / "target-data-archive"
 LOCATIONS_PATH = HUB_ROOT / "auxiliary-data" / "locations.csv"
 
 MODEL_ABBR = "UMass-WISAR6_fourthroot_adaptive_t"
@@ -90,13 +91,13 @@ FOURIER_BETA_SD_PRIOR_SCALE = 1.0
 INNOVATION_DIST = "studentt"  # "studentt" or "gaussian"
 T_DOF = 5.0
 
-# How much training history to use. The hub's target-data has a hard floor
-# of 2022-02-05 across every location (verified directly); production's own
-# idmodels/sarix pipeline hardcodes 2022-10-01 as its start date. We use the
-# fuller available history instead (see
-# reading-literature/pymc-tutorial/ar6_fourier_all_locations.py for the
-# investigation behind this choice) -- override via --train-start if needed.
-DEFAULT_TRAIN_START = "2022-02-05"
+# How much training history to use. 2022-08-06 matches idmodels' WISARModel;
+# it is the first week of iddata's 2022/23 season, not where the data begins.
+# For as_of before 2024-11-15 iddata serves the HHS-era series, which starts
+# 2022-09-03, so those dates effectively train from then. The NHSN series
+# served from 2024-11-15 on goes back to 2020-08-08. (The hub target-data
+# archive used previously started 2022-02-12, with this set to 2022-02-05.)
+DEFAULT_TRAIN_START = "2022-08-06"
 
 # Fixed seeds. All randomness in this model (MCMC sampling and Monte Carlo
 # forecast simulation) is seeded from these two values plus a per-location
@@ -151,52 +152,24 @@ def make_mcmc_progress_callback():
 # Data loading
 # --------------------------------------------------------------------------
 
-def _find_archive_snapshot(as_of: datetime.date) -> Path:
-    """Return the target-data snapshot that was actually available on as_of,
-    for point-in-time-correct historical backtesting.
-
-    The hub's archive_target_data.R names each snapshot after the LAST WEEK
-    OF DATA it contains (max(target_data$date)), not after the date it was
-    published. The file named for week W is committed the Wednesday after
-    W, so the file named for reference date R was published ~4 days after R
-    and contains revisions that were not available at R. Only snapshots
-    named strictly before as_of are therefore usable. The archive skips
-    some weeks, so the newest usable snapshot can end at R-14 or earlier;
-    generate_forecast handles that gap.
-
-    The live target-data file is used only for an operational run (as_of
-    on/after today). For a historical run with no usable snapshot this
-    raises FileNotFoundError rather than silently falling back to the live
-    (revised) file.
-
-    Real-time (operational) forecasts are unaffected by this snapshot
-    selection: they read the live file, which the hub refreshes on the same
-    Wednesday it archives the identical copy that the previous `<= as_of`
-    rule picked. Only historical backfills (as_of before today) change."""
-    if as_of >= datetime.date.today():
-        return TARGET_DATA_PATH
-    candidates = (
-        sorted(TARGET_DATA_ARCHIVE_DIR.glob("target-hospital-admissions_*.csv"))
-        if TARGET_DATA_ARCHIVE_DIR.is_dir() else []
-    )
-    usable = [
-        p for p in candidates
-        if p.stem.split("_")[-1] < as_of.isoformat()
-    ]
-    if not usable:
-        raise FileNotFoundError(
-            f"No target-data-archive snapshot named before {as_of} in "
-            f"{TARGET_DATA_ARCHIVE_DIR}; refusing to fall back to the live "
-            "(revised) target data for a historical reference date."
-        )
-    return usable[-1]
-
-
 def load_target_data(as_of: datetime.date) -> pd.DataFrame:
-    path = _find_archive_snapshot(as_of)
-    raw = pd.read_csv(path)
+    """NHSN weekly flu admissions (counts) as available on as_of, via iddata.
+
+    Returns hub-style columns (location, date, value). Values can be NaN for
+    weeks a location didn't report (MA, MN, and WV in the 2024 off-season);
+    generate_forecast interpolates those interior gaps. Raises if the newest
+    week isn't the one ending as_of - 7 days, e.g. a live run before this
+    week's NHSN release."""
+    raw = NHSNDataSource(disease=Disease.FLU, rates=False).load(as_of=as_of)
+    raw = raw.dropna(subset=["location"]).rename(columns={"wk_end_date": "date", "inc": "value"})
+    raw = raw[["location", "date", "value"]].astype({"location": str})
     raw["date"] = pd.to_datetime(raw["date"])
-    raw["location"] = raw["location"].astype(str)
+    latest = raw["date"].max().date()
+    expected = as_of - datetime.timedelta(days=7)
+    click.echo(f"Target data: iddata NHSN release as of {as_of} (latest week {latest})")
+    if latest < expected:
+        raise RuntimeError(f"iddata NHSN data as of {as_of} ends {latest}, expected {expected}; "
+                           "has this week's NHSN release been posted?")
     return raw
 
 
@@ -235,12 +208,13 @@ def generate_forecast(reference_date: datetime.date, train_start: str = DEFAULT_
     if train_df.empty:
         raise ValueError(
             f"No training data found before reference_date={reference_date} "
-            f"with train_start={train_start}. Check the archive snapshot used."
+            f"with train_start={train_start}. Check the iddata NHSN release used."
         )
 
-    # The archive skips some weeks, so the newest snapshot available before
-    # the reference date may end more than one week before it. Simulate the
-    # missing leading weeks so horizon 0 still lands on the reference date.
+    # Horizons are labeled relative to the reference date, but simulation
+    # steps forward from the last training week, normally reference_date - 7
+    # days. load_target_data enforces that, so n_gap_steps is 0; this stays
+    # as a safeguard if the newest week is ever missing.
     last_train_date = train_df["date"].max()
     n_gap_steps = (ref_ts - last_train_date).days // 7 - 1
     if n_gap_steps > 0:
@@ -257,6 +231,11 @@ def generate_forecast(reference_date: datetime.date, train_start: str = DEFAULT_
     train_df["value"] = train_df.groupby("location")["value"].transform(
         lambda s: s.interpolate(method="linear", limit_area="inside")
     )
+
+    if train_df["value"].isna().any():
+        missing = train_df.loc[train_df["value"].isna(), ["location", "date"]]
+        raise ValueError("Training data has missing values that interpolation can't fill "
+                         f"(leading or trailing gaps):\n{missing.to_string(index=False)}")
 
     # Transform each location's series.
     transform_params = {}

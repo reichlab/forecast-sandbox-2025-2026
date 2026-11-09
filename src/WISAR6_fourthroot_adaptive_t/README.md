@@ -102,17 +102,20 @@ produced the committed forecasts, the slowest date per season took 42 min,
 
 ## Historical vs. live data
 
-`main.py` reads target data from the FluSight Forecast Hub repo, assumed
-to be checked out as a sibling directory (`../../../FluSight-forecast-hub`
-relative to this file; adjust `HUB_ROOT` in `main.py` if your checkout is
-laid out differently).
+`main.py` reads NHSN admissions through reichlab's `iddata` package
+(`NHSNDataSource`, pinned in `pyproject.toml` to the commit the other UMass
+components use via idmodels), with `as_of` set to the reference date. iddata
+returns the newest NHSN release dated on or before `as_of`. Releases are
+named by their weekly release date, so a historical `--today_date` gets
+exactly the data available then, with no revisions leaking in and no skipped
+weeks. For `as_of` before 2024-11-15, iddata serves the HHS-era series
+instead. Training starts 2022-08-06 (2022-09-03 for HHS-era dates).
 
-For a **historical** `--today_date`, `main.py` selects the most recent
-snapshot in the hub's `auxiliary-data/target-data-archive/` that
-predates the requested date, rather than the live
-`target-data/target-hospital-admissions.csv`. The live file includes
-revisions made after that date, which would leak future information into
-a backtest.
+This replaced the hub's `auxiliary-data/target-data-archive/`, which skips
+some weeks. On 9 of the 80 backtest dates that left the model a week short
+of data (e.g. 2025-12-27 trained only through 2025-12-13). The FluSight hub
+clone (`../../../FluSight-forecast-hub`) is still needed for
+`auxiliary-data/locations.csv`. Data loads need network access to S3.
 
 ## A note on `cores=1`
 
