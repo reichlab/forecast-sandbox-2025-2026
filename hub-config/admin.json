@@ -1,6 +1,6 @@
 {
     "schema_version": "https://raw.githubusercontent.com/hubverse-org/schemas/main/v5.1.0/admin-schema.json",
-    "name": "Reich Lab Forecasting Testbed for 2025-2026 season",
+    "name": "Reich Lab Forecasting Testbed for 2025-2026 and 2026-2027 seasons",
     "maintainer": "Reich Lab @ UMass-Amherst",
     "contact": {
         "name": "Nick Reich",
