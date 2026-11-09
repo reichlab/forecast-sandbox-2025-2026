@@ -91,9 +91,12 @@ FOURIER_BETA_SD_PRIOR_SCALE = 1.0
 INNOVATION_DIST = "studentt"  # "studentt" or "gaussian"
 T_DOF = 5.0
 
-# How much training history to use. iddata's NHSN series is complete across
-# every location from 2022-08-06 (the HHS-era series used for as_of before
-# 2024-11-15 starts 2022-09-03); this matches idmodels' WISARModel.
+# How much training history to use. 2022-08-06 matches idmodels' WISARModel;
+# it is the first week of iddata's 2022/23 season, not where the data begins.
+# For as_of before 2024-11-15 iddata serves the HHS-era series, which starts
+# 2022-09-03, so those dates effectively train from then. The NHSN series
+# served from 2024-11-15 on goes back to 2020-08-08. (The hub target-data
+# archive used previously started 2022-02-12, with this set to 2022-02-05.)
 DEFAULT_TRAIN_START = "2022-08-06"
 
 # Fixed seeds. All randomness in this model (MCMC sampling and Monte Carlo

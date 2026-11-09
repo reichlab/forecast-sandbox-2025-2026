@@ -30,6 +30,19 @@ than shelling out to its sibling `src/` directory, so this pipeline keeps
 working even if `gbqr_3src_spatial`, `gbqr_3src`, `WISAR6_fourthroot_adaptive_t`,
 or `gbqr_4src_nssp` change independently elsewhere in the repo.
 
+## Data
+
+Every component reads point-in-time data from reichlab's `iddata` (on S3),
+with `as_of` = the reference date, so each run needs network access to S3.
+gbqr/gbqr_us/nssp read it through `idmodels`. `wisar/` uses iddata's
+`NHSNDataSource` directly, pinned to the same iddata commit. It stops with an
+error if the newest week isn't the week before the reference date, for
+example on a live run before this week's NHSN release is on S3, and that
+stops the pipeline. `wisar/` still needs a FluSight-forecast-hub clone next
+to this repo, but only for `auxiliary-data/locations.csv`. `wisar/` used to
+read the hub's `target-data-archive/`, which skips some weeks, so backtests
+on those dates trained a week short (PR #81).
+
 ## Why three Python environments
 
 - `gbqr/` and `gbqr_us/` depend on `idmodels` pinned to commit `bffe814c`,
@@ -189,9 +202,12 @@ existed only as a backfilled pairwise blend, built from the three
 components' already-existing `model-output/` files by
 `src/gbqr_ar_ensembles/ensemble_pair.R`. That backfill's values were verified
 to match this pipeline's ensembling logic exactly (state = mean of gbqr +
-wisar, US = mean of gbqr_us + wisar) before this directory was built, so
-historical dates in `model-output/UMass-gbqr_3src_spatial_wisar/` need not be
-regenerated.
+wisar, US = mean of gbqr_us + wisar) before this directory was built. So the
+historical dates in `model-output/UMass-gbqr_3src_spatial_wisar/`
+(2023-10-21 to 2026-05-30) are still built with `ensemble_pair.R`, not by
+this pipeline. After WISAR6 switched to iddata, all 80 WISAR6 backtests were
+rerun and those dates rebuilt from them (PR #81).
+Dates from 2026-10-17 on come from this pipeline.
 
 `UMass-gbqr_3src_spatial_wisar_nssp` is new: the combined hosp + ED-visits
 submission file this pipeline produces going forward. Note this is a
