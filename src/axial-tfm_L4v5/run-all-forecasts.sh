@@ -1,9 +1,10 @@
 #!/bin/bash
-# Generate axial-tfm_L4v5 forecasts for every reference_date in hub-config/tasks.json (2023/24 to 2025/26).
+# Generate axial-tfm_L4v5 forecasts for the 2023/24 to 2025/26 reference dates in hub-config/tasks.json
+# and the 2026/27 dates through 2026-11-07.
 # The dates are run dates (the Wednesday before each Saturday reference date); main.py rolls each one
 # forward to the following Saturday. Needs the axial checkout on PYTHONPATH (see README.md), e.g.
 #   PYTHONPATH=../../../axial/src bash run-all-forecasts.sh
-# 2025/26 dates also run the peak rollouts (500 paths), about 4 minutes each.
+# 2025/26 and 2026/27 dates also run the peak rollouts (500 paths), about 4 minutes each.
 
 dates=(
   "2023-10-18"
@@ -86,6 +87,11 @@ dates=(
   "2026-05-13"
   "2026-05-20"
   "2026-05-27"
+  "2026-10-07"
+  "2026-10-14"
+  "2026-10-21"
+  "2026-10-28"
+  "2026-11-04"
 )
 
 for today_date in "${dates[@]}"; do

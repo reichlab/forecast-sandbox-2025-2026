@@ -9,14 +9,14 @@ from dateutil import relativedelta
 from axial.eval.backtest import make_context
 from axial.eval.splits import season_of
 from axial.models import peaks, targets
-from axial.models.transformer import FreshNsspHorizonWeightedR
+from axial.models.transformer import FinetuneRealFrac70, FreshNsspHorizonWeightedR
 
 HUB = Path(__file__).resolve().parents[2]
 MODEL_ID = "axial-tfm_L4v5"
 INC = "wk inc flu hosp"
-# axial's NSSP store is point-in-time from Delphi's 2024 epiweek 16 issue on; before that it is a pseudo-vintage
-# built from later (revised) values, so no ED forecast is written for earlier reference dates.
-ED_FROM = pd.Timestamp("2024-04-21")
+# This model's networks for the ED head and the peak rollouts (axial's defaults moved to axial-tfm_L4v5_r2's).
+ED_PREFIXES = tuple("tfm_v5mrf7" + (f"_s{s}" if s else "") for s in range(5))
+PEAK_BASE = FinetuneRealFrac70.prefixes
 COLUMNS = ["location", "reference_date", "horizon", "target_end_date", "target", "output_type", "output_type_id", "value"]
 
 
@@ -27,11 +27,17 @@ def peak_bins() -> pd.DatetimeIndex:
     return pd.DatetimeIndex(sorted(pd.to_datetime(ids)))
 
 
+def ed_dates() -> set:
+    """Reference dates for which FluSight-baseline has ED forecasts here; ED rows are written only for these."""
+    files = sorted((HUB / "model-output" / "FluSight-baseline").glob("*.csv"))
+    return {f.name[:10] for f in files if targets.ED in f.read_text()}
+
+
 def weekly_rows(ctx, ref: pd.Timestamp) -> pd.DataFrame:
-    """Admissions (always) and ED-visit proportion (point-in-time NSSP, all four horizons), horizons 0-3."""
+    """Admissions (always) and ED-visit proportion (dates with a FluSight-baseline ED forecast), horizons 0-3."""
     fc = FreshNsspHorizonWeightedR().forecast(ctx)
     parts = [targets.to_hub(fc[fc["horizon"].between(0, 3)], ref, INC)]
-    ed = targets.ed_forecast(ctx) if ref >= ED_FROM else pd.DataFrame()
+    ed = targets.ed_forecast(ctx, ED_PREFIXES) if str(ref.date()) in ed_dates() else pd.DataFrame()
     if len(ed) and (ed.groupby("location")["horizon"].nunique() == 4).all():
         parts.append(targets.to_hub(ed, ref, targets.ED))
     return pd.concat(parts, ignore_index=True)
@@ -44,6 +50,7 @@ def peak_rows(ctx, ref: pd.Timestamp) -> pd.DataFrame | None:
     if season != season_of(bins[0]):
         return None
     peaks.WINDOWS[season] = (str(bins[0].date()), str(bins[-1].date()))  # the hub's bins, not axial's FluSight window
+    peaks.BASE = PEAK_BASE
     pw, pk = peaks.peak_forecast(ctx)
     return peaks.to_hub(pw, pk, ref)
 
