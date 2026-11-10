@@ -1,0 +1,35 @@
+team_name: "axial"
+team_abbr: "axial"
+model_name: "Simulation-pretrained axial transformer, revision 2"
+model_abbr: "tfm_L4v5_r2"
+model_version: "2.0"
+model_contributors: [
+  {
+    "name": "Nikhil Lebaka",
+    "affiliation": "UMass Amherst",
+    "email": "nrlebaka@umass.edu"
+  }
+]
+license: "CC-BY-4.0"
+designated_model: false
+methods: "axial-tfm_L4v5 retrained with missing and late weeks in training, rotary positions and size-weighted fine-tuning; 15-network ensemble with NSSP ED-visit inputs."
+methods_long: "
+  The same looped axial transformer as axial-tfm_L4v5 (one block applied 4 times, 81k parameters), attending along
+  each location's weeks and then across locations within each week, with 23 monotone quantiles for horizons 0 to 3.
+  Three changes to training: missing and late newest weeks and dropouts are simulated in every pretraining and
+  fine-tuning input, with a channel for how old each location's newest value is; week positions use rotary
+  embeddings in place of the report-age channels; and fine-tuning weights each location's loss by its size to the
+  power 0.25. Pretraining is 20k steps on the same two-strain SEIR simulator, and fine-tuning is once per season on
+  70% real batches (ILI+, FluSurv-NET, and NHSN seasons completed before that season).
+  The forecast averages 15 networks (5 seeds each of an admissions-only network, an NSSP-input network, and an
+  NSSP-input network with an ED-visit output). The NSSP networks are weighted 0.75, 0.5, 0.5 and 0.25 at horizons 0 to
+  3 when NSSP is as current as NHSN; otherwise the admissions-only networks are used alone.
+  Newest NHSN weeks are corrected by a chain-ladder nowcast. The national median is set to the sum of the state
+  medians.
+  The ED target is the ED-output head. Peak size comes from 500 season paths, each built by feeding the
+  admissions-only networks' one-week-ahead draws back in as data.
+  All forecasts here are point-in-time backtests.
+"
+data_inputs: "Weekly incident influenza hospital admissions from NHSN (point-in-time versions), percent of ED visits for influenza from NSSP (point-in-time versions), and, for fine-tuning only, ILINet times WHO-NREVSS percent positive (ILI+) and FluSurv-NET hospitalization rates."
+ensemble_of_models: true
+ensemble_of_hub_models: false
