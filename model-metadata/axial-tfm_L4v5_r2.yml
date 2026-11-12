@@ -11,7 +11,7 @@ model_contributors: [
   }
 ]
 license: "CC-BY-4.0"
-designated_model: false
+designated_model: true
 methods: "axial-tfm_L4v5 retrained with missing and late weeks in training, rotary positions and size-weighted fine-tuning; 15-network ensemble with NSSP ED-visit inputs."
 methods_long: "
   The same looped axial transformer as axial-tfm_L4v5 (one block applied 4 times, 81k parameters), attending along
