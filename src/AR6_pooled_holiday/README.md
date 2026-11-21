@@ -20,9 +20,15 @@ per 100k plus the floors and offsets that idmodels adds before the fourth root.
 `cal_none` is there because `AR6_pooled`'s existing outputs were made with older idmodels and sarix versions, so
 comparing the holiday models to it would mix holiday effects with version changes.
 
+**Selected variant: `xm1`** (2026-11-21), after scoring 2023/24 and the held-out seasons 2024/25 and 2025/26. Pooled
+over the three seasons, its relative WIS against `cal_none` is 0.849 (counts) and 0.932 (log scale), against 0.864
+and 0.947 for `shared`. The scores and the reasons are in notebook `05-scores-by-season.ipynb` of the `sarix-flu-dev`
+repo.
+
 **Held-out seasons.** The 2023/24 season (`run-all-forecasts-2023-2024.sh`) and, since 2026-11-20, 2024/25
-(`run-all-forecasts-2024-2025.sh`, variants `none`, `shared`, `xm1` and `xm1_ny1`) are run. Do not run or look at
-forecasts or data for 2025/26 or later until we decide to unblind them; see the README of the `sarix-flu-dev` repo.
+(`run-all-forecasts-2024-2025.sh`, variants `none`, `shared`, `xm1` and `xm1_ny1`) and 2025/26
+(`run-all-forecasts-2025-2026.sh`, variants `none`, `shared` and `xm1`) are run. Do not run or look at forecasts or data
+for 2026/27 until we decide to unblind it; see the README of the `sarix-flu-dev` repo.
 
 **2023/24 is not out-of-sample for the choice of holiday weeks.** The holiday weeks in the `xm1` and `xm1_ny1`
 variants were chosen partly from NHSN data for 2023/24 (see the comment above `HOLIDAYS` in `main.py`). Treat their
