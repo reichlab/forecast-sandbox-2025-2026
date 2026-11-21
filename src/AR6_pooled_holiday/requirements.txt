@@ -1,0 +1,4 @@
+click
+python-dateutil
+# reichlab/idmodels branch sarix-calendar-effects (calendar effects; pins sarix to reichlab/sarix#17)
+idmodels @ git+https://github.com/reichlab/idmodels@ec554eb8354dd624eac479876a43cf61c2460aad
