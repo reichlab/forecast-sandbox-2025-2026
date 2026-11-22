@@ -1,0 +1,29 @@
+team_name: "UMass-Amherst"
+team_abbr: "UMass"
+model_name: "AR(6) pooled with Fourier seasonality, holiday effects: shared, with the week before Christmas"
+model_abbr: "AR6_fourierP_thetaP_cal_xm1"
+model_version: "0.1"
+model_contributors: [
+  {
+    "name": "Evan Ray",
+    "affiliation": "UMass Amherst",
+    "email": "elray@umass.edu"
+  },
+  {
+    "name": "Nick Reich",
+    "affiliation": "UMass Amherst",
+    "email": "nick@umass.edu"
+  }
+]
+license: "CC-BY-4.0"
+designated_model: false
+methods: "AR6_fourierP_thetaP (Fourier seasonality, K = 2, shared across locations) with multiplicative effects for the week before Christmas week and the Christmas and New Year's weeks, one effect per week shared by all locations."
+data_inputs: "Weekly incident flu hospitalizations from NHSN."
+methods_long: "
+  AR6_fourierP_thetaP (Fourier seasonality with K = 2 harmonics; Fourier and AR coefficients shared across locations)
+  with multiplicative effects for the week before Christmas week and the Christmas and New Year's weeks, one effect per
+  week shared by all locations, as in AR6_pooled_cal_xm1. Holiday effects use calendar effects from a development
+  version of sarix (reichlab/sarix PR 17). Code: src/AR6_pooled_holiday (variant fp_xm1).
+  "
+ensemble_of_models: false
+ensemble_of_hub_models: false

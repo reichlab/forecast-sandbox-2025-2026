@@ -4,8 +4,15 @@ from pathlib import Path
 import click
 from dateutil import relativedelta
 from iddata.enums import Disease
-from idmodels.config import PoolingStrategy, PowerTransform, RunConfig, SARIXModelConfig, SourceType
-from idmodels.sarix import SARIXModel
+from idmodels.config import (
+    PoolingStrategy,
+    PowerTransform,
+    RunConfig,
+    SARIXFourierModelConfig,
+    SARIXModelConfig,
+    SourceType,
+)
+from idmodels.sarix import SARIXFourierModel, SARIXModel
 
 # Christmas and New Year's weeks were elevated in every season in NHSN (2022/23, 2023/24), FluSurv-NET and ILI+
 # (2010/11 - 2022/23); the week before Christmas week ("christmas-1") in most seasons but not 2022/23; the week after
@@ -22,16 +29,23 @@ HOLIDAYS_XM1_NY1 = ["christmas-1", "christmas", "new_year", "new_year+1"]
 CALENDAR_EFFECT_SD_PRIOR_SCALE = 0.25
 CALENDAR_EFFECT_MU_PRIOR_SCALE = 0.5
 
-# variant -> (model_name, calendar_pooling, calendar_holidays). "none" is the no-holiday baseline: the same model as
-# AR6_pooled, but run with the same idmodels/sarix versions as the holiday variants so that comparisons isolate the
-# holiday effects
+# variant -> (model_name, calendar_pooling, calendar_holidays, fourier). "none" is the no-holiday baseline: the same
+# model as AR6_pooled, but run with the same idmodels/sarix versions as the holiday variants so that comparisons isolate
+# the holiday effects. The fp_ variants add AR6_fourierP_thetaP's Fourier seasonality (K = 2 harmonics, shared across
+# locations); fp_none is their no-holiday baseline on the same versions
 VARIANTS = {
-    "none": ("AR6_pooled_cal_none", None, []),
-    "shared": ("AR6_pooled_cal_shared", PoolingStrategy.SHARED, HOLIDAYS),
-    "partial": ("AR6_pooled_cal_partial", PoolingStrategy.PARTIAL, HOLIDAYS),
-    "xm1": ("AR6_pooled_cal_xm1", PoolingStrategy.SHARED, HOLIDAYS_XM1),
-    "xm1_ny1": ("AR6_pooled_cal_xm1_ny1", PoolingStrategy.SHARED, HOLIDAYS_XM1_NY1),
+    "none": ("AR6_pooled_cal_none", None, [], False),
+    "shared": ("AR6_pooled_cal_shared", PoolingStrategy.SHARED, HOLIDAYS, False),
+    "partial": ("AR6_pooled_cal_partial", PoolingStrategy.PARTIAL, HOLIDAYS, False),
+    "xm1": ("AR6_pooled_cal_xm1", PoolingStrategy.SHARED, HOLIDAYS_XM1, False),
+    "xm1_ny1": ("AR6_pooled_cal_xm1_ny1", PoolingStrategy.SHARED, HOLIDAYS_XM1_NY1, False),
+    "fp_none": ("AR6_fourierP_thetaP_cal_none", None, [], True),
+    "fp_xm1": ("AR6_fourierP_thetaP_cal_xm1", PoolingStrategy.SHARED, HOLIDAYS_XM1, True),
 }
+
+# Fourier settings of AR6_fourierP_thetaP (src/AR6_fourierP_thetaP/main.py)
+FOURIER_K = 2
+FOURIER_POOLING = PoolingStrategy.SHARED
 
 # last reference date main() will run: 2023/24 to 2025/26, whose forecast targets end by 2026-06-20
 # (LAST_VISIBLE_WEEK in sarix-flu-dev's holdout.py; 2024/25 and 2025/26 were unblinded on 2026-11-20). 2026/27 is held
@@ -48,8 +62,13 @@ def build_configs(variant: str, reference_date: datetime.date, short_run: bool =
     """Model and run configs for one variant and reference date (also used by the sarix-flu-dev notebooks)."""
     if reference_date.weekday() != 5:
         raise ValueError(f"reference_date must be a Saturday, got {reference_date} ({reference_date:%A})")
-    model_name, calendar_pooling, calendar_holidays = VARIANTS[variant]
-    model_config = SARIXModelConfig(
+    model_name, calendar_pooling, calendar_holidays, fourier = VARIANTS[variant]
+    config_class, fourier_args = SARIXModelConfig, {}
+    if fourier:
+        config_class, fourier_args = SARIXFourierModelConfig, {"fourier_K": FOURIER_K,
+                                                               "fourier_pooling": FOURIER_POOLING}
+    model_config = config_class(
+        **fourier_args,
         model_name=model_name,
         main_source=SourceType.NHSN,
         fit_locations_separately=False,
@@ -95,9 +114,17 @@ def build_configs(variant: str, reference_date: datetime.date, short_run: bool =
     return model_config, run_config
 
 
+def make_model(model_config: SARIXModelConfig) -> SARIXModel:
+    """The idmodels model for a config from build_configs: SARIXFourierModel for the fp_ variants."""
+    if isinstance(model_config, SARIXFourierModelConfig):
+        return SARIXFourierModel(model_config)
+    return SARIXModel(model_config)
+
+
 @click.command()
 @click.option("--variant", type=click.Choice(list(VARIANTS)), required=True,
-              help="Holiday effects: none (baseline), shared, partial, xm1 or xm1_ny1 (see VARIANTS)")
+              help="Holiday effects and model: none (baseline), shared, partial, xm1, xm1_ny1, or with Fourier "
+                   "seasonality fp_none or fp_xm1 (see VARIANTS)")
 @click.option("--today_date", type=click.DateTime(["%Y-%m-%d"]), required=True,
               help="Date to use as effective model run date (YYYY-MM-DD)")
 @click.option("--short_run", is_flag=True, help="Run with reduced parameters for faster testing")
@@ -109,7 +136,7 @@ def main(variant: str, today_date: datetime.datetime, short_run: bool = False):
                                  "seasons", param_hint="--today_date")
 
     model_config, run_config = build_configs(variant, reference_date, short_run)
-    model = SARIXModel(model_config)
+    model = make_model(model_config)
     model.run(run_config)
     if model.sarix_fit.num_divergences > 0:
         print(f"WARNING: {model.sarix_fit.num_divergences} divergent transitions "

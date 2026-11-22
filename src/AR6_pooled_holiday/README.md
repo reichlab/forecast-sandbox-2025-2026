@@ -3,7 +3,7 @@
 AR(6) SARIX models for weekly flu hospital admissions (NHSN), the same as `AR6_pooled` (fourth root, scaled and
 centred by location, AR coefficients shared across locations), with multiplicative holiday effects from sarix's
 calendar effects ([sarix#17](https://github.com/reichlab/sarix/pull/17), not yet merged). One `main.py` produces
-five models, chosen with `--variant`:
+seven models, chosen with `--variant`:
 
 | variant   | model                          | holiday weeks                          | pooling                                        |
 |-----------|--------------------------------|----------------------------------------|------------------------------------------------|
@@ -12,6 +12,11 @@ five models, chosen with `--variant`:
 | `partial` | `UMass-AR6_pooled_cal_partial` | Christmas, New Year                    | per location, shrunk to a common effect        |
 | `xm1`     | `UMass-AR6_pooled_cal_xm1`     | week before Christmas, Christmas, New Year | shared                                     |
 | `xm1_ny1` | `UMass-AR6_pooled_cal_xm1_ny1` | week before Christmas, Christmas, New Year, week after New Year | shared                |
+| `fp_none` | `UMass-AR6_fourierP_thetaP_cal_none` | none: baseline for `fp_xm1` | |
+| `fp_xm1`  | `UMass-AR6_fourierP_thetaP_cal_xm1`  | as `xm1` | shared |
+
+The `fp_` variants add `AR6_fourierP_thetaP`'s Fourier seasonality (K = 2 harmonics, shared across locations). They
+were run after `xm1` was chosen, on all three seasons, so their scores are exploratory: no season is held out for them.
 
 Holiday weeks are the Sunday-Saturday weeks containing Christmas and New Year's Day, and the weeks before and after
 them, each with its own effect (see `VARIANTS` in `main.py` and `idmodels.calendar`). The effects multiply the rate
