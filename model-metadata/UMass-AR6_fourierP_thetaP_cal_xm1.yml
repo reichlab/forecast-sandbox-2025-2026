@@ -17,7 +17,7 @@ model_contributors: [
 ]
 license: "CC-BY-4.0"
 designated_model: false
-methods: "AR6_fourierP_thetaP (Fourier seasonality, K = 2, shared across locations) with multiplicative effects for the week before Christmas week and the Christmas and New Year's weeks, one effect per week shared by all locations."
+methods: "AR6_fourierP_thetaP (Fourier seasonality, K = 2, shared across locations) with multiplicative effects for the week before Christmas week and Christmas and New Year's weeks, shared across locations."
 data_inputs: "Weekly incident flu hospitalizations from NHSN."
 methods_long: "
   AR6_fourierP_thetaP (Fourier seasonality with K = 2 harmonics; Fourier and AR coefficients shared across locations)
