@@ -16,7 +16,7 @@ model_contributors: [
   }
 ]
 license: "CC-BY-4.0"
-designated_model: false
+designated_model: true
 methods: "AR6_fourierP_thetaP_cal_xm1 with an innovation sd that scales with the previous week's level, through a softplus link."
 data_inputs: "Weekly incident flu hospitalizations from NHSN."
 methods_long: "

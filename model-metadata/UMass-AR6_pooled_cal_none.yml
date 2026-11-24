@@ -16,7 +16,7 @@ model_contributors: [
   }
 ]
 license: "CC-BY-4.0"
-designated_model: false
+designated_model: true
 methods: "Baseline for the holiday-effect variants: the same model as AR6_pooled, with no holiday effects, run with the idmodels and sarix versions used by the holiday-effect variants (AR6_pooled_cal_*)."
 data_inputs: "Weekly incident flu hospitalizations from NHSN."
 methods_long: "

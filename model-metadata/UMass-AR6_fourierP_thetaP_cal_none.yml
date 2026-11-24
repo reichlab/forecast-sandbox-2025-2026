@@ -16,7 +16,7 @@ model_contributors: [
   }
 ]
 license: "CC-BY-4.0"
-designated_model: false
+designated_model: true
 methods: "AR6_fourierP_thetaP (Fourier seasonality, K = 2, shared across locations) without holiday effects, run with the same idmodels and sarix versions as AR6_fourierP_thetaP_cal_xm1."
 data_inputs: "Weekly incident flu hospitalizations from NHSN."
 methods_long: "

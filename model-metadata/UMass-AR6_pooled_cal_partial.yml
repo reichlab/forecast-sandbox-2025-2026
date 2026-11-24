@@ -16,7 +16,7 @@ model_contributors: [
   }
 ]
 license: "CC-BY-4.0"
-designated_model: false
+designated_model: true
 methods: "AR6_pooled with multiplicative effects for the Christmas and New Year's weeks, separate for each location and partially pooled toward a common effect per holiday."
 data_inputs: "Weekly incident flu hospitalizations from NHSN."
 methods_long: "
