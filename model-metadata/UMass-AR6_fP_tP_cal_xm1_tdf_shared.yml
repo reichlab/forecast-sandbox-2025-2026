@@ -1,0 +1,30 @@
+team_name: "UMass-Amherst"
+team_abbr: "UMass"
+model_name: "AR(6) pooled with Fourier seasonality, xm1 holiday effects and t innovations (shared df)"
+model_abbr: "AR6_fP_tP_cal_xm1_tdf_shared"
+model_version: "0.1"
+model_contributors: [
+  {
+    "name": "Evan Ray",
+    "affiliation": "UMass Amherst",
+    "email": "elray@umass.edu"
+  },
+  {
+    "name": "Nick Reich",
+    "affiliation": "UMass Amherst",
+    "email": "nick@umass.edu"
+  }
+]
+license: "CC-BY-4.0"
+designated_model: true
+methods: "AR6_fourierP_thetaP_cal_xm1 with Student's t innovations; degrees of freedom: one value shared by all locations."
+data_inputs: "Weekly incident flu hospitalizations from NHSN."
+methods_long: "
+  AR6_fourierP_thetaP_cal_xm1 (Fourier seasonality with K = 2 harmonics and holiday effects for the week before
+  Christmas week and the Christmas and New Year's weeks, all shared across locations) with Student's t innovations
+  instead of normal ones. The t is standardized so that sigma is the innovation standard deviation, with degrees of
+  freedom above 2 (one value shared by all locations). Uses development versions of sarix (t innovations, reichlab/sarix PR 18)
+  and idmodels (reichlab/idmodels PR 48). Code: src/AR6_fourierP_holiday_t (variant tdf_shared).
+  "
+ensemble_of_models: false
+ensemble_of_hub_models: false

@@ -1,0 +1,4 @@
+click
+python-dateutil
+# reichlab/idmodels branch sigma-level (level-dependent sd; pins sarix to reichlab/sarix#19)
+idmodels @ git+https://github.com/reichlab/idmodels@262c341aaf3332d0d8f8d437c09e67afe2c846f6

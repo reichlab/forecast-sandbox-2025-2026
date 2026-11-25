@@ -1,0 +1,30 @@
+team_name: "UMass-Amherst"
+team_abbr: "UMass"
+model_name: "AR(6) pooled, holiday effects: shared"
+model_abbr: "AR6_pooled_cal_shared"
+model_version: "0.1"
+model_contributors: [
+  {
+    "name": "Evan Ray",
+    "affiliation": "UMass Amherst",
+    "email": "elray@umass.edu"
+  },
+  {
+    "name": "Nick Reich",
+    "affiliation": "UMass Amherst",
+    "email": "nick@umass.edu"
+  }
+]
+license: "CC-BY-4.0"
+designated_model: true
+methods: "AR6_pooled with multiplicative effects for the Christmas and New Year's weeks, one effect per holiday shared by all locations."
+data_inputs: "Weekly incident flu hospitalizations from NHSN."
+methods_long: "
+  AR6_pooled with multiplicative effects for the Christmas and New Year's weeks, one effect per holiday shared by all locations.
+  Data are transformed as for AR6_pooled (rate per 100,000, fourth root, scaled and centred by location).
+  Holiday effects use calendar effects from a development version of sarix (reichlab/sarix PR 17):
+  the AR model is fit to the series with the effects divided out, and forecasts for holiday weeks are
+  multiplied back. Code: src/AR6_pooled_holiday.
+  "
+ensemble_of_models: false
+ensemble_of_hub_models: false

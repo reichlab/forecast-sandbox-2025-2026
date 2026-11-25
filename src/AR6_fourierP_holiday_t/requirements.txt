@@ -1,0 +1,4 @@
+click
+python-dateutil
+# reichlab/idmodels branch t-innovations (t innovations; pins sarix to reichlab/sarix#18)
+idmodels @ git+https://github.com/reichlab/idmodels@ddcf76da650a1fd276ba0e7c367f56fded3b3c04

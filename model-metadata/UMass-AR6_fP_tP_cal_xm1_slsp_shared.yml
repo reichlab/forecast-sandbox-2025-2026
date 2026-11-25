@@ -1,0 +1,31 @@
+team_name: "UMass-Amherst"
+team_abbr: "UMass"
+model_name: "AR(6) pooled with Fourier seasonality, xm1 holiday effects and a level-dependent innovation sd (softplus link)"
+model_abbr: "AR6_fP_tP_cal_xm1_slsp_shared"
+model_version: "0.1"
+model_contributors: [
+  {
+    "name": "Evan Ray",
+    "affiliation": "UMass Amherst",
+    "email": "elray@umass.edu"
+  },
+  {
+    "name": "Nick Reich",
+    "affiliation": "UMass Amherst",
+    "email": "nick@umass.edu"
+  }
+]
+license: "CC-BY-4.0"
+designated_model: true
+methods: "AR6_fourierP_thetaP_cal_xm1 with an innovation sd that scales with the previous week's level, through a softplus link."
+data_inputs: "Weekly incident flu hospitalizations from NHSN."
+methods_long: "
+  AR6_fourierP_thetaP_cal_xm1 (Fourier seasonality with K = 2 harmonics and holiday effects for the week before
+  Christmas week and the Christmas and New Year's weeks, all shared across locations) with an innovation standard
+  deviation that depends on the previous week's level: sigma * softplus(a + coef * x) / softplus(a), with x = y[t-1] - mean of y on the modelled
+  (fourth-root, centered and scaled) scale, with one coef shared by all locations and a learned offset a. Uses development versions of sarix
+  (level-dependent sd, reichlab/sarix PR 19) and idmodels (reichlab/idmodels PR 49).
+  Code: src/AR6_fourierP_holiday_sl (variant slsp_shared).
+  "
+ensemble_of_models: false
+ensemble_of_hub_models: false

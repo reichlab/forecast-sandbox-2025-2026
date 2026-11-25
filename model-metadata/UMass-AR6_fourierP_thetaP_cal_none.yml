@@ -1,0 +1,28 @@
+team_name: "UMass-Amherst"
+team_abbr: "UMass"
+model_name: "AR(6) pooled with Fourier seasonality, no holiday effects (baseline)"
+model_abbr: "AR6_fourierP_thetaP_cal_none"
+model_version: "0.1"
+model_contributors: [
+  {
+    "name": "Evan Ray",
+    "affiliation": "UMass Amherst",
+    "email": "elray@umass.edu"
+  },
+  {
+    "name": "Nick Reich",
+    "affiliation": "UMass Amherst",
+    "email": "nick@umass.edu"
+  }
+]
+license: "CC-BY-4.0"
+designated_model: true
+methods: "AR6_fourierP_thetaP (Fourier seasonality, K = 2, shared across locations) without holiday effects, run with the same idmodels and sarix versions as AR6_fourierP_thetaP_cal_xm1."
+data_inputs: "Weekly incident flu hospitalizations from NHSN."
+methods_long: "
+  AR6_fourierP_thetaP (Fourier seasonality with K = 2 harmonics; Fourier and AR coefficients shared across locations)
+  without holiday effects. It is the baseline for AR6_fourierP_thetaP_cal_xm1, run with the same idmodels and sarix
+  versions so that comparisons isolate the holiday effects. Code: src/AR6_pooled_holiday (variant fp_none).
+  "
+ensemble_of_models: false
+ensemble_of_hub_models: false
